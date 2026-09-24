@@ -148,5 +148,21 @@ class TestBarberApp(unittest.TestCase):
         res = client.post("/api/appointments", json=xss_payload)
         self.assertEqual(res.status_code, 200)
 
+    def test_09_live_agenda_and_kiosk_view(self):
+        # 1. Test live agenda API
+        res_api = client.get("/api/live-agenda")
+        self.assertEqual(res_api.status_code, 200)
+        data = res_api.json()
+        self.assertIn("in_service", data)
+        self.assertIn("next_up", data)
+        self.assertIn("upcoming", data)
+        self.assertIn("barbers", data)
+        self.assertIn("server_time", data)
+
+        # 2. Test HTML view serving
+        res_html = client.get("/live.html")
+        self.assertEqual(res_html.status_code, 200)
+        self.assertIn("AGENDA EN VIVO", res_html.text)
+
 if __name__ == "__main__":
     unittest.main()

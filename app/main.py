@@ -649,6 +649,129 @@ def get_ai_style_advice(req: StyleAdviceRequest):
 
 
 # ==========================================
+# AGENDA EN VIVO / PANTALLA EN TIEMPO REAL
+# ==========================================
+@app.get("/api/live-agenda")
+def get_live_agenda(
+    barber_id: Optional[int] = None,
+    target_date: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Retorna la agenda en vivo para hoy (o fecha especificada),
+    calculando en tiempo real quién está en atención ahora, quién sigue,
+    y la lista de turnos ordenada con estadísticas para pantalla o móvil.
+    """
+    now_dt = get_argentina_now()
+    if target_date:
+        try:
+            curr_date = datetime.strptime(target_date, "%Y-%m-%d").date()
+        except ValueError:
+            curr_date = now_dt.date()
+    else:
+        curr_date = now_dt.date()
+
+    start_day = datetime.combine(curr_date, datetime.min.time())
+    end_day = datetime.combine(curr_date, datetime.max.time())
+
+    query = db.query(Appointment).filter(
+        Appointment.appointment_time >= start_day,
+        Appointment.appointment_time <= end_day,
+        Appointment.canceled == False,
+        Appointment.status != "CANCELADO"
+    )
+    if barber_id:
+        query = query.filter(Appointment.barber_id == barber_id)
+
+    appts = query.order_by(Appointment.appointment_time.asc()).all()
+    now_naive = now_dt.replace(tzinfo=None) if curr_date == now_dt.date() else datetime.combine(curr_date, datetime.min.time())
+
+    in_service_list = []
+    next_up_list = []
+    upcoming_list = []
+    completed_list = []
+
+    for a in appts:
+        start_t = a.appointment_time
+        dur = a.duration_min or 45
+        end_t = a.end_time or (start_t + timedelta(minutes=dur))
+
+        # Calcular progreso si está en horario
+        progress_pct = 0
+        if start_t <= now_naive <= end_t and (end_t > start_t):
+            total_sec = (end_t - start_t).total_seconds()
+            elapsed_sec = (now_naive - start_t).total_seconds()
+            progress_pct = min(100, max(0, int((elapsed_sec / total_sec) * 100)))
+
+        item = {
+            "id": a.id,
+            "client_name": a.client_name,
+            "barber_id": a.barber_id,
+            "barber_name": a.barber_name or "General",
+            "service": a.service or "Corte de Autor",
+            "duration_min": dur,
+            "appointment_time": start_t.isoformat(),
+            "time_str": start_t.strftime("%H:%M"),
+            "end_time_str": end_t.strftime("%H:%M"),
+            "status": a.status,
+            "is_now": False,
+            "progress_pct": progress_pct
+        }
+
+        if a.status == "COMPLETADO":
+            completed_list.append(item)
+        elif a.status in ["EN_ATENCION", "EN_SILLON"] or (curr_date == now_dt.date() and start_t <= now_naive < end_t and a.status in ["PENDIENTE", "CONFIRMADO"]):
+            item["is_now"] = True
+            item["status"] = "EN SILLÓN"
+            in_service_list.append(item)
+        elif curr_date == now_dt.date() and end_t <= now_naive and a.status != "COMPLETADO":
+            item["status"] = "FINALIZADO"
+            completed_list.append(item)
+        else:
+            upcoming_list.append(item)
+
+    # Identificar siguiente en turno
+    if upcoming_list:
+        next_up_list.append(upcoming_list[0])
+
+    barbers = db.query(Barber).filter(Barber.is_active == True).order_by(Barber.display_order.asc()).all()
+    barbers_data = [{"id": b.id, "name": b.name, "avatar_url": b.avatar_url, "specialties": b.specialties} for b in barbers]
+    bName = get_setting(db, "barber_name", "BARBERÍA")
+
+    return {
+        "server_time": now_dt.strftime("%H:%M:%S"),
+        "server_date": curr_date.strftime("%Y-%m-%d"),
+        "barber_name": bName,
+        "total_today": len(appts),
+        "in_service": in_service_list,
+        "next_up": next_up_list,
+        "upcoming": upcoming_list,
+        "completed": completed_list,
+        "barbers": barbers_data
+    }
+
+@app.post("/api/live-agenda/{appointment_id}/status")
+def update_live_status(
+    appointment_id: int,
+    status_data: Dict[str, str],
+    db: Session = Depends(get_db)
+):
+    new_status = status_data.get("status")
+    if not new_status:
+        raise HTTPException(status_code=400, detail="Falta el estado.")
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Turno no encontrado.")
+    appt.status = new_status
+    if new_status == "COMPLETADO":
+        appt.confirmed = True
+    elif new_status == "CANCELADO":
+        appt.canceled = True
+    db.commit()
+    return {"message": "Estado actualizado exitosamente.", "id": appt.id, "status": appt.status}
+
+
+# ==========================================
 # APIS DEL SHOP BARBER (CATÁLOGO, CHECKOUT)
 # ==========================================
 @app.get("/api/shop/categories", response_model=List[CategoryRead])
@@ -1521,6 +1644,15 @@ def serve_shop():
     if os.path.exists(shop_path):
         return FileResponse(shop_path)
     raise HTTPException(status_code=404, detail="Página shop.html no encontrada.")
+
+@app.get("/live.html", include_in_schema=False)
+@app.get("/agenda.html", include_in_schema=False)
+@app.get("/agenda-en-vivo.html", include_in_schema=False)
+def serve_live():
+    live_path = os.path.join(STATIC_DIR, "live.html")
+    if os.path.exists(live_path):
+        return FileResponse(live_path)
+    raise HTTPException(status_code=404, detail="Página live.html no encontrada.")
 
 @app.get("/manifest.json", include_in_schema=False)
 def serve_manifest():

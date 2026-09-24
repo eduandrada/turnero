@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a0a0c">
+  <title>AGENDA EN VIVO // Sala de Espera</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --neon-volt: #d4ff00;
+      --neon-cyan: #00f2fe;
+      --bg-dark: #0a0a0c;
+      --card-bg: #131318;
+      --card-border: #23232c;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: #f3f4f6;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background-image: 
+        radial-gradient(at 10% 10%, rgba(212, 255, 0, 0.04) 0px, transparent 50%),
+        radial-gradient(at 90% 90%, rgba(0, 242, 254, 0.04) 0px, transparent 50%);
+    }
+
+    .font-mono-num {
+      font-family: 'Space Grotesk', monospace;
+    }
+
+    .border-glow-volt {
+      border-color: var(--neon-volt);
+      box-shadow: 0 0 25px rgba(212, 255, 0, 0.22);
+    }
+
+    .border-glow-cyan {
+      border-color: var(--neon-cyan);
+      box-shadow: 0 0 25px rgba(0, 242, 254, 0.22);
+    }
+
+    @keyframes pulseSoft {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.01); }
+    }
+
+    .animate-pulse-soft {
+      animation: pulseSoft 3s ease-in-out infinite;
+    }
+
+    /* Kiosk full screen custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0a0a0c; }
+    ::-webkit-scrollbar-thumb { background: #23232c; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #d4ff00; }
+
+    .live-progress-bar {
+      transition: width 1s linear;
+    }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen p-3 sm:p-6 antialiased selection:bg-[#d4ff00] selection:text-black">
+
+  <!-- TOP HEADER KIOSK -->
+  <header class="w-full max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 pb-4 border-b border-[#23232c]">
+    
+    <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+      <div class="flex items-center gap-2.5">
+        <span class="relative flex h-3.5 w-3.5">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-80"></span>
+          <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-red-500"></span>
+        </span>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] font-mono-num uppercase tracking-widest text-[#d4ff00] font-bold px-2 py-0.5 rounded bg-[#d4ff00]/10 border border-[#d4ff00]/20">SALA DE ESPERA // EN VIVO</span>
+            <span class="text-[10px] text-gray-500 font-mono-num hidden sm:inline" id="liveDateText">--/--/----</span>
+          </div>
+          <h1 class="text-xl sm:text-2xl font-extrabold font-mono-num text-white tracking-tight flex items-center gap-1" id="liveBarberTitle">
+            BARBERÍA<span class="text-[#d4ff00]">_</span>
+          </h1>
+        </div>
+      </div>
+
+      <div class="md:hidden flex items-center gap-2">
+        <button onclick="toggleFullScreen()" class="p-2 rounded-xl bg-[#131318] border border-[#23232c] text-xs font-mono-num text-gray-300">
+          ⛶
+        </button>
+      </div>
+    </div>
+
+    <!-- DIGITAL CLOCK & CONTROLS -->
+    <div class="flex flex-wrap items-center justify-between md:justify-end gap-3 w-full md:w-auto">
+      
+      <!-- Big Digital Clock -->
+      <div class="flex items-center gap-2 bg-[#131318] px-4 py-2 rounded-2xl border border-[#23232c] shadow-lg">
+        <span class="text-xs text-gray-400 font-mono-num">HORA:</span>
+        <span class="text-xl sm:text-2xl font-extrabold font-mono-num text-white tracking-wider" id="digitalClock">00:00:00</span>
+        <span class="text-[10px] font-mono-num text-[#d4ff00] font-bold">ART</span>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex items-center gap-2">
+        <button onclick="announceCurrentTurnVoice()" id="btnVoiceAnnounce" title="Anunciar Próximo Turno con Voz" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#131318] border border-[#23232c] text-xs font-mono-num text-gray-200 hover:border-[#d4ff00] hover:text-[#d4ff00] transition active:scale-95 shadow">
+          <span>🔔</span>
+          <span class="hidden sm:inline">Llamador</span>
+        </button>
+
+        <button onclick="toggleFullScreen()" title="Pantalla Completa Kiosk TV" class="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#131318] border border-[#23232c] text-xs font-mono-num text-gray-200 hover:border-[#00f2fe] hover:text-[#00f2fe] transition active:scale-95 shadow">
+          <span>⛶</span>
+          <span>TV Kiosk</span>
+        </button>
+
+        <button onclick="fetchLiveAgenda(true)" title="Refrescar Ahora" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#131318] border border-[#23232c] text-xs font-mono-num text-gray-200 hover:border-white transition active:scale-95 shadow">
+          <span id="refreshIcon">🔄</span>
+          <span class="hidden sm:inline">Refrescar</span>
+        </button>
+
+        <a href="/" class="px-3 py-2 rounded-xl bg-[#1a1a22] border border-[#23232c] text-xs font-mono-num text-gray-400 hover:text-white transition">
+          Turnero
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- AUTO-REFRESH PROGRESS BAR -->
+  <div class="w-full max-w-7xl mx-auto h-0.5 bg-[#1a1a22] overflow-hidden my-2">
+    <div id="refreshProgressBar" class="h-full bg-gradient-to-r from-[#00f2fe] to-[#d4ff00] w-full transition-all duration-300"></div>
+  </div>
+
+  <!-- SILLÓN / BARBER FILTER PILLS -->
+  <div class="w-full max-w-7xl mx-auto flex items-center gap-2 overflow-x-auto py-2 no-scrollbar" id="barberFilterBar">
+    <button onclick="filterByBarber(null)" id="btnFilterAll" class="px-4 py-2 rounded-xl font-mono-num text-xs font-bold shrink-0 transition bg-[#d4ff00] text-black shadow">
+      💈 Todos los Sillones
+    </button>
+    <!-- Dynamic Barbers injected here -->
+  </div>
+
+  <!-- MAIN KIOSK BOARD -->
+  <main class="w-full max-w-7xl mx-auto flex-1 flex flex-col gap-6 py-4">
+
+    <!-- TOP ROW: IN CHAIR NOW & UP NEXT (TV HIGHLIGHTS) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      
+      <!-- CARD 1: EN ATENCIÓN AHORA (EN SILLÓN) -->
+      <div class="bg-[#131318] border-2 border-glow-volt rounded-3xl p-5 sm:p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between animate-pulse-soft">
+        <div class="absolute -right-16 -top-16 w-36 h-36 bg-[#d4ff00]/10 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div>
+          <div class="flex items-center justify-between pb-3 border-b border-[#23232c]">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">💺</span>
+              <span class="text-xs font-mono-num font-bold text-[#d4ff00] tracking-widest uppercase">EN SILLÓN // ATENDIENDO AHORA</span>
+            </div>
+            <span class="px-2.5 py-1 rounded-full bg-[#d4ff00]/20 text-[#d4ff00] border border-[#d4ff00]/40 font-mono-num text-xs font-bold animate-pulse">
+              EN PROCESO
+            </span>
+          </div>
+
+          <div class="pt-4" id="inServiceContainer">
+            <!-- Dynamic In Service Content -->
+            <div class="text-center py-8">
+              <span class="text-3xl block mb-2">💈</span>
+              <h3 class="text-lg font-mono-num font-bold text-gray-300">Sillón Disponible</h3>
+              <p class="text-xs text-gray-500 font-mono-num mt-1">Esperando el próximo turno programado.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-4 mt-2 border-t border-[#23232c] flex justify-between items-center text-xs font-mono-num text-gray-400">
+          <span>Tiempo estimado de corte</span>
+          <span class="text-white font-bold" id="inServiceDuration">-- min</span>
+        </div>
+      </div>
+
+      <!-- CARD 2: SIGUIENTE EN TURNO (PREPARATE) -->
+      <div class="bg-[#131318] border-2 border-glow-cyan rounded-3xl p-5 sm:p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+        <div class="absolute -right-16 -top-16 w-36 h-36 bg-[#00f2fe]/10 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div>
+          <div class="flex items-center justify-between pb-3 border-b border-[#23232c]">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">⚡</span>
+              <span class="text-xs font-mono-num font-bold text-[#00f2fe] tracking-widest uppercase">SIGUIENTE EN TURNO // PREPÁRATE</span>
+            </div>
+            <span class="px-2.5 py-1 rounded-full bg-[#00f2fe]/20 text-[#00f2fe] border border-[#00f2fe]/40 font-mono-num text-xs font-bold">
+              PRÓXIMO EN SILLÓN
+            </span>
+          </div>
+
+          <div class="pt-4" id="nextUpContainer">
+            <!-- Dynamic Next Up Content -->
+            <div class="text-center py-8">
+              <span class="text-3xl block mb-2">⏳</span>
+              <h3 class="text-lg font-mono-num font-bold text-gray-300">Sin turnos inmediatos</h3>
+              <p class="text-xs text-gray-500 font-mono-num mt-1">La agenda para hoy se encuentra al día.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-4 mt-2 border-t border-[#23232c] flex justify-between items-center text-xs font-mono-num">
+          <span class="text-gray-400">Atento a la llamada del barbero</span>
+          <button onclick="announceCurrentTurnVoice()" class="text-[#00f2fe] hover:underline font-bold">
+            🔔 Anunciar por altavoz
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- MIDDLE SECTION: LISTA GENERAL DE TURNOS DE HOY -->
+    <div class="bg-[#131318] border border-[#23232c] rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col gap-4">
+      
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-3 border-b border-[#23232c]">
+        <div>
+          <h2 class="text-lg font-mono-num font-extrabold text-white flex items-center gap-2">
+            <span>📋</span> Agenda Completa del Día en Vivo
+          </h2>
+          <p class="text-xs text-gray-400 font-mono-num">Cronograma ordenado por horario para seguimiento de clientes y barberos.</p>
+        </div>
+
+        <div class="flex items-center gap-2 font-mono-num text-xs">
+          <span class="px-2.5 py-1 rounded-lg bg-[#1a1a22] border border-[#23232c] text-gray-300" id="statTotalToday">Total: 0</span>
+          <span class="px-2.5 py-1 rounded-lg bg-[#d4ff00]/10 text-[#d4ff00] border border-[#d4ff00]/20" id="statRemaining">Restantes: 0</span>
+        </div>
+      </div>
+
+      <!-- APPOINTMENTS TABLE / GRID -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left font-mono-num text-xs">
+          <thead>
+            <tr class="text-gray-400 border-b border-[#23232c]">
+              <th class="py-3 px-3">HORARIO</th>
+              <th class="py-3 px-3">CLIENTE</th>
+              <th class="py-3 px-3">BARBERO</th>
+              <th class="py-3 px-3">SERVICIO</th>
+              <th class="py-3 px-3">DURACIÓN</th>
+              <th class="py-3 px-3">ESTADO</th>
+              <th class="py-3 px-3 text-right">ACCIÓN</th>
+            </tr>
+          </thead>
+          <tbody id="upcomingTableBody" class="divide-y divide-[#23232c]">
+            <!-- Dynamic rows -->
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- COMPLETED SECTION (ACCORDION / STATS) -->
+    <div class="bg-[#131318] border border-[#23232c] rounded-3xl p-4 shadow flex flex-col gap-2">
+      <div onclick="toggleCompletedSection()" class="flex justify-between items-center cursor-pointer p-2 rounded-xl hover:bg-white/5 transition">
+        <div class="flex items-center gap-2">
+          <span>✓</span>
+          <span class="text-xs font-mono-num font-bold text-gray-300">Turnos Finalizados Hoy</span>
+          <span class="text-[10px] font-mono-num bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full border border-green-500/30" id="badgeCompletedCount">0</span>
+        </div>
+        <span class="text-xs font-mono-num text-gray-500" id="arrowCompleted">▼ Mostrar</span>
+      </div>
+
+      <div id="completedListContainer" class="hidden overflow-x-auto pt-2 border-t border-[#23232c]">
+        <table class="w-full text-left font-mono-num text-xs text-gray-400">
+          <tbody id="completedTableBody" class="divide-y divide-[#23232c]"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="w-full max-w-7xl mx-auto pt-6 text-center text-xs font-mono-num text-gray-600 flex flex-col sm:flex-row justify-between items-center gap-2">
+    <div>SISTEMA DE TURNOS EN VIVO // BLADESYNC 2026</div>
+    <div class="flex items-center gap-3">
+      <a href="/" class="hover:text-gray-400">Ir al Turnero</a>
+      <span>•</span>
+      <a href="/shop.html" class="hover:text-gray-400">Shop Barber</a>
+      <span>•</span>
+      <a href="/admin.html" class="hover:text-gray-400">Administración</a>
+    </div>
+  </footer>
+
+  <!-- SCRIPT CONTROLLER -->
+  <script>
+    let liveState = {
+      selectedBarberId: null,
+      agendaData: null,
+      autoRefreshTimer: null,
+      progressTimer: null,
+      secondsRemaining: 12,
+      refreshInterval: 12
+    };
+
+    // UI Sound Synthesizer
+    const UISound = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === "suspended") this.ctx.resume();
+      },
+      playChime() {
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          // Dual pleasant chime (E5 -> G5 -> C6)
+          const notes = [659.25, 783.99, 1046.50];
+          notes.forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.type = "sine";
+            const startTime = now + (idx * 0.12);
+            osc.frequency.setValueAtTime(freq, startTime);
+            gain.gain.setValueAtTime(0.18, startTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
+            osc.start(startTime);
+            osc.stop(startTime + 0.4);
+          });
+        } catch(e) {}
+      }
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+      initDigitalClock();
+      fetchLiveAgenda();
+      startAutoRefresh();
+
+      // Fullscreen change handler
+      document.addEventListener("fullscreenchange", () => {
+        const btn = document.getElementById("btnVoiceAnnounce");
+      });
+    });
+
+    function initDigitalClock() {
+      const clockEl = document.getElementById("digitalClock");
+      const dateEl = document.getElementById("liveDateText");
+      
+      const update = () => {
+        const now = new Date();
+        if (clockEl) clockEl.textContent = now.toTimeString().split(" ")[0];
+        if (dateEl) {
+          const d = String(now.getDate()).padStart(2, "0");
+          const m = String(now.getMonth() + 1).padStart(2, "0");
+          const y = now.getFullYear();
+          dateEl.textContent = `${d}/${m}/${y}`;
+        }
+      };
+      update();
+      setInterval(update, 1000);
+    }
+
+    async function fetchLiveAgenda(manual = false) {
+      const icon = document.getElementById("refreshIcon");
+      if (manual && icon) icon.classList.add("animate-spin");
+
+      try {
+        let url = "/api/live-agenda";
+        if (liveState.selectedBarberId) {
+          url += `?barber_id=${liveState.selectedBarberId}`;
+        }
+
+        const res = await fetch(url);
+        if (res.ok) {
+          liveState.agendaData = await res.json();
+          renderLiveBoard();
+        }
+      } catch (e) {
+        console.error("Error al obtener agenda en vivo:", e);
+      } finally {
+        if (manual && icon) {
+          setTimeout(() => icon.classList.remove("animate-spin"), 500);
+        }
+        resetProgressTimer();
+      }
+    }
+
+    function renderLiveBoard() {
+      const data = liveState.agendaData;
+      if (!data) return;
+
+      // Update Barber Brand Title
+      const titleEl = document.getElementById("liveBarberTitle");
+      if (titleEl && data.barber_name) {
+        titleEl.innerHTML = `${escapeHtml(data.barber_name.toUpperCase())}<span class="text-[#d4ff00]">_</span>`;
+      }
+      document.title = `${data.barber_name} // Agenda en Vivo`;
+
+      // Render Barbers Filter Bar
+      renderBarbersFilterBar(data.barbers);
+
+      // Render In Service (In Chair Now)
+      renderInService(data.in_service);
+
+      // Render Next Up (Siguiente en Turno)
+      renderNextUp(data.next_up);
+
+      // Render Upcoming Queue
+      renderUpcomingQueue(data.upcoming);
+
+      // Render Completed
+      renderCompleted(data.completed);
+
+      // Render Stats
+      const totalEl = document.getElementById("statTotalToday");
+      const remEl = document.getElementById("statRemaining");
+      if (totalEl) totalEl.textContent = `Total Hoy: ${data.total_today}`;
+      if (remEl) remEl.textContent = `Restantes: ${data.upcoming.length + data.in_service.length}`;
+    }
+
+    function renderBarbersFilterBar(barbers) {
+      const container = document.getElementById("barberFilterBar");
+      if (!container || !barbers) return;
+
+      // Keep only first button (Todos) and append barbers
+      const allBtn = document.getElementById("btnFilterAll");
+      container.innerHTML = "";
+      if (allBtn) {
+        allBtn.className = `px-4 py-2 rounded-xl font-mono-num text-xs font-bold shrink-0 transition ${
+          liveState.selectedBarberId === null ? "bg-[#d4ff00] text-black shadow" : "bg-[#131318] text-gray-300 border border-[#23232c]"
+        }`;
+        container.appendChild(allBtn);
+      }
+
+      barbers.forEach(b => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `px-4 py-2 rounded-xl font-mono-num text-xs font-bold shrink-0 transition flex items-center gap-2 ${
+          liveState.selectedBarberId === b.id ? "bg-[#d4ff00] text-black shadow" : "bg-[#131318] text-gray-300 border border-[#23232c]"
+        }`;
+        btn.innerHTML = `
+          <img src="${b.avatar_url || 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=400&q=80'}" class="w-4 h-4 rounded-full object-cover">
+          <span>${escapeHtml(b.name)}</span>
+        `;
+        btn.onclick = () => filterByBarber(b.id);
+        container.appendChild(btn);
+      });
+    }
+
+    function filterByBarber(id) {
+      liveState.selectedBarberId = id;
+      fetchLiveAgenda(true);
+    }
+
+    function renderInService(inServiceList) {
+      const container = document.getElementById("inServiceContainer");
+      const durationEl = document.getElementById("inServiceDuration");
+      if (!container) return;
+
+      if (!inServiceList || inServiceList.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-6">
+            <span class="text-3xl block mb-2">💈</span>
+            <h3 class="text-lg font-mono-num font-bold text-gray-300">Sillón Disponible</h3>
+            <p class="text-xs text-gray-500 font-mono-num mt-1">No hay ningún corte en curso en este momento.</p>
+          </div>
+        `;
+        if (durationEl) durationEl.textContent = "-- min";
+        return;
+      }
+
+      const cur = inServiceList[0];
+      if (durationEl) durationEl.textContent = `${cur.duration_min} minutos`;
+
+      container.innerHTML = `
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono-num text-gray-400">TURNO ACTUAL:</span>
+            <span class="text-sm font-bold font-mono-num text-[#d4ff00]">${cur.time_str} a ${cur.end_time_str} hs</span>
+          </div>
+
+          <h3 class="text-2xl sm:text-3xl font-extrabold font-mono-num text-white tracking-tight break-words">
+            ${escapeHtml(cur.client_name.toUpperCase())}
+          </h3>
+
+          <div class="grid grid-cols-2 gap-2 text-xs font-mono-num bg-black/40 p-3 rounded-2xl border border-[#23232c]">
+            <div>
+              <span class="text-gray-500 block text-[10px]">BARBERO ASIGNADO:</span>
+              <span class="text-white font-bold">${escapeHtml(cur.barber_name)}</span>
+            </div>
+            <div>
+              <span class="text-gray-500 block text-[10px]">SERVICIO:</span>
+              <span class="text-[#d4ff00] font-bold">${escapeHtml(cur.service)}</span>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div>
+            <div class="flex justify-between text-[10px] font-mono-num text-gray-400 mb-1">
+              <span>Progreso de atención</span>
+              <span>${cur.progress_pct}%</span>
+            </div>
+            <div class="w-full bg-[#1a1a22] h-2 rounded-full overflow-hidden border border-[#23232c]">
+              <div class="bg-[#d4ff00] h-full rounded-full live-progress-bar" style="width: ${cur.progress_pct}%;"></div>
+            </div>
+          </div>
+
+          <button onclick="changeAppointmentStatus(${cur.id}, 'COMPLETADO')" class="w-full mt-2 py-3 rounded-xl bg-[#d4ff00] text-black font-mono-num font-bold text-xs hover:bg-[#d4ff00]/90 transition shadow flex items-center justify-center gap-1.5">
+            <span>✓ FINALIZAR CORTE</span>
+          </button>
+        </div>
+      `;
+    }
+
+    function renderNextUp(nextUpList) {
+      const container = document.getElementById("nextUpContainer");
+      if (!container) return;
+
+      if (!nextUpList || nextUpList.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-6">
+            <span class="text-3xl block mb-2">⏳</span>
+            <h3 class="text-lg font-mono-num font-bold text-gray-300">Sin turnos pendientes</h3>
+            <p class="text-xs text-gray-500 font-mono-num mt-1">Todos los turnos de hoy fueron atendidos.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const nxt = nextUpList[0];
+
+      container.innerHTML = `
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono-num text-gray-400">HORARIO ESTIMADO:</span>
+            <span class="text-base font-bold font-mono-num text-[#00f2fe]">${nxt.time_str} hs</span>
+          </div>
+
+          <h3 class="text-2xl sm:text-3xl font-extrabold font-mono-num text-white tracking-tight break-words">
+            ${escapeHtml(nxt.client_name.toUpperCase())}
+          </h3>
+
+          <div class="grid grid-cols-2 gap-2 text-xs font-mono-num bg-black/40 p-3 rounded-2xl border border-[#23232c]">
+            <div>
+              <span class="text-gray-500 block text-[10px]">CON BARBERO:</span>
+              <span class="text-white font-bold">${escapeHtml(nxt.barber_name)}</span>
+            </div>
+            <div>
+              <span class="text-gray-500 block text-[10px]">SERVICIO:</span>
+              <span class="text-[#00f2fe] font-bold">${escapeHtml(nxt.service)}</span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 mt-1">
+            <button onclick="changeAppointmentStatus(${nxt.id}, 'EN_ATENCION')" class="flex-1 py-3 rounded-xl bg-[#00f2fe] text-black font-mono-num font-bold text-xs hover:bg-[#00f2fe]/90 transition shadow flex items-center justify-center gap-1.5">
+              <span>💺 PASAR A SILLÓN</span>
+            </button>
+            <button onclick="announceSpecificClient('${escapeHtml(nxt.client_name)}', '${escapeHtml(nxt.barber_name)}')" class="px-4 py-3 rounded-xl bg-[#1a1a22] border border-[#23232c] text-[#00f2fe] font-mono-num font-bold text-xs hover:border-[#00f2fe] transition" title="Llamar Cliente">
+              🔔
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderUpcomingQueue(upcomingList) {
+      const tbody = document.getElementById("upcomingTableBody");
+      if (!tbody) return;
+
+      tbody.innerHTML = "";
+
+      if (!upcomingList || upcomingList.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="py-8 text-center text-gray-500 font-mono-num">
+              No hay turnos pendientes para la jornada de hoy.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      upcomingList.forEach((a, idx) => {
+        const isNext = idx === 0;
+        const tr = document.createElement("tr");
+        tr.className = `hover:bg-white/5 transition ${isNext ? "bg-[#00f2fe]/5 border-l-2 border-l-[#00f2fe]" : ""}`;
+
+        tr.innerHTML = `
+          <td class="py-3 px-3 font-bold ${isNext ? "text-[#00f2fe] text-sm" : "text-white"}">
+            ${a.time_str} hs
+          </td>
+          <td class="py-3 px-3 font-bold text-white">
+            ${escapeHtml(a.client_name)}
+            ${isNext ? '<span class="ml-2 text-[9px] px-1.5 py-0.5 rounded bg-[#00f2fe]/20 text-[#00f2fe] uppercase">SIGUIENTE</span>' : ''}
+          </td>
+          <td class="py-3 px-3 text-gray-300">
+            ${escapeHtml(a.barber_name)}
+          </td>
+          <td class="py-3 px-3 text-gray-400">
+            ${escapeHtml(a.service)}
+          </td>
+          <td class="py-3 px-3 text-gray-500">
+            ${a.duration_min} min
+          </td>
+          <td class="py-3 px-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${
+              a.status === 'CONFIRMADO' ? 'bg-green-500/15 text-green-400 border border-green-500/30' : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+            }">
+              ${a.status}
+            </span>
+          </td>
+          <td class="py-3 px-3 text-right">
+            <div class="flex items-center justify-end gap-1">
+              <button onclick="changeAppointmentStatus(${a.id}, 'EN_ATENCION')" class="px-2.5 py-1 rounded bg-[#d4ff00]/10 border border-[#d4ff00]/30 text-[#d4ff00] hover:bg-[#d4ff00] hover:text-black transition text-[11px] font-bold" title="Iniciar">
+                Iniciar
+              </button>
+              <button onclick="changeAppointmentStatus(${a.id}, 'COMPLETADO')" class="px-2.5 py-1 rounded bg-white/5 border border-white/10 text-gray-300 hover:text-white transition text-[11px]" title="Completar">
+                ✓
+              </button>
+            </div>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderCompleted(completedList) {
+      const tbody = document.getElementById("completedTableBody");
+      const badge = document.getElementById("badgeCompletedCount");
+      if (!tbody) return;
+
+      tbody.innerHTML = "";
+      if (badge) badge.textContent = completedList ? completedList.length : 0;
+
+      if (!completedList || completedList.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="4" class="py-3 text-center text-gray-600">Ningún turno finalizado todavía.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      completedList.forEach(a => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="py-2 px-3 text-gray-500">${a.time_str} hs</td>
+          <td class="py-2 px-3 text-gray-300 font-bold">${escapeHtml(a.client_name)}</td>
+          <td class="py-2 px-3 text-gray-500">${escapeHtml(a.barber_name)}</td>
+          <td class="py-2 px-3 text-green-400 text-right">✓ Atendido</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function toggleCompletedSection() {
+      const container = document.getElementById("completedListContainer");
+      const arrow = document.getElementById("arrowCompleted");
+      if (!container) return;
+
+      container.classList.toggle("hidden");
+      if (arrow) {
+        arrow.textContent = container.classList.contains("hidden") ? "▼ Mostrar" : "▲ Ocultar";
+      }
+    }
+
+    async function changeAppointmentStatus(apptId, newStatus) {
+      try {
+        UISound.playChime();
+        const res = await fetch(`/api/live-agenda/${apptId}/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus })
+        });
+        if (res.ok) {
+          fetchLiveAgenda(true);
+        }
+      } catch (e) {
+        console.error("Error cambiando estado:", e);
+      }
+    }
+
+    // Voice & Chime Announcer
+    function announceCurrentTurnVoice() {
+      if (!liveState.agendaData) return;
+      const nxt = liveState.agendaData.next_up && liveState.agendaData.next_up.length > 0 ? liveState.agendaData.next_up[0] : null;
+      if (nxt) {
+        announceSpecificClient(nxt.client_name, nxt.barber_name);
+      } else {
+        announceText("No hay turnos inmediatos en espera.");
+      }
+    }
+
+    function announceSpecificClient(clientName, barberName) {
+      UISound.playChime();
+      setTimeout(() => {
+        const text = `Siguiente turno: ${clientName}, con ${barberName}. Por favor pasar al sillón.`;
+        announceText(text);
+      }, 500);
+    }
+
+    function announceText(text) {
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "es-AR";
+        utterance.rate = 0.95;
+        utterance.pitch = 1.0;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {});
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    function startAutoRefresh() {
+      liveState.secondsRemaining = liveState.refreshInterval;
+      resetProgressTimer();
+
+      liveState.autoRefreshTimer = setInterval(() => {
+        fetchLiveAgenda(false);
+      }, liveState.refreshInterval * 1000);
+    }
+
+    function resetProgressTimer() {
+      const bar = document.getElementById("refreshProgressBar");
+      if (!bar) return;
+
+      bar.style.transition = "none";
+      bar.style.width = "100%";
+
+      setTimeout(() => {
+        bar.style.transition = `width ${liveState.refreshInterval}s linear`;
+        bar.style.width = "0%";
+      }, 50);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>

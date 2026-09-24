@@ -1,0 +1,23 @@
+🚀 1. Configuración de Start Command en Render
+Para desplegar tu aplicación FastAPI en Render.com (Web Service), coloca exactamente el siguiente comando en el campo Start Command:
+
+bash
+uvicorn app.main:app --host 0.0.0.0 --port $PORT
+📋 Resumen completo de configuración en Render:
+Campo en Render	Valor a ingresar
+Name	turnero-barberia (o el nombre que elijas)
+Runtime	Python
+Build Command	pip install -r requirements.txt
+Start Command	uvicorn app.main:app --host 0.0.0.0 --port $PORT
+🔑 Variables de Entorno Recomendadas en Render (Environment Variables):
+PYTHON_VERSION = 3.10 (o 3.11 / 3.12)
+SECRET_KEY = tu_clave_secreta_aqui
+TIMEZONE = America/Argentina/Catamarca
+🐙 2. Comandos para subir tu código a GitHub
+Ya hemos inicializado el repositorio local y creado el commit inicial con todo el proyecto ordenado. Ahora ejecuta en tu terminal los siguientes comandos para conectarlo y subirlo a GitHub:
+
+bash
+git remote add origin https://github.com/eduandrada/turnero.git
+git push -u origin main
+(Si ya tenías el remote configurado y quieres forzar la rama principal, puedes ejecutar git push -u origin main directamente).
+
