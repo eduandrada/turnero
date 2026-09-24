@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="es" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a0a0c">
+  <meta name="description" content="Barbería Don Carlos - Sistema de reservas de alta gama para barberías de autor y shop de productos profesionales.">
+  <title id="headTitle">BARBERÍA DON CARLOS // Turnero & Shop</title>
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts: Space Grotesk & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"Space Grotesk"', 'monospace'],
+          },
+          colors: {
+            obsidian: '#0a0a0c',
+            surface: '#131318',
+            surfaceElevated: '#1a1a22',
+            surfaceBorder: '#23232c',
+            neonVolt: '#d4ff00',
+            neonCyan: '#00f2fe',
+            neonPurple: '#a855f7'
+          },
+          boxShadow: {
+            'volt-sm': '0 0 14px rgba(212, 255, 0, 0.28)',
+            'volt-md': '0 0 28px rgba(212, 255, 0, 0.38)',
+            'cyan-sm': '0 0 14px rgba(0, 242, 254, 0.28)',
+            'cyber': '0 10px 36px 0 rgba(0, 0, 0, 0.75)'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0a0a0c; }
+    ::-webkit-scrollbar-thumb { background: #23232c; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #d4ff00; }
+
+    body {
+      background-color: #0a0a0c;
+      background-image: 
+        radial-gradient(at 15% 10%, rgba(212, 255, 0, 0.05) 0px, transparent 40%),
+        radial-gradient(at 85% 90%, rgba(0, 242, 254, 0.04) 0px, transparent 45%);
+      color: #f3f4f6;
+      min-height: 100vh;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .glass-card {
+      background: rgba(19, 19, 24, 0.84);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .glass-card-interactive {
+      background: rgba(19, 19, 24, 0.88);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-card-interactive:hover {
+      border-color: rgba(212, 255, 0, 0.38);
+      transform: translateY(-2px);
+    }
+    .glass-card-interactive:active {
+      transform: scale(0.985);
+    }
+
+    .neon-border-active {
+      border-color: #d4ff00 !important;
+      box-shadow: 0 0 18px rgba(212, 255, 0, 0.22);
+      background: rgba(212, 255, 0, 0.05) !important;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center p-3 sm:p-5 antialiased selection:bg-neonVolt selection:text-black">
+
+  <!-- REPRODUCTOR DE MÚSICA DE FONDO (AUDIO ONLY, SIN VIDEO VISIBLE) -->
+  <audio id="bgMusicPlayer" loop preload="auto" src="/static/musica%20punchi/punchi.mp4"></audio>
+
+  <!-- Main Container Mobile First -->
+  <div class="w-full max-w-lg flex flex-col gap-4 pb-20">
+    
+    <!-- Top Bar & Brand Identity (Siempre Visible) -->
+    <header class="flex justify-between items-center pt-2 px-1">
+      <div onclick="navigateTo('screen-intro')" class="cursor-pointer group">
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] font-mono tracking-widest text-neonVolt uppercase font-bold px-2 py-0.5 rounded bg-neonVolt/10 border border-neonVolt/20" id="badgeEst">EST. 2026</span>
+          <span class="text-[10px] font-mono tracking-widest text-neonCyan uppercase font-bold" id="badgeSub">ATELIER DE AUTOR</span>
+        </div>
+        <h1 class="text-xl sm:text-2xl font-extrabold font-mono tracking-tight text-white mt-0.5 flex items-center group-hover:text-neonVolt transition" id="appBrandTitle">
+          DON CARLOS<span class="text-neonVolt animate-pulse">_</span>
+        </h1>
+      </div>
+
+      <div class="flex flex-col items-end gap-1.5">
+        <!-- BOTÓN MUTE / DESMUTE MÚSICA DE FONDO -->
+        <div class="flex items-center gap-2">
+          <button type="button" id="btnAudioToggle" onclick="toggleBgMusic()" class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface border border-surfaceBorder text-[11px] font-mono font-bold text-neonVolt hover:border-neonVolt/50 transition">
+            <span id="audioIcon">🔇</span>
+            <span id="audioText">Música</span>
+          </button>
+          
+          <div class="flex items-center gap-1.5 bg-surface px-2.5 py-1 rounded-full border border-surfaceBorder shadow-sm">
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-neonVolt opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-neonVolt"></span>
+            </span>
+            <span class="text-[11px] font-mono font-medium text-gray-200">AGENDA EN VIVO</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <a href="/shop.html" class="text-[11px] font-mono text-neonCyan hover:underline">🛍️ Shop Barber</a>
+          <span class="text-gray-600">•</span>
+          <a href="/admin.html" class="text-[11px] font-mono text-gray-400 hover:text-white">🔑 Admin</a>
+          <span class="text-gray-600">•</span>
+          <span class="text-[10px] font-mono text-gray-400" id="liveClock">00:00:00</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- STEP PROGRESS BAR & BACK BUTTON -->
+    <div id="stepNavigator" class="hidden glass-card rounded-2xl p-3 flex flex-col gap-2.5 border border-surfaceBorder shadow-sm">
+      <div class="flex items-center justify-between">
+        <button type="button" onclick="goBack()" class="flex items-center gap-1.5 text-xs font-mono text-gray-300 hover:text-neonVolt active:scale-95 transition px-2 py-1 rounded-lg bg-white/5 border border-white/5 hover:border-neonVolt/40">
+          <span>←</span>
+          <span>Volver</span>
+        </button>
+        <span class="text-[11px] font-mono text-neonVolt font-bold tracking-wider" id="stepCounterText">PASO 1 DE 4</span>
+      </div>
+
+      <!-- Stepper Indicator Dots -->
+      <div class="grid grid-cols-4 gap-1.5">
+        <div id="stepPill1" class="h-1.5 rounded-full bg-neonVolt shadow-volt-sm transition-all"></div>
+        <div id="stepPill2" class="h-1.5 rounded-full bg-surfaceBorder transition-all"></div>
+        <div id="stepPill3" class="h-1.5 rounded-full bg-surfaceBorder transition-all"></div>
+        <div id="stepPill4" class="h-1.5 rounded-full bg-surfaceBorder transition-all"></div>
+      </div>
+
+      <!-- Breadcrumb -->
+      <div class="flex items-center justify-between text-[11px] font-mono text-gray-400 px-0.5">
+        <span id="breadcrumbCurrentStep" class="truncate max-w-[200px] text-white font-medium">1. Elige tu Barbero/a</span>
+        <span id="breadcrumbSelectedItems" class="text-neonCyan truncate max-w-[170px] text-right"></span>
+      </div>
+    </div>
+
+
+    <!-- PANTALLA 0: INTRO / SPLASH CON LOGO -->
+    <section id="screen-intro" class="screen-view glass-card rounded-3xl p-6 sm:p-8 flex flex-col items-center text-center gap-6 shadow-cyber border border-surfaceBorder relative overflow-hidden animate-fade-in">
+      <div class="absolute -right-20 -top-20 w-48 h-48 bg-neonVolt/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -left-20 -bottom-20 w-48 h-48 bg-neonCyan/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Logo Badge -->
+      <div class="relative w-28 h-28 rounded-full bg-gradient-to-tr from-surfaceElevated to-surface flex items-center justify-center border-2 border-neonVolt/40 shadow-volt-md">
+        <svg class="w-16 h-16 text-neonVolt" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="32" cy="32" r="30" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.3"/>
+          <path d="M20 18L44 46M24 16C21 16 18 19 18 22C18 25 21 28 24 28C27 28 30 25 30 22C30 19 27 16 24 16Z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M44 18L20 46M40 16C43 16 46 19 46 22C46 25 43 28 40 28C37 28 34 25 34 22C34 19 37 16 40 16Z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="32" y1="28" x2="32" y2="48" stroke="#00f2fe" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="32" cy="28" r="2.5" fill="#00f2fe"/>
+        </svg>
+        <span class="absolute -bottom-2 bg-obsidian text-neonVolt text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border border-neonVolt/40 tracking-widest uppercase" id="splashBadgeText">
+          BARBERÍA
+        </span>
+      </div>
+
+      <div class="flex flex-col gap-1.5 max-w-sm">
+        <h2 class="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-white" id="splashTitleText">
+          BARBERÍA DON CARLOS
+        </h2>
+        <p class="text-xs sm:text-sm text-gray-300 leading-relaxed" id="splashSubText">
+          Tu estilo comienza acá. Reservá tu turno en 60 segundos o visitá nuestra tienda Shop Barber.
+        </p>
+      </div>
+
+      <!-- Highlights Pills -->
+      <div class="grid grid-cols-3 gap-2 w-full max-w-xs text-[10px] font-mono text-gray-300">
+        <div class="bg-surfaceElevated border border-surfaceBorder rounded-xl p-2 flex flex-col items-center">
+          <span class="text-neonVolt text-sm mb-0.5">💈</span>
+          <span>Barberos Top</span>
+        </div>
+        <div class="bg-surfaceElevated border border-surfaceBorder rounded-xl p-2 flex flex-col items-center">
+          <span class="text-neonVolt text-sm mb-0.5">⚡</span>
+          <span>Visagismo IA</span>
+        </div>
+        <a href="/shop.html" class="bg-surfaceElevated border border-surfaceBorder rounded-xl p-2 flex flex-col items-center hover:border-neonCyan transition">
+          <span class="text-neonCyan text-sm mb-0.5">🛍️</span>
+          <span>Shop Barber</span>
+        </a>
+      </div>
+
+      <!-- Action Button -->
+      <div class="flex flex-col gap-2 w-full max-w-xs">
+        <button type="button" onclick="navigateTo('screen-barber')" class="w-full py-4 px-6 rounded-2xl bg-neonVolt text-obsidian font-mono font-bold text-sm hover:bg-neonVolt/90 active:scale-[0.98] transition shadow-volt-md flex items-center justify-center gap-2">
+          <span>RESERVAR TURNO</span>
+          <span class="text-base font-extrabold">→</span>
+        </button>
+
+        <a href="/shop.html" class="w-full py-3 px-6 rounded-2xl bg-surfaceElevated border border-surfaceBorder text-neonCyan font-mono font-bold text-xs hover:border-neonCyan transition flex items-center justify-center gap-2">
+          <span>VER SHOP DE PRODUCTOS</span>
+          <span>🛍️</span>
+        </a>
+      </div>
+    </section>
+
+
+    <!-- PANTALLA 1: ELEGIR BARBERO/A -->
+    <section id="screen-barber" class="screen-view hidden flex flex-col gap-4 animate-fade-in">
+      <div class="px-1">
+        <span class="text-[11px] font-mono text-neonVolt font-bold tracking-wider uppercase block mb-0.5">PASO 01</span>
+        <h2 class="text-xl sm:text-2xl font-bold font-mono text-white">¿Con quién te gustaría atenderte?</h2>
+        <p class="text-xs text-gray-400 mt-1" id="textBarbersDesc">Selecciona al profesional para tu atención:</p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="barbersGrid"></div>
+
+      <div class="pt-2">
+        <button type="button" id="btnContinueFromBarber" onclick="continueToServices()" class="w-full py-4 rounded-xl bg-neonVolt text-obsidian font-mono font-bold text-xs sm:text-sm hover:bg-neonVolt/90 active:scale-[0.99] transition shadow-volt-sm flex items-center justify-center gap-2">
+          <span id="btnBarberText">CONTINUAR CON ESTE BARBERO</span>
+          <span class="text-base">→</span>
+        </button>
+      </div>
+    </section>
+
+
+    <!-- PANTALLA 2: ELEGIR ESTILO DE CORTE & PRECIO -->
+    <section id="screen-service" class="screen-view hidden flex flex-col gap-4 animate-fade-in">
+      <div class="px-1">
+        <span class="text-[11px] font-mono text-neonVolt font-bold tracking-wider uppercase block mb-0.5">PASO 02</span>
+        <h2 class="text-xl sm:text-2xl font-bold font-mono text-white">Selecciona tu Estilo de Corte</h2>
+        <p class="text-xs text-gray-400 mt-1" id="textServicesDesc">Conoce las opciones de autor, duración y precio transparente:</p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="servicesGrid"></div>
+
+      <!-- Asesor Morfológico IA -->
+      <div class="mt-1">
+        <button type="button" onclick="toggleAIAdvisor()" class="w-full py-3 px-4 rounded-xl bg-surfaceElevated hover:bg-white/10 active:scale-[0.99] border border-surfaceBorder hover:border-neonVolt/40 text-xs font-mono flex items-center justify-between text-gray-300 transition">
+          <span class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded-md bg-neonVolt/15 flex items-center justify-center text-neonVolt font-bold text-xs">⚡</span>
+            <span>¿Dudas con tu corte? <strong>Asesor de Visagismo IA</strong></span>
+          </span>
+          <span id="aiToggleIcon" class="text-[11px] text-neonVolt font-bold font-mono tracking-wider">+ CONSULTAR IA</span>
+        </button>
+
+        <div id="aiAdvisorPanel" class="hidden glass-card rounded-2xl p-4 sm:p-5 border-l-4 border-l-neonVolt relative overflow-hidden shadow-cyber mt-2">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg bg-neonVolt/15 flex items-center justify-center text-neonVolt font-bold text-sm">⚡</div>
+              <div>
+                <h3 class="text-sm font-mono font-bold tracking-wide text-white uppercase">Asesor Morfológico IA</h3>
+                <p class="text-[11px] text-gray-400">Algoritmo de Visagismo Facial & Proporción Áurea</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+            <div>
+              <label class="text-[10px] font-mono text-gray-400 block mb-1">FORMA FACIAL</label>
+              <select id="aiFace" class="w-full bg-black/60 border border-surfaceBorder text-xs rounded-xl p-2.5 text-gray-200 outline-none focus:border-neonVolt transition">
+                <option value="ovalada">Rostro Ovalado</option>
+                <option value="cuadrada">Rostro Cuadrado</option>
+                <option value="redonda">Rostro Redondo</option>
+                <option value="diamante">Rostro Diamante</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[10px] font-mono text-gray-400 block mb-1">DENSIDAD</label>
+              <select id="aiDensity" class="w-full bg-black/60 border border-surfaceBorder text-xs rounded-xl p-2.5 text-gray-200 outline-none focus:border-neonVolt transition">
+                <option value="media">Media / Normal</option>
+                <option value="alta">Alta / Gruesa</option>
+                <option value="baja">Baja / Fina</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[10px] font-mono text-gray-400 block mb-1">TIPO DE PELO</label>
+              <select id="aiHairType" class="w-full bg-black/60 border border-surfaceBorder text-xs rounded-xl p-2.5 text-gray-200 outline-none focus:border-neonVolt transition">
+                <option value="lacio">Lacio</option>
+                <option value="ondulado">Ondulado</option>
+                <option value="rizado">Rizado</option>
+              </select>
+            </div>
+          </div>
+
+          <button id="btnAskAI" onclick="askAIAdvisor()" class="w-full py-2.5 px-4 rounded-xl bg-surfaceElevated hover:bg-white/10 border border-surfaceBorder text-xs font-mono font-bold text-white transition flex items-center justify-center gap-2">
+            <span id="aiBtnText">CALCULAR CORTE ÓPTIMO</span>
+          </button>
+
+          <div id="aiResult" class="hidden mt-3 p-3.5 rounded-xl bg-black/70 border border-neonVolt/30 text-xs animate-fade-in">
+            <span class="text-[10px] font-mono text-neonVolt uppercase font-bold tracking-wider" id="aiResultFade"></span>
+            <p class="text-white font-bold text-sm mb-1.5" id="aiResultCut"></p>
+            <p class="text-gray-300 text-xs leading-relaxed mb-3" id="aiResultTip"></p>
+            <button onclick="applyAISuggestion()" class="w-full py-2 rounded-lg bg-neonVolt/10 border border-neonVolt text-neonVolt font-mono text-xs font-bold hover:bg-neonVolt hover:text-black transition">
+              APLICAR CORTE RECOMENDADO
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-2">
+        <button type="button" id="btnContinueFromService" onclick="continueToAgenda()" class="w-full py-4 rounded-xl bg-neonVolt text-obsidian font-mono font-bold text-xs sm:text-sm hover:bg-neonVolt/90 transition shadow-volt-sm flex items-center justify-center gap-2">
+          <span id="btnServiceText">VER AGENDA DE TURNOS</span>
+          <span class="text-base">→</span>
+        </button>
+      </div>
+    </section>
+
+
+    <!-- PANTALLA 3: AGENDA EN TIEMPO REAL -->
+    <section id="screen-agenda" class="screen-view hidden flex flex-col gap-4 animate-fade-in">
+      <div class="px-1">
+        <span class="text-[11px] font-mono text-neonVolt font-bold tracking-wider uppercase block mb-0.5">PASO 03</span>
+        <h2 class="text-xl sm:text-2xl font-bold font-mono text-white">Agenda & Horarios Disponibles</h2>
+        <p class="text-xs text-gray-400 mt-1">Elige el día y horario que mejor te convenga:</p>
+      </div>
+
+      <div class="bg-surfaceElevated border border-surfaceBorder rounded-2xl p-3 flex items-center justify-between text-xs font-mono shadow-sm">
+        <div class="flex items-center gap-2">
+          <span class="text-neonVolt text-base">📅</span>
+          <div>
+            <span class="text-gray-400 text-[10px] block uppercase">PROFESIONAL</span>
+            <strong id="agendaBarberName" class="text-neonCyan text-xs">Barbero</strong>
+          </div>
+        </div>
+        <div class="text-right">
+          <span class="text-gray-400 text-[10px] block uppercase">SERVICIO SELECCIONADO</span>
+          <span id="agendaServiceName" class="text-white text-xs font-bold truncate block max-w-[150px]">Servicio</span>
+        </div>
+      </div>
+
+      <!-- Quick Day Shortcuts -->
+      <div class="flex gap-2">
+        <button type="button" onclick="setQuickDate(0)" id="quickDateToday" class="flex-1 py-2.5 rounded-xl text-xs font-mono border border-surfaceBorder bg-surface text-gray-300">Hoy</button>
+        <button type="button" onclick="setQuickDate(1)" id="quickDateTomorrow" class="flex-1 py-2.5 rounded-xl text-xs font-mono border border-surfaceBorder bg-surface text-gray-300">Mañana</button>
+        <button type="button" onclick="setQuickDate(2)" id="quickDateAfter" class="flex-1 py-2.5 rounded-xl text-xs font-mono border border-surfaceBorder bg-surface text-gray-300">Pasado</button>
+      </div>
+
+      <div class="relative">
+        <input type="date" id="bookingDate" onchange="loadSlots()" class="w-full bg-surface border border-surfaceBorder p-3 rounded-xl text-sm font-mono text-gray-100 outline-none focus:border-neonVolt transition cursor-pointer">
+      </div>
+
+      <div id="slotsContainer" class="grid grid-cols-4 sm:grid-cols-5 gap-2 mt-1"></div>
+
+      <div class="pt-2">
+        <button type="button" id="btnContinueFromAgenda" onclick="continueToConfirm()" class="w-full py-4 rounded-xl bg-neonVolt text-obsidian font-mono font-bold text-xs sm:text-sm hover:bg-neonVolt/90 transition shadow-volt-sm flex items-center justify-center gap-2">
+          <span id="btnAgendaText">SELECCIONA UN HORARIO</span>
+          <span class="text-base">→</span>
+        </button>
+      </div>
+    </section>
+
+
+    <!-- PANTALLA 4: CONFIRMACIÓN -->
+    <section id="screen-confirm" class="screen-view hidden flex flex-col gap-4 animate-fade-in">
+      <div class="px-1">
+        <span class="text-[11px] font-mono text-neonVolt font-bold tracking-wider uppercase block mb-0.5">PASO 04</span>
+        <h2 class="text-xl sm:text-2xl font-bold font-mono text-white">Confirma tus Datos y Turno</h2>
+        <p class="text-xs text-gray-400 mt-1">Ingresa tu número para recibir la confirmación por WhatsApp:</p>
+      </div>
+
+      <div class="glass-card p-4 rounded-2xl border border-surfaceBorder flex flex-col gap-2">
+        <div class="flex items-center justify-between pb-2 border-b border-white/5">
+          <span class="text-[10px] font-mono uppercase text-neonVolt font-bold">RESUMEN DEL TURNO</span>
+        </div>
+        <div class="flex justify-between text-xs py-1 text-gray-300">
+          <span class="text-gray-500 font-mono">1. Barbero:</span>
+          <span class="text-neonCyan font-mono font-bold" id="summaryBarberText">-</span>
+        </div>
+        <div class="flex justify-between text-xs py-1 text-gray-300">
+          <span class="text-gray-500 font-mono">2. Servicio:</span>
+          <span class="font-bold text-white text-right" id="summaryServiceText">-</span>
+        </div>
+        <div class="flex justify-between text-xs py-1 text-gray-300">
+          <span class="text-gray-500 font-mono">3. Fecha/Hora:</span>
+          <span class="text-white font-mono font-bold" id="summaryTimeText">-</span>
+        </div>
+        <div class="flex justify-between text-xs pt-2 border-t border-surfaceBorder mt-1">
+          <span class="text-gray-400 font-mono font-bold">TOTAL:</span>
+          <span class="text-neonVolt font-mono font-bold text-base" id="summaryPriceText">$0</span>
+        </div>
+      </div>
+
+      <div class="glass-card p-4 sm:p-5 rounded-2xl flex flex-col gap-3.5 border border-surfaceBorder">
+        <div>
+          <label class="text-[10px] font-mono text-gray-400 block mb-1">NOMBRE Y APELLIDO *</label>
+          <input type="text" id="clientName" placeholder="Ej: Juan Pérez" class="w-full bg-black/60 border border-surfaceBorder text-xs sm:text-sm rounded-xl p-3 text-gray-100 outline-none focus:border-neonVolt transition">
+        </div>
+
+        <div>
+          <label class="text-[10px] font-mono text-gray-400 block mb-1">TELÉFONO WHATSAPP *</label>
+          <input type="tel" id="clientPhone" placeholder="5493834123456" class="w-full bg-black/60 border border-surfaceBorder text-xs sm:text-sm rounded-xl p-3 text-gray-100 outline-none focus:border-neonVolt transition font-mono">
+        </div>
+
+        <button id="btnSubmitBooking" onclick="submitBooking()" class="w-full mt-2 bg-neonVolt text-obsidian font-mono font-bold text-sm py-4 rounded-xl hover:bg-neonVolt/90 transition shadow-volt-md flex items-center justify-center gap-2">
+          <span>CONFIRMAR RESERVA POR WHATSAPP</span>
+          <span class="text-base">→</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="text-center text-xs text-gray-600 font-mono pt-4 flex flex-col gap-1">
+      <div id="footerText">BARBERÍA DON CARLOS // TURNERO & SHOP © 2026</div>
+    </footer>
+
+  </div>
+
+  <!-- Success Modal -->
+  <div id="successModal" class="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden">
+    <div class="glass-card max-w-sm w-full rounded-2xl p-6 border border-neonVolt/40 flex flex-col items-center text-center">
+      <div class="w-14 h-14 rounded-full bg-neonVolt/10 border border-neonVolt flex items-center justify-center text-neonVolt text-2xl mb-4">✓</div>
+      <h3 class="text-xl font-bold font-mono text-white mb-2" id="modalClientTitle">¡Turno Asignado!</h3>
+      <p class="text-xs text-gray-300 mb-4 leading-relaxed" id="modalClientMessage">Hemos registrado tu reserva exitosamente.</p>
+      <button onclick="closeModal()" class="w-full py-3.5 rounded-xl bg-neonVolt text-black font-mono font-bold text-xs hover:bg-neonVolt/90 transition">VOLVER AL INICIO</button>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

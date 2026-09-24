@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Administrativo // Barbería</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+
+  <!-- LOGIN OVERLAY -->
+  <div id="loginOverlay" class="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-50" style="position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 999; display: flex; align-items: center; justify-content: center;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; width: 100%; max-width: 380px; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #d4ff00; letter-spacing: 2px; text-transform: uppercase; font-weight: 700;">ACCESO ADMINISTRATIVO</span>
+        <h2 style="font-family: 'Space Grotesk', monospace; color: #ffffff; margin: 6px 0 0 0; font-size: 1.5rem;">CENTRO DE CONTROL</h2>
+        <p style="color: #9ca3af; font-size: 0.8rem; margin-top: 4px;">Ingresá tus credenciales de administrador</p>
+      </div>
+
+      <form id="adminLoginForm" onsubmit="event.preventDefault(); handleAdminLogin();">
+        <div class="form-group">
+          <label for="loginUsername">USUARIO</label>
+          <input type="text" id="loginUsername" class="form-control" placeholder="admin" required value="admin">
+        </div>
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label for="loginPassword">CONTRASEÑA</label>
+          <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" required value="admin123">
+        </div>
+        <button type="submit" class="btn-admin" style="width: 100%; justify-content: center; padding: 12px;">INGRESAR AL PANEL →</button>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- MAIN ADMIN LAYOUT -->
+  <div class="admin-layout" id="adminApp" style="display: none;">
+
+    <!-- SIDEBAR -->
+    <aside class="admin-sidebar" id="adminSidebar">
+      <div class="admin-sidebar-header">
+        <a href="/" style="text-decoration: none; color: inherit;" title="Ir al Inicio / App Pública">
+          <div class="admin-sidebar-brand" id="sidebarBrandName">
+            DON CARLOS<span>_</span>
+          </div>
+        </a>
+      </div>
+
+      <nav class="admin-menu">
+        <div class="admin-menu-category">General</div>
+        <a class="admin-nav-item active" onclick="switchSection('dashboard')">
+          <span class="icon">🏠</span> Dashboard
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('appointments')">
+          <span class="icon">📅</span> Turnos
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('clients')">
+          <span class="icon">👥</span> Clientes
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('barbers')">
+          <span class="icon">✂️</span> Barberos
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('services')">
+          <span class="icon">💈</span> Servicios & Precios
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('styles')">
+          <span class="icon">🎨</span> Estilos de Corte
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('schedules')">
+          <span class="icon">🕐</span> Horarios de Atención
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('stats')">
+          <span class="icon">📊</span> Historial & Estadísticas
+        </a>
+
+        <div class="admin-menu-category">Shop Barber</div>
+        <a class="admin-nav-item" onclick="switchSection('products')">
+          <span class="icon">📦</span> Productos & Stock
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('orders')">
+          <span class="icon">🛒</span> Pedidos
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('delivery')">
+          <span class="icon">🚚</span> Delivery
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('promotions')">
+          <span class="icon">🎟️</span> Promociones
+        </a>
+
+        <div class="admin-menu-category">Comunicación</div>
+        <a class="admin-nav-item" onclick="switchSection('whatsapp')">
+          <span class="icon">💬</span> WhatsApp
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('notifications')">
+          <span class="icon">🔔</span> Notificaciones
+        </a>
+
+        <div class="admin-menu-category">Configuración</div>
+        <a class="admin-nav-item" onclick="switchSection('identity')">
+          <span class="icon">🏷️</span> Identidad & Barbería
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('appearance')">
+          <span class="icon">🎨</span> Apariencia & Tema
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('content')">
+          <span class="icon">📝</span> Contenido & Textos
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('pwa')">
+          <span class="icon">📱</span> Configuración PWA
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('security')">
+          <span class="icon">🔐</span> Seguridad
+        </a>
+        <a class="admin-nav-item" onclick="switchSection('backups')">
+          <span class="icon">💾</span> Copias de Seguridad
+        </a>
+
+        <div style="margin-top: auto; padding-top: 16px;">
+          <a class="admin-nav-item" onclick="adminLogout()" style="color: #ef4444;">
+            <span class="icon">🚪</span> Cerrar Sesión
+          </a>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- MAIN AREA -->
+    <main class="admin-main">
+
+      <!-- TOPBAR -->
+      <header class="admin-topbar">
+        <h1 class="admin-topbar-title" id="currentSectionTitle">Dashboard</h1>
+        <div class="admin-topbar-actions">
+          <a href="/" class="btn-admin btn-admin-secondary btn-admin-sm">🏠 Inicio / Turnos</a>
+          <a href="/shop.html" class="btn-admin btn-admin-secondary btn-admin-sm">🛍️ Shop Barber</a>
+          <span style="font-size: 0.8rem; font-family: 'Space Grotesk', monospace; color: #d4ff00;" id="adminUserBadge">admin</span>
+        </div>
+      </header>
+
+      <!-- CONTENT AREA -->
+      <div class="admin-content">
+
+        <!-- SECTION: DASHBOARD -->
+        <div id="section-dashboard" class="admin-section">
+          <div class="stats-grid" id="dashboardStatsGrid">
+            <!-- Dynamic Stats Cards -->
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+            <div class="admin-card">
+              <div class="admin-card-header">
+                <h3 class="admin-card-title">📅 Próximos Turnos</h3>
+              </div>
+              <div class="admin-table-wrapper">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Cliente</th>
+                      <th>Servicio</th>
+                      <th>Barbero</th>
+                      <th>Fecha / Hora</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashRecentAppts"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="admin-card">
+              <div class="admin-card-header">
+                <h3 class="admin-card-title">🛒 Pedidos Recientes (Shop)</h3>
+              </div>
+              <div class="admin-table-wrapper">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Nº Pedido</th>
+                      <th>Cliente</th>
+                      <th>Total</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashRecentOrders"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: TURNOS -->
+        <div id="section-appointments" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Gestión de Turnos</h3>
+              <div style="display: flex; gap: 8px;">
+                <input type="date" id="filterApptDate" class="form-control" onchange="loadAdminAppointments()" style="padding: 6px 10px;">
+                <select id="filterApptStatus" class="form-control" onchange="loadAdminAppointments()" style="padding: 6px 10px;">
+                  <option value="">Todos los Estados</option>
+                  <option value="PENDIENTE">PENDIENTE</option>
+                  <option value="CONFIRMADO">CONFIRMADO</option>
+                  <option value="COMPLETADO">COMPLETADO</option>
+                  <option value="CANCELADO">CANCELADO</option>
+                </select>
+              </div>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>#ID</th>
+                    <th>Cliente</th>
+                    <th>WhatsApp</th>
+                    <th>Barbero</th>
+                    <th>Servicio</th>
+                    <th>Fecha & Hora</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="appointmentsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: CLIENTES -->
+        <div id="section-clients" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Directorio de Clientes</h3>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>#ID</th>
+                    <th>Nombre</th>
+                    <th>WhatsApp</th>
+                    <th>Email</th>
+                    <th>Registrado</th>
+                  </tr>
+                </thead>
+                <tbody id="clientsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: BARBEROS -->
+        <div id="section-barbers" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Barberos de Autor</h3>
+              <button class="btn-admin btn-admin-sm" onclick="openBarberModal()">+ Agregar Barbero</button>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Avatar</th>
+                    <th>Nombre</th>
+                    <th>Especialidades</th>
+                    <th>Días</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="barbersTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: SERVICIOS -->
+        <div id="section-services" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Catálogo de Servicios & Precios</h3>
+              <button class="btn-admin btn-admin-sm" onclick="openServiceModal()">+ Agregar Servicio</button>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Categoría</th>
+                    <th>Duración</th>
+                    <th>Precio Actual</th>
+                    <th>Precio Anterior</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="servicesTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: ESTILOS DE CORTE -->
+        <div id="section-styles" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Estilos de Corte (Catálogo Visual)</h3>
+              <button class="btn-admin btn-admin-sm" onclick="openStyleModal()">+ Agregar Estilo</button>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Categoría</th>
+                    <th>Duración Aprox</th>
+                    <th>Precio Sugerido</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="stylesTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: HORARIOS DE ATENCIÓN -->
+        <div id="section-schedules" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Configuración de Horarios de Atención</h3>
+              <button class="btn-admin btn-admin-sm" onclick="saveBusinessHours()">Guardar Horarios</button>
+            </div>
+            <div id="businessHoursContainer" class="form-grid">
+              <!-- Renderizado dinámico de Lunes a Domingo -->
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: HISTORIAL & AUDITORÍA -->
+        <div id="section-stats" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Historial de Auditoría & Cambios Administrative</h3>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Fecha / Hora</th>
+                    <th>Usuario</th>
+                    <th>Módulo</th>
+                    <th>Acción</th>
+                    <th>Detalles</th>
+                  </tr>
+                </thead>
+                <tbody id="auditLogsBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: PRODUCTOS & STOCK -->
+        <div id="section-products" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Inventario & Productos Shop Barber</h3>
+              <button class="btn-admin btn-admin-sm" onclick="openProductModal()">+ Agregar Producto</button>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Imagen</th>
+                    <th>Nombre</th>
+                    <th>Categoría</th>
+                    <th>Precio</th>
+                    <th>Stock</th>
+                    <th>Stock Mín.</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="productsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: PEDIDOS SHOP -->
+        <div id="section-orders" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Gestión de Pedidos Shop Barber</h3>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Nº Pedido</th>
+                    <th>Cliente</th>
+                    <th>WhatsApp</th>
+                    <th>Entrega</th>
+                    <th>Total</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="ordersTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: DELIVERY -->
+        <div id="section-delivery" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Zonas de Entrega & Delivery</h3>
+              <button class="btn-admin btn-admin-sm" onclick="openDeliveryModal()">+ Agregar Zona</button>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Nombre Zona</th>
+                    <th>Costo Delivery</th>
+                    <th>Monto Mín. Pedido</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="deliveryTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: PROMOCIONES -->
+        <div id="section-promotions" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Promociones & Descuentos</h3>
+            </div>
+            <p style="color: #9ca3af; font-size: 0.85rem;">Creá ofertas especiales y combos para destacar en el shop o turnero.</p>
+          </div>
+        </div>
+
+        <!-- SECTION: WHATSAPP -->
+        <div id="section-whatsapp" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Integración WhatsApp Business API</h3>
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>NÚMERO DE WHATSAPP NEGOCIO</label>
+                <input type="text" id="setting_whatsapp" class="form-control" placeholder="5493834123456">
+              </div>
+              <div class="form-group">
+                <label>TOKEN DE VERIFICACIÓN WEBHOOK</label>
+                <input type="text" id="setting_whatsapp_verify" class="form-control" value="bladesync_webhook_secret_token_2026" readonly>
+              </div>
+            </div>
+            <button class="btn-admin" onclick="saveSettingsSection('whatsapp')">Guardar WhatsApp</button>
+          </div>
+        </div>
+
+        <!-- SECTION: NOTIFICACIONES -->
+        <div id="section-notifications" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Avisos & Notificaciones PWA</h3>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: IDENTIDAD & DATOS -->
+        <div id="section-identity" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Identidad & Textos de la Barbería</h3>
+              <button class="btn-admin btn-admin-sm" onclick="saveSettingsSection('identity')">Guardar Cambios</button>
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>NOMBRE DE LA BARBERÍA</label>
+                <input type="text" id="setting_barber_name" class="form-control" placeholder="Ej: BARBERÍA PEREYRAS BARBER">
+              </div>
+              <div class="form-group">
+                <label>TÍTULO PRINCIPAL (ENCABEZADO / SPLASH)</label>
+                <input type="text" id="setting_splash_title" class="form-control" placeholder="Ej: BARBERÍA PEREYRAS BARBER">
+              </div>
+              <div class="form-group">
+                <label>SUBTÍTULO DE BIENVENIDA</label>
+                <input type="text" id="setting_splash_subtitle" class="form-control" placeholder="Ej: Tu estilo comienza acá. Reservá tu turno en 60 segundos.">
+              </div>
+              <div class="form-group">
+                <label>TÍTULO EN PESTAÑA DE NAVEGADOR</label>
+                <input type="text" id="setting_browser_title" class="form-control" placeholder="Ej: Barbería Pereyras // Turnero & Shop">
+              </div>
+              <div class="form-group">
+                <label>TEXTO PIE DE PÁGINA (FOOTER)</label>
+                <input type="text" id="setting_text_footer" class="form-control" placeholder="Ej: BARBERÍA PEREYRAS // RESERVAS & SHOP © 2026">
+              </div>
+              <div class="form-group">
+                <label>TELÉFONO DE CONTACTO / WHATSAPP</label>
+                <input type="text" id="setting_phone" class="form-control">
+              </div>
+              <div class="form-group">
+                <label>EMAIL</label>
+                <input type="email" id="setting_email" class="form-control">
+              </div>
+              <div class="form-group">
+                <label>DIRECCIÓN</label>
+                <input type="text" id="setting_address" class="form-control">
+              </div>
+              <div class="form-group">
+                <label>INSTAGRAM</label>
+                <input type="text" id="setting_instagram" class="form-control">
+              </div>
+              <div class="form-group">
+                <label>FACEBOOK</label>
+                <input type="text" id="setting_facebook" class="form-control">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: APARIENCIA -->
+        <div id="section-appearance" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Apariencia & Tema Visual</h3>
+              <button class="btn-admin btn-admin-sm" onclick="saveSettingsSection('appearance')">Publicar Cambios</button>
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>COLOR PRINCIPAL</label>
+                <input type="color" id="setting_primary_color" class="form-control" style="height: 40px; padding: 2px;">
+              </div>
+              <div class="form-group">
+                <label>COLOR SECUNDARIO</label>
+                <input type="color" id="setting_secondary_color" class="form-control" style="height: 40px; padding: 2px;">
+              </div>
+              <div class="form-group">
+                <label>MÚSICA DE FONDO (URL)</label>
+                <input type="text" id="setting_bg_music_url" class="form-control" value="/static/musica punchi/punchi.mp4">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: CONTENIDO -->
+        <div id="section-content" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Textos del Sistema</h3>
+              <button class="btn-admin btn-admin-sm" onclick="saveSettingsSection('content')">Guardar Textos</button>
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>TÍTULO PRINCIPAL DE BIENVENIDA</label>
+                <input type="text" id="setting_welcome_title" class="form-control">
+              </div>
+              <div class="form-group">
+                <label>SUBTÍTULO</label>
+                <input type="text" id="setting_welcome_sub" class="form-control">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: PWA -->
+        <div id="section-pwa" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Configuración PWA (Aplicación Instalable)</h3>
+              <button class="btn-admin btn-admin-sm" onclick="saveSettingsSection('pwa')">Guardar PWA</button>
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>NOMBRE PWA</label>
+                <input type="text" id="setting_pwa_name" class="form-control">
+              </div>
+              <div class="form-group">
+                <label>NOMBRE CORTO</label>
+                <input type="text" id="setting_pwa_short_name" class="form-control">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: SEGURIDAD -->
+        <div id="section-security" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Seguridad & Credenciales</h3>
+            </div>
+            <form onsubmit="event.preventDefault(); updateAdminPassword();" style="max-width: 400px;">
+              <div class="form-group">
+                <label>CONTRASEÑA ACTUAL</label>
+                <input type="password" id="changeCurrPass" class="form-control" required>
+              </div>
+              <div class="form-group">
+                <label>NUEVA CONTRASEÑA</label>
+                <input type="password" id="changeNewPass" class="form-control" required>
+              </div>
+              <button type="submit" class="btn-admin">ACTUALIZAR CONTRASEÑA</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- SECTION: BACKUPS -->
+        <div id="section-backups" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">Copias de Seguridad (Backups)</h3>
+              <button class="btn-admin btn-admin-sm" onclick="triggerCreateBackup()">+ Crear Nuevo Backup</button>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Archivo</th>
+                    <th>Tamaño</th>
+                    <th>Fecha de Creación</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="backupsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL CONTENEDOR REUTILIZABLE PARA CREAR Y EDITAR -->
+  <div id="adminModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; width: 100%; max-width: 500px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <h3 id="modalAdminTitle" style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 0; font-size: 1.1rem;">Nuevo Registro</h3>
+        <button onclick="closeAdminModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <form id="adminModalForm" onsubmit="event.preventDefault(); submitAdminModal();">
+        <div id="modalAdminBody" class="form-grid" style="grid-template-columns: 1fr;">
+          <!-- Inyectado dinámicamente -->
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; border-top: 1px solid #23232c; padding-top: 16px;">
+          <button type="button" onclick="closeAdminModal()" class="btn-admin btn-admin-secondary">Cancelar</button>
+          <button type="submit" class="btn-admin">Guardar →</button>
+        </div>
+      </form>
+    </div>
+  <!-- MODAL DE DETALLE Y COORDINACIÓN DE PEDIDOS -->
+  <div id="orderDetailModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; width: 100%; max-width: 620px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <div>
+          <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #d4ff00; letter-spacing: 2px;">GESTIÓN INTELIGENTE DE VENTAS & DELIVERY</span>
+          <h3 id="orderDetailTitle" style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 2px 0 0 0; font-size: 1.2rem;">Detalle del Pedido</h3>
+        </div>
+        <button onclick="closeOrderDetailModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <div id="orderDetailContent">
+        <!-- Renderizado dinámico de productos, cliente, cálculo de delivery y botón WhatsApp -->
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; border-top: 1px solid #23232c; padding-top: 16px;">
+        <button type="button" onclick="closeOrderDetailModal()" class="btn-admin btn-admin-secondary">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/admin.js"></script>
+</body>
+</html>

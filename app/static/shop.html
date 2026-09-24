@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a0a0c">
+  <title>SHOP BARBER // Barbería</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/shop.css">
+</head>
+<body class="bg-[#0a0a0c] text-gray-100 min-h-screen antialiased flex flex-col items-center">
+
+  <div class="w-full max-w-2xl min-h-screen flex flex-col pb-24">
+
+    <!-- HEADER -->
+    <header class="shop-header">
+      <a href="/" class="shop-brand" title="Ir al Inicio / Turnero">
+        SHOP BARBER<span>_</span>
+      </a>
+
+      <div class="flex items-center gap-2">
+        <a href="/" class="flex items-center gap-1 text-xs font-mono text-gray-300 hover:text-[#d4ff00] transition bg-[#131318] px-2.5 py-1.5 rounded-full border border-[#23232c]">
+          <span>🏠 Inicio</span>
+        </a>
+        <a href="/admin.html" class="flex items-center gap-1 text-xs font-mono text-gray-400 hover:text-white transition bg-[#131318] px-2.5 py-1.5 rounded-full border border-[#23232c]">
+          <span>⚙️ Admin</span>
+        </a>
+        <button onclick="toggleCartDrawer()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1a1a22] border border-[#23232c] text-xs font-mono text-white font-bold hover:border-[#d4ff00] transition">
+          <span>🛒 Carrito</span>
+          <span class="cart-badge" id="cartCountBadge">0</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- BANNER & HERO -->
+    <div class="p-4">
+      <div class="bg-gradient-to-r from-[#131318] to-[#1a1a22] border border-[#23232c] rounded-3xl p-6 relative overflow-hidden shadow-2xl">
+        <span class="text-[10px] font-mono uppercase tracking-widest text-[#d4ff00] font-bold px-2 py-0.5 rounded bg-[#d4ff00]/10 border border-[#d4ff00]/20">PRODUCTOS DE AUTOR</span>
+        <h1 class="text-2xl font-extrabold font-mono text-white mt-2" id="shopTitle">Cuidado Profesional de Barba & Cabello</h1>
+        <p class="text-xs text-gray-300 mt-1 max-w-sm" id="shopDescription">Pomadas de fijación mate, aceites esenciales para barba y artículos de barbería profesional.</p>
+      </div>
+
+      <!-- PUNCHI MUSIC & VIDEO PLAYER -->
+      <div class="mt-4 bg-[#131318] border border-[#23232c] rounded-3xl p-4 shadow-xl flex flex-col gap-3 relative overflow-hidden group">
+        <div class="flex items-center justify-between z-10">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#d4ff00]/10 text-[#d4ff00] text-sm animate-pulse">🎵</span>
+            <div>
+              <h3 class="text-xs font-mono font-bold text-white tracking-wider">BARBER PUNCHI MUSIC & VIDEO</h3>
+              <p class="text-[10px] text-gray-400 font-mono">Ambientación oficial Shop Barber</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btnPlayPunchi" onclick="togglePunchiVideoPlay()" class="px-2.5 py-1 rounded-full bg-[#1a1a22] border border-[#23232c] text-[11px] font-mono text-gray-200 hover:text-white transition hover:border-[#d4ff00]">
+              ⏸️ Pausa
+            </button>
+            <button id="btnMutePunchi" onclick="togglePunchiVideoMute()" class="px-2.5 py-1 rounded-full bg-[#d4ff00] text-black font-bold text-[11px] font-mono hover:bg-[#d4ff00]/90 transition shadow">
+              🔊 Sonido ON
+            </button>
+          </div>
+        </div>
+
+        <div class="relative rounded-2xl overflow-hidden border border-[#23232c] bg-black">
+          <video id="punchiVideo" src="/static/musica%20punchi/punchi.mp4" playsinline loop muted autoplay class="w-full h-44 sm:h-52 object-cover opacity-90 transition duration-300 group-hover:scale-105"></video>
+          <div class="absolute bottom-2 left-2 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-md text-[10px] font-mono text-[#d4ff00] font-bold border border-white/10 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-[#d4ff00] animate-ping"></span>
+            <span>SHOP PUNCHI STREAMING</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CATEGORIES & SEARCH FILTER -->
+    <div class="px-4 flex flex-col gap-3">
+      <div class="flex gap-2 overflow-x-auto pb-1 no-scrollbar" id="shopCategoriesFilter">
+        <!-- Renderizado dinámico de categorías -->
+      </div>
+    </div>
+
+    <!-- PRODUCTS GRID -->
+    <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4" id="shopProductsGrid">
+      <!-- Renderizado dinámico de productos -->
+    </div>
+
+  </div>
+
+  <!-- CART DRAWER / MODAL -->
+  <div id="cartDrawer" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex justify-end">
+    <div class="w-full max-w-md bg-[#131318] border-l border-[#23232c] h-full flex flex-col p-5 shadow-2xl overflow-y-auto">
+      <div class="flex justify-between items-center pb-4 border-b border-[#23232c]">
+        <h2 class="text-lg font-mono font-bold text-white flex items-center gap-2">
+          <span>🛒</span> Tu Carrito de Compras
+        </h2>
+        <button onclick="toggleCartDrawer()" class="text-gray-400 hover:text-white font-mono text-sm px-2 py-1 rounded bg-[#1a1a22]">✕ Cerrar</button>
+      </div>
+
+      <div class="flex-1 py-4 flex flex-col gap-3" id="cartItemsContainer">
+        <!-- Items in cart -->
+      </div>
+
+      <div class="border-t border-[#23232c] pt-4 flex flex-col gap-3">
+        <div class="flex justify-between items-center text-sm font-mono">
+          <span class="text-gray-400">SUBTOTAL:</span>
+          <span class="text-white font-bold text-base" id="cartSubtotal">$0</span>
+        </div>
+
+        <button onclick="openCheckoutModal()" id="btnGoToCheckout" class="w-full py-4 rounded-xl bg-[#d4ff00] text-black font-mono font-bold text-sm hover:bg-[#d4ff00]/90 transition shadow-lg flex items-center justify-center gap-2">
+          <span>INICIAR PEDIDO</span>
+          <span>→</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHECKOUT MODAL -->
+  <div id="checkoutModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#131318] border border-[#23232c] rounded-3xl p-6 w-full max-w-lg shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center pb-3 border-b border-[#23232c]">
+        <h3 class="text-lg font-mono font-bold text-white">Confirma los Datos de tu Pedido</h3>
+        <button onclick="closeCheckoutModal()" class="text-gray-400 hover:text-white font-mono text-sm">✕</button>
+      </div>
+
+      <form id="checkoutForm" onsubmit="event.preventDefault(); submitShopOrder();">
+        <div class="flex flex-col gap-3 text-xs font-mono">
+          <div>
+            <label class="text-gray-400 block mb-1">NOMBRE Y APELLIDO *</label>
+            <input type="text" id="chkName" class="w-full bg-black border border-[#23232c] rounded-xl p-3 text-white outline-none focus:border-[#d4ff00]" required placeholder="Ej: Lucas Gómez">
+          </div>
+
+          <div>
+            <label class="text-gray-400 block mb-1">TELÉFONO WHATSAPP *</label>
+            <input type="tel" id="chkPhone" class="w-full bg-black border border-[#23232c] rounded-xl p-3 text-white outline-none focus:border-[#d4ff00]" required placeholder="5493834123456">
+          </div>
+
+          <div>
+            <label class="text-gray-400 block mb-1">TIPO DE ENTREGA *</label>
+            <select id="chkDeliveryType" onchange="toggleDeliveryZoneSelect()" class="w-full bg-black border border-[#23232c] rounded-xl p-3 text-white outline-none focus:border-[#d4ff00]">
+              <option value="pickup">💈 Retiro en Barbería (Gratis)</option>
+              <option value="delivery">🚚 Delivery a Domicilio</option>
+            </select>
+          </div>
+
+          <div id="deliveryZoneGroup" class="hidden">
+            <label class="text-gray-400 block mb-1">ZONA DE ENTREGA *</label>
+            <select id="chkDeliveryZone" onchange="updateCheckoutTotal()" class="w-full bg-black border border-[#23232c] rounded-xl p-3 text-white outline-none focus:border-[#d4ff00]">
+              <!-- Renderizado dinámico -->
+            </select>
+          </div>
+
+          <div id="addressGroup" class="hidden">
+            <label class="text-gray-400 block mb-1">DIRECCIÓN Y BARRIO *</label>
+            <input type="text" id="chkAddress" class="w-full bg-black border border-[#23232c] rounded-xl p-3 text-white outline-none focus:border-[#d4ff00]" placeholder="Calle, Número, Barrio">
+          </div>
+
+          <div>
+            <label class="text-gray-400 block mb-1">FORMA DE PAGO</label>
+            <select id="chkPaymentMethod" class="w-full bg-black border border-[#23232c] rounded-xl p-3 text-white outline-none focus:border-[#d4ff00]">
+              <option value="Efectivo">Efectivo al retirar / entregar</option>
+              <option value="Transferencia">Transferencia bancaria</option>
+              <option value="Mercado Pago">Mercado Pago</option>
+            </select>
+          </div>
+
+          <div class="bg-[#1a1a22] border border-[#23232c] p-3 rounded-xl flex flex-col gap-1.5 mt-2">
+            <div class="flex justify-between text-gray-400">
+              <span>Subtotal:</span>
+              <span id="chkSubtotal">$0</span>
+            </div>
+            <div class="flex justify-between text-gray-400">
+              <span>Envío / Delivery:</span>
+              <span id="chkDeliveryCost">$0</span>
+            </div>
+            <div class="flex justify-between text-white font-bold text-sm pt-2 border-t border-[#23232c]">
+              <span>TOTAL PEDIDO:</span>
+              <span class="text-[#d4ff00] text-base" id="chkTotal">$0</span>
+            </div>
+          </div>
+
+          <button type="submit" id="btnSubmitOrder" class="w-full py-4 mt-2 rounded-xl bg-[#d4ff00] text-black font-mono font-bold text-sm hover:bg-[#d4ff00]/90 transition shadow-lg">
+            CONFIRMAR PEDIDO Y COORDINAR WHATSAPP →
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/shop.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "name": "Barbería Don Carlos",
+  "short_name": "Don Carlos",
+  "description": "Sistema Digital Integral para una Barbería (Turnos + Admin + Shop Barber)",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0c",
+  "theme_color": "#0a0a0c",
+  "icons": [
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

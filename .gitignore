@@ -1,0 +1,23 @@
+# Environments
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Databases
+*.db
+*.sqlite3
+
+# Environment credentials
+.env
+
+# Archives & Scratch
+*.zip
+scratch/
+
+# Logs
+*.log

@@ -1,0 +1,128 @@
+/* Shop Barber Styles - Obsidian Cyber Dark Theme */
+:root {
+  --shop-primary: #d4ff00;
+  --shop-cyan: #00f2fe;
+  --shop-bg: #0a0a0c;
+  --shop-surface: #131318;
+  --shop-border: #23232c;
+  --shop-text: #f3f4f6;
+}
+
+body {
+  background-color: var(--shop-bg);
+  color: var(--shop-text);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+.shop-header {
+  background: rgba(19, 19, 24, 0.9);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--shop-border);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding: 12px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.shop-brand {
+  font-family: 'Space Grotesk', monospace;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #ffffff;
+  text-decoration: none;
+}
+.shop-brand span { color: var(--shop-primary); }
+
+.product-card {
+  background: var(--shop-surface);
+  border: 1px solid var(--shop-border);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.2s ease;
+}
+
+.product-card:hover {
+  border-color: rgba(212, 255, 0, 0.4);
+  transform: translateY(-2px);
+}
+
+.product-img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+
+.product-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #ffffff;
+  margin: 0 0 4px 0;
+}
+
+.product-price {
+  font-family: 'Space Grotesk', monospace;
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--shop-primary);
+}
+
+.product-old-price {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  text-decoration: line-through;
+  margin-left: 6px;
+}
+
+.cart-badge {
+  background: var(--shop-primary);
+  color: #000;
+  font-family: 'Space Grotesk', monospace;
+  font-weight: 800;
+  font-size: 0.75rem;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  margin-left: 6px;
+}
+
+/* Micro-Interactions & Transitions */
+button, a, .product-card, .tab-btn {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+button:active, a:active {
+  transform: scale(0.96);
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-in {
+  animation: modalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
