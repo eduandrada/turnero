@@ -238,6 +238,8 @@ class TestBarberApp(unittest.TestCase):
             db.commit()
 
         prod = db.query(Product).first()
+        zone_id = zone.id
+        prod_id = prod.id if prod else 1
         db.close()
 
         # Try ordering with inactive zone
@@ -245,9 +247,9 @@ class TestBarberApp(unittest.TestCase):
             "client_name": "Test Minimum Client",
             "client_phone": "5493834000111",
             "delivery_type": "delivery",
-            "delivery_zone_id": zone.id,
+            "delivery_zone_id": zone_id,
             "payment_method": "Efectivo",
-            "items": [{"product_id": prod.id, "quantity": 1}]
+            "items": [{"product_id": prod_id, "quantity": 1}]
         }
         res_inactive = client.post("/api/shop/orders", json=payload_inactive)
         self.assertEqual(res_inactive.status_code, 400)
@@ -255,7 +257,7 @@ class TestBarberApp(unittest.TestCase):
 
         # Activate zone and test minimum order enforcement
         db = SessionLocal()
-        zone_db = db.query(DeliveryZone).filter(DeliveryZone.id == zone.id).first()
+        zone_db = db.query(DeliveryZone).filter(DeliveryZone.id == zone_id).first()
         zone_db.is_active = True
         zone_db.min_order_amount = 999999.0  # High minimum
         db.commit()
