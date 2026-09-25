@@ -164,5 +164,142 @@ class TestBarberApp(unittest.TestCase):
         self.assertEqual(res_html.status_code, 200)
         self.assertIn("AGENDA EN VIVO", res_html.text)
 
+        # 3. Test Display Billboard HTML
+        res_tv = client.get("/display.html")
+        self.assertEqual(res_tv.status_code, 200)
+        self.assertIn("SIGUIENTE EN TURNO", res_tv.text)
+
+        # 4. Test live agenda settings endpoint
+        res_cfg = client.get("/api/live-agenda/settings")
+        self.assertEqual(res_cfg.status_code, 200)
+        self.assertIn("live_tv_title", res_cfg.json())
+
+    def test_10_admin_password_change_invalidates_old(self):
+        # 1. Login with default admin
+        res_login = client.post("/api/admin/login", json={"username": "admin", "password": "admin123"})
+        self.assertEqual(res_login.status_code, 200)
+        token = res_login.json()["token"]
+
+        # 2. Change password to newpass2026
+        res_change = client.post(
+            "/api/admin/change-password",
+            json={"current_password": "admin123", "new_password": "newpass2026"},
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        self.assertEqual(res_change.status_code, 200)
+
+        # 3. Old password admin123 MUST be rejected now!
+        res_old_try = client.post("/api/admin/login", json={"username": "admin", "password": "admin123"})
+        self.assertEqual(res_old_try.status_code, 401)
+
+        # 4. New password works
+        res_new_try = client.post("/api/admin/login", json={"username": "admin", "password": "newpass2026"})
+        self.assertEqual(res_new_try.status_code, 200)
+        new_token = res_new_try.json()["token"]
+
+        # 5. Restore original password admin123
+        res_restore = client.post(
+            "/api/admin/change-password",
+            json={"current_password": "newpass2026", "new_password": "admin123"},
+            headers={"Authorization": f"Bearer {new_token}"}
+        )
+        self.assertEqual(res_restore.status_code, 200)
+
+    def test_11_token_logout_revocation(self):
+        login_res = client.post("/api/admin/login", json={"username": "admin", "password": "admin123"})
+        token = login_res.json()["token"]
+
+        # Before logout: me route works
+        me_res = client.get("/api/admin/me", headers={"Authorization": f"Bearer {token}"})
+        self.assertEqual(me_res.status_code, 200)
+
+        # Perform logout
+        logout_res = client.post("/api/admin/logout", headers={"Authorization": f"Bearer {token}"})
+        self.assertEqual(logout_res.status_code, 200)
+
+        # After logout: token is revoked and returns 401
+        me_after = client.get("/api/admin/me", headers={"Authorization": f"Bearer {token}"})
+        self.assertEqual(me_after.status_code, 401)
+
+    def test_12_delivery_minimum_and_inactive_zone(self):
+        from app.database import SessionLocal
+        from app.models import DeliveryZone, Product
+        db = SessionLocal()
+        
+        zone = db.query(DeliveryZone).filter(DeliveryZone.name == "Zona Test Exclusiva").first()
+        if not zone:
+            zone = DeliveryZone(name="Zona Test Exclusiva", cost=500.0, min_order_amount=5000.0, is_active=False)
+            db.add(zone)
+            db.commit()
+            db.refresh(zone)
+        else:
+            zone.is_active = False
+            zone.min_order_amount = 5000.0
+            db.commit()
+
+        prod = db.query(Product).first()
+        db.close()
+
+        # Try ordering with inactive zone
+        payload_inactive = {
+            "client_name": "Test Minimum Client",
+            "client_phone": "5493834000111",
+            "delivery_type": "delivery",
+            "delivery_zone_id": zone.id,
+            "payment_method": "Efectivo",
+            "items": [{"product_id": prod.id, "quantity": 1}]
+        }
+        res_inactive = client.post("/api/shop/orders", json=payload_inactive)
+        self.assertEqual(res_inactive.status_code, 400)
+        self.assertIn("activa", res_inactive.json()["detail"].lower())
+
+        # Activate zone and test minimum order enforcement
+        db = SessionLocal()
+        zone_db = db.query(DeliveryZone).filter(DeliveryZone.id == zone.id).first()
+        zone_db.is_active = True
+        zone_db.min_order_amount = 999999.0  # High minimum
+        db.commit()
+        db.close()
+
+        res_min = client.post("/api/shop/orders", json=payload_inactive)
+        self.assertEqual(res_min.status_code, 400)
+        self.assertIn("mínimo", res_min.json()["detail"].lower())
+
+    def test_13_unique_order_number_format(self):
+        res_p = client.get("/api/shop/products")
+        prod = res_p.json()[0]
+
+        order_payload = {
+            "client_name": "Cliente Unique Order",
+            "client_phone": "5493834999777",
+            "delivery_type": "pickup",
+            "payment_method": "Efectivo",
+            "items": [{"product_id": prod["id"], "quantity": 1}]
+        }
+        res1 = client.post("/api/shop/orders", json=order_payload)
+        res2 = client.post("/api/shop/orders", json=order_payload)
+
+        num1 = res1.json()["order_number"]
+        num2 = res2.json()["order_number"]
+
+        self.assertNotEqual(num1, num2)
+        self.assertRegex(num1, r"^PED-\d{8}-\d{6}-[A-F0-9]{4}$")
+
+    def test_14_pwa_manifest_and_icons(self):
+        res_m = client.get("/manifest.json")
+        self.assertEqual(res_m.status_code, 200)
+        manifest = res_m.json()
+        self.assertIn("icons", manifest)
+        self.assertGreaterEqual(len(manifest["icons"]), 2)
+
+        res_i192 = client.get("/static/icon-192.png")
+        self.assertEqual(res_i192.status_code, 200)
+        self.assertEqual(res_i192.headers["content-type"], "image/png")
+
+        res_i512 = client.get("/static/icon-512.png")
+        self.assertEqual(res_i512.status_code, 200)
+        self.assertEqual(res_i512.headers["content-type"], "image/png")
+
 if __name__ == "__main__":
     unittest.main()
+

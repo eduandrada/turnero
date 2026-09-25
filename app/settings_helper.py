@@ -84,6 +84,15 @@ DEFAULT_SETTINGS = {
     "bg_music_url": "/static/musica punchi/punchi.mp4",
     "bg_music_enabled": "true",
 
+    # Agenda en Vivo & Pantalla TV
+    "live_tv_title": "SALA DE ESPERA // TURNERO EN VIVO",
+    "live_tv_subtitle": "ATENCIÓN POR SILLÓN",
+    "live_tv_marquee": "💈 Bienvenido a la Barbería • Turnos en Tiempo Real • Wi-Fi Disponible • Consulta nuestros productos en el Shop Barber",
+    "live_voice_enabled": "true",
+    "live_chime_enabled": "true",
+    "live_auto_refresh_sec": "10",
+    "live_current_called_id": "",
+
     # Horarios de Atención (JSON)
     "business_hours": json.dumps({
         "Lunes": {"active": True, "open": "09:00", "close": "20:00", "pause_start": "13:00", "pause_end": "14:00"},

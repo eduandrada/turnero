@@ -2,6 +2,8 @@ import os
 import io
 import json
 import logging
+import threading
+import secrets
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, time
 from typing import List, Optional, Dict, Any
@@ -10,6 +12,7 @@ from fastapi import FastAPI, HTTPException, Depends, Request, Response, Query, U
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func
 
@@ -35,13 +38,16 @@ from app.schemas import (
     AuditLogRead, DashboardStatsResponse,
     StyleAdviceRequest, StyleAdviceResponse, BulkSettingsUpdate
 )
-from app.auth import get_current_admin, create_admin_token, hash_password, verify_password
+from app.auth import get_current_admin, create_admin_token, hash_password, verify_password, revoke_token, security_bearer
 from app.settings_helper import get_all_settings, get_setting, bulk_set_settings, DEFAULT_SETTINGS
 from app.backup_helper import create_database_backup, list_backups, restore_database_backup, BACKUP_DIR
 from app.scheduler import start_scheduler, shutdown_scheduler
 
 logger = logging.getLogger("bladesync.main")
 logging.basicConfig(level=logging.INFO)
+
+APPOINTMENT_LOCK = threading.Lock()
+
 
 WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "bladesync_webhook_secret_token_2026")
 ALLOWED_ORIGINS_STR = os.getenv("ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000")
@@ -272,78 +278,6 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 uploads_dir = os.path.join(static_dir, "uploads")
 os.makedirs(uploads_dir, exist_ok=True)
 
-if os.path.exists(static_dir):
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
-
-
-# ==========================================
-# RUTAS HTML PRINCIPALES
-# ==========================================
-@app.get("/")
-def read_root():
-    """Sirve la App Pública de Turnos."""
-    idx = os.path.join(static_dir, "index.html")
-    if os.path.exists(idx):
-        return FileResponse(idx)
-    return {"message": "BladeSync Barber Engine Running."}
-
-@app.get("/admin.html")
-def read_admin():
-    """Sirve el Panel Administrativo Central."""
-    adm = os.path.join(static_dir, "admin.html")
-    if os.path.exists(adm):
-        return FileResponse(adm)
-    return {"message": "admin.html no encontrado."}
-
-@app.get("/shop.html")
-def read_shop():
-    """Sirve la Tienda Shop Barber."""
-    shp = os.path.join(static_dir, "shop.html")
-    if os.path.exists(shp):
-        return FileResponse(shp)
-    return {"message": "shop.html no encontrado."}
-
-@app.get("/manifest.json")
-def get_manifest(db: Session = Depends(get_db)):
-    """Genera manifest.json PWA dinámico desde backend."""
-    app_name = get_setting(db, "pwa_name", "Barbería Don Carlos")
-    short_name = get_setting(db, "pwa_short_name", "Don Carlos")
-    desc = get_setting(db, "pwa_description", "Reservas y Shop Barber")
-    theme_color = get_setting(db, "pwa_theme_color", "#0a0a0c")
-    bg_color = get_setting(db, "pwa_bg_color", "#0a0a0c")
-    
-    return JSONResponse({
-        "name": app_name,
-        "short_name": short_name,
-        "description": desc,
-        "start_url": "/",
-        "display": "standalone",
-        "background_color": bg_color,
-        "theme_color": theme_color,
-        "icons": [
-            {
-                "src": "/static/icon-192.png",
-                "sizes": "192x192",
-                "type": "image/png"
-            },
-            {
-                "src": "/static/icon-512.png",
-                "sizes": "512x512",
-                "type": "image/png"
-            }
-        ]
-    })
-
-@app.get("/service-worker.js")
-def get_service_worker():
-    sw = os.path.join(static_dir, "service-worker.js")
-    if os.path.exists(sw):
-        return FileResponse(sw, media_type="application/javascript")
-    return Response(
-        content="self.addEventListener('fetch', function(e) {});",
-        media_type="application/javascript"
-    )
-
 
 # ==========================================
 # APIS PÚBLICAS (CONFIGURACIÓN, BARBEROS, SERVICIOS, SLOTS, RESERVA)
@@ -544,58 +478,59 @@ def create_public_appointment(data: AppointmentCreate, db: Session = Depends(get
     slot_start = appt_time_naive
     slot_end = slot_start + timedelta(minutes=duration_min)
 
-    # Validar colisión de horario
-    existing = db.query(Appointment).filter(
-        Appointment.canceled == False,
-        or_(
-            Appointment.barber_id == resolved_b_id,
-            Appointment.barber_name == resolved_b_name
-        )
-    ).all()
-
-    for ex in existing:
-        ex_start = ex.appointment_time
-        ex_dur = ex.duration_min or 45
-        ex_end = ex.end_time or (ex_start + timedelta(minutes=ex_dur))
-
-        if slot_start < ex_end and slot_end > ex_start:
-            raise HTTPException(
-                status_code=400,
-                detail="El horario seleccionado ya se encuentra ocupado. Por favor elige otro horario."
+    # Validar colisión de horario y crear turno de forma atómica (thread-safe)
+    with APPOINTMENT_LOCK:
+        existing = db.query(Appointment).filter(
+            Appointment.canceled == False,
+            or_(
+                Appointment.barber_id == resolved_b_id,
+                Appointment.barber_name == resolved_b_name
             )
+        ).all()
 
-    # Buscar o crear cliente
-    client_obj = db.query(Client).filter(Client.phone == data.client_phone).first()
-    if not client_obj:
-        client_obj = Client(
-            name=data.client_name,
-            phone=data.client_phone,
-            is_active=True
+        for ex in existing:
+            ex_start = ex.appointment_time
+            ex_dur = ex.duration_min or 45
+            ex_end = ex.end_time or (ex_start + timedelta(minutes=ex_dur))
+
+            if slot_start < ex_end and slot_end > ex_start:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El horario seleccionado ya se encuentra ocupado. Por favor elige otro horario."
+                )
+
+        # Buscar o crear cliente
+        client_obj = db.query(Client).filter(Client.phone == data.client_phone).first()
+        if not client_obj:
+            client_obj = Client(
+                name=data.client_name,
+                phone=data.client_phone,
+                is_active=True
+            )
+            db.add(client_obj)
+            db.commit()
+            db.refresh(client_obj)
+
+        new_appt = Appointment(
+            client_id=client_obj.id if client_obj else None,
+            client_name=data.client_name,
+            client_phone=data.client_phone,
+            barber_id=resolved_b_id,
+            barber_name=resolved_b_name,
+            service_id=resolved_s_id,
+            service=resolved_s_name,
+            appointment_time=slot_start,
+            end_time=slot_end,
+            duration_min=duration_min,
+            status="PENDIENTE",
+            confirmed=False,
+            canceled=False,
+            reminder_sent=False,
+            notes=data.notes
         )
-        db.add(client_obj)
+        db.add(new_appt)
         db.commit()
-        db.refresh(client_obj)
-
-    new_appt = Appointment(
-        client_id=client_obj.id if client_obj else None,
-        client_name=data.client_name,
-        client_phone=data.client_phone,
-        barber_id=resolved_b_id,
-        barber_name=resolved_b_name,
-        service_id=resolved_s_id,
-        service=resolved_s_name,
-        appointment_time=slot_start,
-        end_time=slot_end,
-        duration_min=duration_min,
-        status="PENDIENTE",
-        confirmed=False,
-        canceled=False,
-        reminder_sent=False,
-        notes=data.notes
-    )
-    db.add(new_appt)
-    db.commit()
-    db.refresh(new_appt)
+        db.refresh(new_appt)
 
     logger.info(f"Nuevo turno creado #{new_appt.id} para {new_appt.client_name} a las {slot_start}")
 
@@ -738,10 +673,38 @@ def get_live_agenda(
     barbers_data = [{"id": b.id, "name": b.name, "avatar_url": b.avatar_url, "specialties": b.specialties} for b in barbers]
     bName = get_setting(db, "barber_name", "BARBERÍA")
 
+    # Settings de Live TV / Sala de espera
+    tv_title = get_setting(db, "live_tv_title", "SALA DE ESPERA // TURNERO EN VIVO")
+    tv_subtitle = get_setting(db, "live_tv_subtitle", "ATENCIÓN POR SILLÓN")
+    tv_marquee = get_setting(db, "live_tv_marquee", "💈 Bienvenido • Turnos en Tiempo Real • Wi-Fi Disponible • Shop Barber")
+    voice_enabled = get_setting(db, "live_voice_enabled", "true") == "true"
+    chime_enabled = get_setting(db, "live_chime_enabled", "true") == "true"
+    auto_refresh_sec = int(get_setting(db, "live_auto_refresh_sec", "10") or 10)
+    current_called_id_str = get_setting(db, "live_current_called_id", "")
+
+    called_appointment = None
+    if current_called_id_str and current_called_id_str.isdigit():
+        c_appt = db.query(Appointment).filter(Appointment.id == int(current_called_id_str)).first()
+        if c_appt:
+            called_appointment = {
+                "id": c_appt.id,
+                "client_name": c_appt.client_name,
+                "barber_name": c_appt.barber_name or "General",
+                "service": c_appt.service or "Corte",
+                "time_str": c_appt.appointment_time.strftime("%H:%M")
+            }
+
     return {
         "server_time": now_dt.strftime("%H:%M:%S"),
         "server_date": curr_date.strftime("%Y-%m-%d"),
         "barber_name": bName,
+        "tv_title": tv_title,
+        "tv_subtitle": tv_subtitle,
+        "tv_marquee": tv_marquee,
+        "voice_enabled": voice_enabled,
+        "chime_enabled": chime_enabled,
+        "auto_refresh_sec": auto_refresh_sec,
+        "called_appointment": called_appointment,
         "total_today": len(appts),
         "in_service": in_service_list,
         "next_up": next_up_list,
@@ -749,6 +712,90 @@ def get_live_agenda(
         "completed": completed_list,
         "barbers": barbers_data
     }
+
+@app.post("/api/live-agenda/{appointment_id}/call")
+def call_live_appointment(appointment_id: int, db: Session = Depends(get_db)):
+    """Llama al cliente a pantalla TV y emite timbre/chime sincronizado."""
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Turno no encontrado.")
+    appt.status = "LLAMANDO"
+    set_setting(db, "live_current_called_id", str(appt.id))
+    db.commit()
+    return {
+        "message": f"Turno #{appt.id} de {appt.client_name} llamado a pantalla.",
+        "appointment": {
+            "id": appt.id,
+            "client_name": appt.client_name,
+            "barber_name": appt.barber_name or "General",
+            "service": appt.service or "Corte",
+            "time_str": appt.appointment_time.strftime("%H:%M")
+        }
+    }
+
+@app.post("/api/live-agenda/walk-in")
+def create_live_walk_in(data: Dict[str, Any], db: Session = Depends(get_db)):
+    """Agrega un cliente espontáneo / en espera directamente a la cola de hoy."""
+    name = str(data.get("client_name", "")).strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="El nombre del cliente es obligatorio.")
+    phone = str(data.get("client_phone", "")).strip() or "5493834000000"
+    barber_id = data.get("barber_id")
+    barber_name = "General"
+    if barber_id:
+        b = db.query(Barber).filter(Barber.id == barber_id).first()
+        if b:
+            barber_name = b.name
+    service_name = data.get("service_name") or "Corte Espontáneo / En Espera"
+    dur = int(data.get("duration_min") or 30)
+
+    now_arg = get_argentina_now().replace(tzinfo=None)
+
+    new_appt = Appointment(
+        client_name=name,
+        client_phone=phone,
+        barber_id=barber_id,
+        barber_name=barber_name,
+        service=service_name,
+        appointment_time=now_arg,
+        end_time=now_arg + timedelta(minutes=dur),
+        duration_min=dur,
+        status="PENDIENTE",
+        confirmed=True
+    )
+    db.add(new_appt)
+    db.commit()
+    db.refresh(new_appt)
+    return {"message": "Cliente agregado a la cola en vivo exitosamente.", "appointment_id": new_appt.id}
+
+@app.put("/api/live-agenda/{appointment_id}")
+def update_live_appointment(appointment_id: int, data: Dict[str, Any], db: Session = Depends(get_db)):
+    """Permite editar cliente, barbero o servicio directamente desde la pantalla de moderación."""
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Turno no encontrado.")
+    if "client_name" in data and data["client_name"]:
+        appt.client_name = data["client_name"]
+    if "service" in data and data["service"]:
+        appt.service = data["service"]
+    if "barber_id" in data:
+        appt.barber_id = data["barber_id"]
+        if appt.barber_id:
+            b = db.query(Barber).filter(Barber.id == appt.barber_id).first()
+            if b:
+                appt.barber_name = b.name
+    if "status" in data and data["status"]:
+        appt.status = data["status"]
+    if "time_str" in data and data["time_str"]:
+        try:
+            parts = data["time_str"].split(":")
+            h, m = int(parts[0]), int(parts[1])
+            appt.appointment_time = appt.appointment_time.replace(hour=h, minute=m)
+            appt.end_time = appt.appointment_time + timedelta(minutes=appt.duration_min or 45)
+        except Exception:
+            pass
+    db.commit()
+    return {"message": "Turno actualizado correctamente.", "id": appt.id}
 
 @app.post("/api/live-agenda/{appointment_id}/status")
 def update_live_status(
@@ -769,6 +816,30 @@ def update_live_status(
         appt.canceled = True
     db.commit()
     return {"message": "Estado actualizado exitosamente.", "id": appt.id, "status": appt.status}
+
+@app.get("/api/live-agenda/settings")
+def get_live_settings(db: Session = Depends(get_db)):
+    """Retorna las configuraciones actuales de la pantalla TV y agenda en vivo."""
+    return {
+        "live_tv_title": get_setting(db, "live_tv_title", DEFAULT_SETTINGS.get("live_tv_title", "DON CARLOS BARBERSHOP")),
+        "live_tv_subtitle": get_setting(db, "live_tv_subtitle", DEFAULT_SETTINGS.get("live_tv_subtitle", "SALA DE ESPERA // TURNERO EN VIVO")),
+        "live_tv_marquee": get_setting(db, "live_tv_marquee", DEFAULT_SETTINGS.get("live_tv_marquee", "Bienvenidos a Don Carlos Barbería • Por favor aguarde sentado a que su nombre aparezca en la pantalla principal • WiFi Clientes: BarberDonCarlos2026")),
+        "live_voice_enabled": str(get_setting(db, "live_voice_enabled", DEFAULT_SETTINGS.get("live_voice_enabled", "true"))).lower() in ["true", "1", "yes"],
+        "live_chime_enabled": str(get_setting(db, "live_chime_enabled", DEFAULT_SETTINGS.get("live_chime_enabled", "true"))).lower() in ["true", "1", "yes"],
+        "live_auto_refresh_sec": int(get_setting(db, "live_auto_refresh_sec", DEFAULT_SETTINGS.get("live_auto_refresh_sec", "8")) or 8)
+    }
+
+@app.post("/api/live-agenda/settings")
+@app.put("/api/live-agenda/settings")
+def save_live_settings(data: Dict[str, Any], db: Session = Depends(get_db)):
+    """Guarda las configuraciones de la pantalla TV y cartelera directamente desde live.html o admin."""
+    allowed = ["live_tv_title", "live_tv_subtitle", "live_tv_marquee", "live_voice_enabled", "live_chime_enabled", "live_auto_refresh_sec"]
+    for k in allowed:
+        if k in data:
+            set_setting(db, k, str(data[k]))
+    db.commit()
+    return {"message": "Configuraciones de pantalla TV guardadas exitosamente."}
+
 
 
 # ==========================================
@@ -841,15 +912,33 @@ def create_shop_order(order_in: OrderCreate, db: Session = Depends(get_db)):
         })
 
     delivery_cost = 0.0
-    if order_in.delivery_type == "delivery" and order_in.delivery_zone_id:
-        dz = db.query(DeliveryZone).filter(DeliveryZone.id == order_in.delivery_zone_id).first()
-        if dz:
-            delivery_cost = dz.cost
+    if order_in.delivery_type == "delivery":
+        if not order_in.delivery_zone_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Debe seleccionar una zona de envío para entregas a domicilio."
+            )
+        dz = db.query(DeliveryZone).filter(
+            DeliveryZone.id == order_in.delivery_zone_id,
+            DeliveryZone.is_active == True
+        ).first()
+        if not dz:
+            raise HTTPException(
+                status_code=400,
+                detail="La zona de envío seleccionada no existe o no se encuentra activa."
+            )
+        if dz.min_order_amount and subtotal < dz.min_order_amount:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El monto mínimo de productos para la zona '{dz.name}' es de ${dz.min_order_amount:,.2f}. Tu subtotal es ${subtotal:,.2f}."
+            )
+        delivery_cost = dz.cost
 
     total = subtotal + delivery_cost
 
-    # Generar código de pedido único #PED-XXXX
-    order_num = f"PED-{get_argentina_now().strftime('%Y%m%d%H%M%S')}"
+    # Generar código de pedido único #PED-YYYYMMDD-HHMMSS-XXXX
+    unique_suffix = secrets.token_hex(2).upper()
+    order_num = f"PED-{get_argentina_now().strftime('%Y%m%d-%H%M%S')}-{unique_suffix}"
 
     # Buscar o crear cliente
     client_obj = db.query(Client).filter(Client.phone == order_in.client_phone).first()
@@ -953,21 +1042,23 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
 def admin_login(creds: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(AdminUser).filter(AdminUser.username == creds.username, AdminUser.is_active == True).first()
     if not user or not verify_password(creds.password, user.password_hash):
-        # Allow default fallback admin if first run
-        if creds.username == "admin" and creds.password == "admin123":
-            if not user:
-                user = AdminUser(username="admin", password_hash=hash_password("admin123"), is_active=True)
-                db.add(user)
-                db.commit()
-        else:
-            raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
 
-    token = create_admin_token(creds.username)
+    token = create_admin_token(user.username)
     return LoginResponse(
         token=token,
         username=user.username,
         message="Autenticación exitosa."
     )
+
+@app.post("/api/admin/logout")
+def admin_logout(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
+    admin: AdminUser = Depends(get_current_admin)
+):
+    if credentials and credentials.credentials:
+        revoke_token(credentials.credentials)
+    return {"message": "Sesión cerrada correctamente."}
 
 @app.get("/api/admin/me")
 def get_admin_me(admin: AdminUser = Depends(get_current_admin)):
@@ -1654,12 +1745,52 @@ def serve_live():
         return FileResponse(live_path)
     raise HTTPException(status_code=404, detail="Página live.html no encontrada.")
 
+@app.get("/display.html", include_in_schema=False)
+@app.get("/tv.html", include_in_schema=False)
+def serve_display():
+    disp_path = os.path.join(STATIC_DIR, "display.html")
+    if os.path.exists(disp_path):
+        return FileResponse(disp_path)
+    # Fallback to live.html if display not created yet
+    live_path = os.path.join(STATIC_DIR, "live.html")
+    if os.path.exists(live_path):
+        return FileResponse(live_path)
+    raise HTTPException(status_code=404, detail="Página display.html no encontrada.")
+
 @app.get("/manifest.json", include_in_schema=False)
-def serve_manifest():
-    manifest_path = os.path.join(STATIC_DIR, "manifest.json")
-    if os.path.exists(manifest_path):
-        return FileResponse(manifest_path, media_type="application/json")
-    raise HTTPException(status_code=404, detail="manifest.json no encontrado.")
+def serve_manifest(db: Session = Depends(get_db)):
+    """Genera manifest.json PWA dinámico desde configuración o static fallback."""
+    app_name = get_setting(db, "pwa_name", "Barbería Don Carlos")
+    short_name = get_setting(db, "pwa_short_name", "Don Carlos")
+    desc = get_setting(db, "pwa_description", "Reservas y Shop Barber")
+    theme_color = get_setting(db, "pwa_theme_color", "#0a0a0c")
+    bg_color = get_setting(db, "pwa_bg_color", "#0a0a0c")
+    custom_icon = get_setting(db, "app_icon_url", None)
+    
+    icon_192 = custom_icon if custom_icon else "/static/icon-192.png"
+    icon_512 = custom_icon if custom_icon else "/static/icon-512.png"
+
+    return JSONResponse({
+        "name": app_name,
+        "short_name": short_name,
+        "description": desc,
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": bg_color,
+        "theme_color": theme_color,
+        "icons": [
+            {
+                "src": icon_192,
+                "sizes": "192x192",
+                "type": "image/png"
+            },
+            {
+                "src": icon_512,
+                "sizes": "512x512",
+                "type": "image/png"
+            }
+        ]
+    })
 
 @app.get("/service-worker.js", include_in_schema=False)
 def serve_sw():

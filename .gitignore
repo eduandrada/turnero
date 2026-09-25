@@ -2,22 +2,40 @@
 venv/
 .venv/
 env/
+ENV/
 
-# Python cache
+# Python cache & bytecode
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
 
-# Databases
+# Databases & local state
 *.db
 *.sqlite3
+barberia - copia.db
+barberia.db
 
-# Environment credentials
+# Backups & Uploads (runtime)
+backups/
+app/static/uploads/*
+!app/static/uploads/.gitkeep
+
+# Environment & Credentials
 .env
+.env.local
+.env.*.local
 
-# Archives & Scratch
+# Archives & Temporary files
 *.zip
 scratch/
 
 # Logs
 *.log
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+

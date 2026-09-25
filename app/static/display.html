@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a0a0c">
+  <title>PANTALLA DE TURNOS // SALA DE ESPERA</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&family=Space+Grotesk:wght@600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --neon-volt: #d4ff00;
+      --neon-cyan: #00f2fe;
+    }
+
+    body {
+      background-color: #060608;
+      color: #f3f4f6;
+      font-family: 'Space Grotesk', monospace;
+      overflow-x: hidden;
+      min-height: 100vh;
+      background-image: 
+        radial-gradient(circle at 10% 15%, rgba(212, 255, 0, 0.05) 0, transparent 40%),
+        radial-gradient(circle at 90% 85%, rgba(0, 242, 254, 0.05) 0, transparent 45%);
+    }
+
+    .border-glow-volt {
+      border-color: #d4ff00;
+      box-shadow: 0 0 35px rgba(212, 255, 0, 0.3);
+    }
+
+    .border-glow-cyan {
+      border-color: #00f2fe;
+      box-shadow: 0 0 35px rgba(0, 242, 254, 0.3);
+    }
+
+    @keyframes callFlash {
+      0%, 100% {
+        box-shadow: 0 0 50px rgba(212, 255, 0, 0.8), inset 0 0 40px rgba(212, 255, 0, 0.3);
+        transform: scale(1);
+      }
+      50% {
+        box-shadow: 0 0 90px rgba(0, 242, 254, 1), inset 0 0 60px rgba(0, 242, 254, 0.5);
+        transform: scale(1.02);
+      }
+    }
+
+    .animate-call-flash {
+      animation: callFlash 1s ease-in-out infinite;
+    }
+
+    /* Marquee / Zocalo animado */
+    @keyframes marquee {
+      0% { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+
+    .marquee-text {
+      display: inline-block;
+      white-space: nowrap;
+      animation: marquee 28s linear infinite;
+    }
+
+    .marquee-text:hover {
+      animation-play-state: paused;
+    }
+  </style>
+</head>
+<body class="flex flex-col justify-between min-h-screen p-4 sm:p-8 select-none">
+
+  <!-- TOP BAR KIOSK -->
+  <header class="flex justify-between items-center pb-4 border-b border-[#23232c]/80">
+    <div class="flex items-center gap-4">
+      <span class="relative flex h-5 w-5">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#d4ff00] opacity-80"></span>
+        <span class="relative inline-flex rounded-full h-5 w-5 bg-[#d4ff00]"></span>
+      </span>
+      <div>
+        <div class="text-xs uppercase tracking-widest text-[#d4ff00] font-bold" id="tvSubtitle">
+          SALA DE ESPERA // TURNERO EN VIVO
+        </div>
+        <h1 class="text-2xl sm:text-4xl font-black text-white tracking-tight" id="tvBarberTitle">
+          BARBERÍA<span class="text-[#d4ff00]">_</span>
+        </h1>
+      </div>
+    </div>
+
+    <!-- DIGITAL CLOCK & FULLSCREEN TOGGLE -->
+    <div class="flex items-center gap-4">
+      <div class="bg-[#111116] px-6 py-3 rounded-2xl border border-[#23232c] shadow-2xl flex items-center gap-3">
+        <span class="text-gray-400 text-sm">HORA:</span>
+        <span class="text-3xl sm:text-5xl font-black text-white tracking-wider font-mono" id="tvDigitalClock">00:00:00</span>
+        <span class="text-xs text-[#d4ff00] font-bold">ART</span>
+      </div>
+
+      <button onclick="toggleFullScreen()" class="p-4 rounded-2xl bg-[#131318] border border-[#23232c] text-white hover:border-[#d4ff00] transition active:scale-95 shadow">
+        ⛶
+      </button>
+    </div>
+  </header>
+
+  <!-- OVERLAY / MODAL DE LLAMADO DE TURNO ACTIVO (BILLBOARD FLASH) -->
+  <div id="calledOverlay" class="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 hidden flex items-center justify-center p-6">
+    <div class="w-full max-w-4xl bg-gradient-to-b from-[#16161e] to-[#0a0a0f] border-4 border-glow-volt rounded-3xl p-8 sm:p-14 text-center flex flex-col items-center gap-6 shadow-2xl animate-call-flash">
+      <div class="inline-flex items-center gap-3 px-6 py-2 rounded-full bg-[#d4ff00] text-black font-black text-sm uppercase tracking-widest animate-bounce">
+        <span>🔔 ¡ATENCIÓN! TURNO LLAMADO</span>
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <span class="text-sm sm:text-base text-gray-400 uppercase tracking-widest font-mono">POR FAVOR PASAR AL SILLÓN</span>
+        <h2 class="text-4xl sm:text-7xl font-black text-white tracking-tight uppercase" id="calledClientName">
+          LUCAS GÓMEZ
+        </h2>
+      </div>
+
+      <!-- MEGA HERO CALLOUT BARBERO EN LLAMADO -->
+      <div class="w-full max-w-2xl p-5 sm:p-7 rounded-3xl bg-[#d4ff00]/15 border-4 border-[#d4ff00] text-center flex flex-col items-center gap-1 shadow-2xl">
+        <span class="text-xs sm:text-sm font-black text-[#d4ff00] uppercase tracking-widest font-mono">SE TIENE QUE CORTAR CON EL BARBERO:</span>
+        <span class="text-3xl sm:text-6xl font-black text-white uppercase tracking-tight" id="calledBarberName">
+          Misael Fade
+        </span>
+        <div class="mt-2 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/60 border border-[#23232c] text-xs text-gray-300 font-mono">
+          <span>Servicio:</span>
+          <span class="text-[#00f2fe] font-bold" id="calledService">Corte Signature Fade</span>
+        </div>
+      </div>
+
+      <button onclick="dismissCalledOverlay()" class="mt-2 px-8 py-3 rounded-xl bg-[#23232c] hover:bg-white hover:text-black font-bold text-xs transition">
+        Cerrar Aviso
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN DUAL GIANT DISPLAY (EL QUE SIGUE + AHORA EN SILLÓN) -->
+  <main class="w-full my-auto py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-stretch">
+    
+    <!-- LEFT: EL QUE SIGUE (MEGA BILLBOARD HIGHLIGHT) -->
+    <div class="lg:col-span-7 bg-gradient-to-br from-[#111118] to-[#151522] border-4 border-glow-cyan rounded-3xl p-6 sm:p-10 flex flex-col justify-between shadow-2xl relative overflow-hidden">
+      <div class="absolute -right-24 -top-24 w-60 h-60 bg-[#00f2fe]/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div>
+        <div class="flex items-center justify-between pb-4 border-b border-[#23232c]">
+          <div class="flex items-center gap-3">
+            <span class="text-3xl">⚡</span>
+            <div>
+              <span class="text-xs text-[#00f2fe] uppercase tracking-widest font-black block">SIGUIENTE EN TURNO</span>
+              <span class="text-sm font-bold text-white">PREPARATE PARA PASAR AL SILLÓN</span>
+            </div>
+          </div>
+          <span class="px-4 py-1.5 rounded-full bg-[#00f2fe]/20 text-[#00f2fe] border border-[#00f2fe]/40 text-xs font-black uppercase tracking-wider animate-pulse">
+            EL PRÓXIMO
+          </span>
+        </div>
+
+        <!-- CLIENT NAME MEGA DISPLAY -->
+        <div class="pt-6 pb-2 flex flex-col gap-2" id="nextClientBox">
+          <span class="text-xs sm:text-sm text-gray-400 uppercase tracking-widest font-mono">CLIENTE QUE SIGUE:</span>
+          <h2 class="text-4xl sm:text-6xl md:text-7xl font-black text-white tracking-tight uppercase leading-none break-words" id="tvNextClientName">
+            ESPERANDO TURNO...
+          </h2>
+        </div>
+
+        <!-- BARBER CALLOUT MEGA HIGHLIGHT -->
+        <div class="my-4 p-4 sm:p-6 rounded-3xl bg-gradient-to-r from-[#00f2fe]/20 via-[#00f2fe]/10 to-transparent border-2 border-[#00f2fe] flex items-center gap-4 sm:gap-6 shadow-2xl">
+          <div class="w-14 h-14 sm:w-18 sm:h-18 rounded-2xl bg-[#00f2fe] text-black font-black flex items-center justify-center text-3xl sm:text-4xl shrink-0 shadow-lg">
+            💈
+          </div>
+          <div class="flex flex-col">
+            <span class="text-xs sm:text-sm font-black text-[#00f2fe] tracking-widest uppercase font-mono">
+              SE TIENE QUE CORTAR CON EL BARBERO:
+            </span>
+            <span class="text-3xl sm:text-5xl font-black text-white tracking-tight uppercase mt-0.5" id="tvNextBarberHero">
+              --
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 bg-black/60 p-4 rounded-2xl border border-[#23232c] text-xs mt-2">
+        <div>
+          <span class="text-gray-500 block text-[11px] font-mono">HORARIO ESTIMADO:</span>
+          <span class="text-base sm:text-xl font-bold text-[#00f2fe] font-mono" id="tvNextTime">--:-- hs</span>
+        </div>
+        <div>
+          <span class="text-gray-500 block text-[11px] font-mono">SERVICIO SOLICITADO:</span>
+          <span class="text-base sm:text-xl font-bold text-gray-200 truncate block font-mono" id="tvNextService">--</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: EN ATENCIÓN AHORA (EN SILLÓN) + MINI COLA -->
+    <div class="lg:col-span-5 flex flex-col gap-6">
+      
+      <!-- AHORA EN SILLÓN -->
+      <div class="bg-gradient-to-br from-[#111118] to-[#1c1c16] border-2 border-glow-volt rounded-3xl p-6 sm:p-7 shadow-2xl relative overflow-hidden">
+        <div class="flex items-center justify-between pb-3 border-b border-[#23232c]">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">💺</span>
+            <span class="text-xs text-[#d4ff00] font-black uppercase tracking-widest">EN SILLÓN AHORA</span>
+          </div>
+          <span class="px-3 py-1 rounded-full bg-[#d4ff00]/20 text-[#d4ff00] text-[10px] font-black uppercase tracking-wider">
+            ATENDIENDO
+          </span>
+        </div>
+
+        <div class="py-4">
+          <span class="text-[10px] text-gray-500 uppercase tracking-widest block font-mono">CLIENTE:</span>
+          <h3 class="text-2xl sm:text-4xl font-black text-white tracking-tight uppercase break-words" id="tvInChairClientName">
+            SILLÓN DISPONIBLE
+          </h3>
+          <div class="flex justify-between items-center text-xs text-gray-400 mt-2">
+            <span>Barbero: <strong class="text-white" id="tvInChairBarber">--</strong></span>
+            <span>Servicio: <strong class="text-[#d4ff00]" id="tvInChairService">--</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRÓXIMOS EN ESPERA (COLA) -->
+      <div class="bg-[#111116] border border-[#23232c] rounded-3xl p-5 flex-1 shadow-xl flex flex-col justify-between">
+        <div>
+          <div class="flex justify-between items-center pb-2 border-b border-[#23232c]">
+            <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">PRÓXIMOS EN COLA DE ESPERA</span>
+            <span class="text-xs text-[#d4ff00] font-bold" id="tvQueueCount">0 en espera</span>
+          </div>
+
+          <div class="divide-y divide-[#23232c] text-xs pt-1 max-h-48 overflow-hidden" id="tvQueueList">
+            <!-- Dynamic rows -->
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-[#23232c] flex justify-between items-center text-[11px] text-gray-500 font-mono">
+          <span>Actualización en tiempo real</span>
+          <span class="text-[#00f2fe] font-bold">● Vía BladeSync</span>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- BOTTOM TICKER / MARQUEE BANNER -->
+  <footer class="w-full bg-[#111116] border border-[#23232c] rounded-2xl py-3 px-4 shadow-2xl overflow-hidden flex items-center gap-3">
+    <span class="px-2.5 py-1 rounded-lg bg-[#d4ff00] text-black text-xs font-black uppercase tracking-widest shrink-0">
+      AVISOS
+    </span>
+    <div class="overflow-hidden flex-1 relative whitespace-nowrap">
+      <div class="marquee-text text-sm font-bold text-gray-200" id="tvMarqueeText">
+        💈 Bienvenido a la Barbería • Turnos en Tiempo Real • Wi-Fi Disponible en Sala de Espera • Conoce nuestros productos en el Shop Barber
+      </div>
+    </div>
+  </footer>
+
+  <!-- SCRIPT DISPLAY CONTROLLER -->
+  <script>
+    let lastCalledId = null;
+
+    // Web Audio Chime Synth
+    const TVSound = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === "suspended") this.ctx.resume();
+      },
+      playChime() {
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          // Dual Airport Chime: G4 (392Hz) -> C5 (523.25Hz)
+          [392.00, 523.25].forEach((freq, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.type = "sine";
+            const startTime = now + (i * 0.35);
+            osc.frequency.setValueAtTime(freq, startTime);
+            gain.gain.setValueAtTime(0.3, startTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.8);
+            osc.start(startTime);
+            osc.stop(startTime + 0.8);
+          });
+        } catch(e) {}
+      }
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+      initDigitalClock();
+      fetchDisplayData();
+      setInterval(fetchDisplayData, 8000); // Polling cada 8s para sincronización con moderador
+    });
+
+    function initDigitalClock() {
+      const clockEl = document.getElementById("tvDigitalClock");
+      const update = () => {
+        const now = new Date();
+        if (clockEl) clockEl.textContent = now.toTimeString().split(" ")[0];
+      };
+      update();
+      setInterval(update, 1000);
+    }
+
+    async function fetchDisplayData() {
+      try {
+        const res = await fetch("/api/live-agenda");
+        if (!res.ok) return;
+        const data = await res.json();
+        renderTVBoard(data);
+      } catch (e) {
+        console.warn("Error cargando pantalla TV:", e);
+      }
+    }
+
+    function renderTVBoard(data) {
+      if (!data) return;
+
+      // Brand Title
+      const titleEl = document.getElementById("tvBarberTitle");
+      if (titleEl && data.barber_name) {
+        titleEl.innerHTML = `${escapeHtml(data.barber_name.toUpperCase())}<span class="text-[#d4ff00]">_</span>`;
+      }
+
+      // Marquee & Subtitle
+      if (data.tv_marquee) {
+        document.getElementById("tvMarqueeText").textContent = data.tv_marquee;
+      }
+      if (data.tv_subtitle) {
+        document.getElementById("tvSubtitle").textContent = data.tv_subtitle;
+      }
+
+      // 1. EL QUE SIGUE (NEXT UP)
+      const nextClient = data.next_up && data.next_up.length > 0 ? data.next_up[0] : null;
+      const nextClientNameEl = document.getElementById("tvNextClientName");
+      const nextBarberHeroEl = document.getElementById("tvNextBarberHero");
+      const nextTimeEl = document.getElementById("tvNextTime");
+      const nextServiceEl = document.getElementById("tvNextService");
+
+      if (nextClient) {
+        nextClientNameEl.textContent = nextClient.client_name.toUpperCase();
+        if (nextBarberHeroEl) {
+          nextBarberHeroEl.textContent = (nextClient.barber_name || "GENERAL").toUpperCase();
+        }
+        nextTimeEl.textContent = `${nextClient.time_str} hs`;
+        nextServiceEl.textContent = nextClient.service;
+      } else {
+        nextClientNameEl.textContent = "SIN TURNOS EN ESPERA";
+        if (nextBarberHeroEl) {
+          nextBarberHeroEl.textContent = "AL DÍA";
+        }
+        nextTimeEl.textContent = "--:-- hs";
+        nextServiceEl.textContent = "--";
+      }
+
+      // 2. EN SILLÓN AHORA (IN SERVICE)
+      const inChair = data.in_service && data.in_service.length > 0 ? data.in_service[0] : null;
+      const inChairClientEl = document.getElementById("tvInChairClientName");
+      const inChairBarberEl = document.getElementById("tvInChairBarber");
+      const inChairServiceEl = document.getElementById("tvInChairService");
+
+      if (inChair) {
+        inChairClientEl.textContent = inChair.client_name.toUpperCase();
+        inChairBarberEl.textContent = inChair.barber_name;
+        inChairServiceEl.textContent = inChair.service;
+      } else {
+        inChairClientEl.textContent = "SILLÓN DISPONIBLE";
+        inChairBarberEl.textContent = "Listo para atender";
+        inChairServiceEl.textContent = "--";
+      }
+
+      // 3. COLA DE ESPERA
+      const queueListEl = document.getElementById("tvQueueList");
+      const queueCountEl = document.getElementById("tvQueueCount");
+      const upcoming = data.upcoming || [];
+
+      // Exclude first if it's already shown as next up
+      const waitingList = upcoming.slice(nextClient ? 1 : 0, 5);
+      if (queueCountEl) queueCountEl.textContent = `${upcoming.length} en agenda`;
+
+      if (queueListEl) {
+        queueListEl.innerHTML = "";
+        if (waitingList.length === 0) {
+          queueListEl.innerHTML = '<div class="py-3 text-gray-500 text-center">No hay más turnos en cola para hoy.</div>';
+        } else {
+          waitingList.forEach(item => {
+            const row = document.createElement("div");
+            row.className = "flex justify-between items-center py-2";
+            row.innerHTML = `
+              <div class="flex items-center gap-2">
+                <span class="text-[#00f2fe] font-bold font-mono">${item.time_str} hs</span>
+                <span class="text-white font-bold">${escapeHtml(item.client_name)}</span>
+              </div>
+              <span class="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-300 text-[11px] font-mono">
+                Barbero: <strong class="text-[#d4ff00]">${escapeHtml(item.barber_name)}</strong>
+              </span>
+            `;
+            queueListEl.appendChild(row);
+          });
+        }
+      }
+
+      // 4. CHECK IF A TURN HAS BEEN CALLED VIA LIVE MODERATOR
+      if (data.called_appointment) {
+        const called = data.called_appointment;
+        if (lastCalledId !== called.id) {
+          lastCalledId = called.id;
+          triggerCalledAlert(called);
+        }
+      }
+    }
+
+    function triggerCalledAlert(called) {
+      document.getElementById("calledClientName").textContent = called.client_name.toUpperCase();
+      document.getElementById("calledBarberName").textContent = (called.barber_name || "GENERAL").toUpperCase();
+      document.getElementById("calledService").textContent = called.service;
+
+      const overlay = document.getElementById("calledOverlay");
+      if (overlay) overlay.classList.remove("hidden");
+
+      // Play chime
+      TVSound.playChime();
+
+      // Announce voice
+      setTimeout(() => {
+        if ("speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(
+            `¡Turno llamado! ${called.client_name}, se tiene que cortar con el barbero ${called.barber_name}. Por favor pasar al sillón.`
+          );
+          utterance.lang = "es-AR";
+          utterance.rate = 0.9;
+          utterance.pitch = 1.0;
+          window.speechSynthesis.speak(utterance);
+        }
+      }, 700);
+
+      // Auto dismiss after 14 seconds
+      setTimeout(dismissCalledOverlay, 14000);
+    }
+
+    function dismissCalledOverlay() {
+      const overlay = document.getElementById("calledOverlay");
+      if (overlay) overlay.classList.add("hidden");
+    }
+
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {});
+      } else if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>

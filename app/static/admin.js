@@ -126,6 +126,9 @@ async function verifyAdminSession() {
 }
 
 function adminLogout() {
+  if (adminToken) {
+    fetch('/api/admin/logout', { method: 'POST', headers: authHeaders() }).catch(() => {});
+  }
   adminToken = "";
   localStorage.removeItem("bladesync_admin_token");
   showLoginOverlay();

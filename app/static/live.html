@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0a0a0c">
-  <title>AGENDA EN VIVO // Sala de Espera</title>
+  <title>AGENDA EN VIVO // Moderador de Turnos y Pantalla TV</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700;800;900&display=swap" rel="stylesheet">
   
   <style>
     :root {
@@ -27,8 +27,8 @@
       padding: 0;
       min-height: 100vh;
       background-image: 
-        radial-gradient(at 10% 10%, rgba(212, 255, 0, 0.04) 0px, transparent 50%),
-        radial-gradient(at 90% 90%, rgba(0, 242, 254, 0.04) 0px, transparent 50%);
+        radial-gradient(at 10% 10%, rgba(212, 255, 0, 0.05) 0px, transparent 50%),
+        radial-gradient(at 90% 90%, rgba(0, 242, 254, 0.05) 0px, transparent 50%);
     }
 
     .font-mono-num {
@@ -47,14 +47,14 @@
 
     @keyframes pulseSoft {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.85; transform: scale(1.01); }
+      50% { opacity: 0.88; transform: scale(1.008); }
     }
 
     .animate-pulse-soft {
       animation: pulseSoft 3s ease-in-out infinite;
     }
 
-    /* Kiosk full screen custom scrollbar */
+    /* Custom scrollbar */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #0a0a0c; }
     ::-webkit-scrollbar-thumb { background: #23232c; border-radius: 9999px; }
@@ -63,11 +63,16 @@
     .live-progress-bar {
       transition: width 1s linear;
     }
+
+    .modal-backdrop {
+      background-color: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+    }
   </style>
 </head>
 <body class="flex flex-col min-h-screen p-3 sm:p-6 antialiased selection:bg-[#d4ff00] selection:text-black">
 
-  <!-- TOP HEADER KIOSK -->
+  <!-- TOP HEADER MODERATOR & KIOSK -->
   <header class="w-full max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 pb-4 border-b border-[#23232c]">
     
     <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
@@ -78,7 +83,7 @@
         </span>
         <div>
           <div class="flex items-center gap-2">
-            <span class="text-[10px] font-mono-num uppercase tracking-widest text-[#d4ff00] font-bold px-2 py-0.5 rounded bg-[#d4ff00]/10 border border-[#d4ff00]/20">SALA DE ESPERA // EN VIVO</span>
+            <span class="text-[10px] font-mono-num uppercase tracking-widest text-[#d4ff00] font-bold px-2 py-0.5 rounded bg-[#d4ff00]/10 border border-[#d4ff00]/20">MODERADOR EN VIVO</span>
             <span class="text-[10px] text-gray-500 font-mono-num hidden sm:inline" id="liveDateText">--/--/----</span>
           </div>
           <h1 class="text-xl sm:text-2xl font-extrabold font-mono-num text-white tracking-tight flex items-center gap-1" id="liveBarberTitle">
@@ -88,43 +93,58 @@
       </div>
 
       <div class="md:hidden flex items-center gap-2">
-        <button onclick="toggleFullScreen()" class="p-2 rounded-xl bg-[#131318] border border-[#23232c] text-xs font-mono-num text-gray-300">
-          ⛶
+        <a href="/display.html" target="_blank" class="px-2.5 py-1.5 rounded-xl bg-[#00f2fe]/10 border border-[#00f2fe]/30 text-xs font-mono-num text-[#00f2fe] font-bold">
+          📺 TV
+        </a>
+        <button onclick="openWalkInModal()" class="px-2.5 py-1.5 rounded-xl bg-[#d4ff00] text-black font-mono-num text-xs font-bold">
+          + Walk-in
         </button>
       </div>
     </div>
 
-    <!-- DIGITAL CLOCK & CONTROLS -->
-    <div class="flex flex-wrap items-center justify-between md:justify-end gap-3 w-full md:w-auto">
+    <!-- DIGITAL CLOCK & MAIN ACTION BUTTONS -->
+    <div class="flex flex-wrap items-center justify-between md:justify-end gap-2.5 w-full md:w-auto">
       
       <!-- Big Digital Clock -->
-      <div class="flex items-center gap-2 bg-[#131318] px-4 py-2 rounded-2xl border border-[#23232c] shadow-lg">
+      <div class="flex items-center gap-2 bg-[#131318] px-3.5 py-1.5 rounded-2xl border border-[#23232c] shadow-lg">
         <span class="text-xs text-gray-400 font-mono-num">HORA:</span>
-        <span class="text-xl sm:text-2xl font-extrabold font-mono-num text-white tracking-wider" id="digitalClock">00:00:00</span>
+        <span class="text-lg sm:text-xl font-extrabold font-mono-num text-white tracking-wider" id="digitalClock">00:00:00</span>
         <span class="text-[10px] font-mono-num text-[#d4ff00] font-bold">ART</span>
       </div>
 
-      <!-- Actions -->
-      <div class="flex items-center gap-2">
-        <button onclick="announceCurrentTurnVoice()" id="btnVoiceAnnounce" title="Anunciar Próximo Turno con Voz" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#131318] border border-[#23232c] text-xs font-mono-num text-gray-200 hover:border-[#d4ff00] hover:text-[#d4ff00] transition active:scale-95 shadow">
-          <span>🔔</span>
-          <span class="hidden sm:inline">Llamador</span>
-        </button>
+      <!-- Action: Open TV Screen -->
+      <a href="/display.html" target="_blank" title="Abrir Pantalla TV Gigante para Clientes" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#00f2fe]/10 border border-[#00f2fe]/30 text-xs font-mono-num text-[#00f2fe] hover:bg-[#00f2fe] hover:text-black font-bold transition active:scale-95 shadow">
+        <span>📺</span>
+        <span>Pantalla TV</span>
+      </a>
 
-        <button onclick="toggleFullScreen()" title="Pantalla Completa Kiosk TV" class="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#131318] border border-[#23232c] text-xs font-mono-num text-gray-200 hover:border-[#00f2fe] hover:text-[#00f2fe] transition active:scale-95 shadow">
-          <span>⛶</span>
-          <span>TV Kiosk</span>
-        </button>
+      <!-- Action: Add Walk-in (Spontaneous Client) -->
+      <button onclick="openWalkInModal()" title="Agregar Cliente Espontáneo a la Fila" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#d4ff00] text-black text-xs font-mono-num font-bold hover:bg-[#d4ff00]/90 transition active:scale-95 shadow">
+        <span>+</span>
+        <span>Walk-in</span>
+      </button>
 
-        <button onclick="fetchLiveAgenda(true)" title="Refrescar Ahora" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#131318] border border-[#23232c] text-xs font-mono-num text-gray-200 hover:border-white transition active:scale-95 shadow">
-          <span id="refreshIcon">🔄</span>
-          <span class="hidden sm:inline">Refrescar</span>
-        </button>
+      <!-- Action: Configure Live TV & Marquee -->
+      <button onclick="openTvConfigModal()" title="Configurar Título, Marquesina y Sonidos de la TV" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#131318] border border-[#23232c] text-xs font-mono-num text-gray-300 hover:border-gray-400 hover:text-white transition active:scale-95 shadow">
+        <span>⚙️</span>
+        <span class="hidden sm:inline">Ajustes TV</span>
+      </button>
 
-        <a href="/" class="px-3 py-2 rounded-xl bg-[#1a1a22] border border-[#23232c] text-xs font-mono-num text-gray-400 hover:text-white transition">
-          Turnero
-        </a>
-      </div>
+      <!-- Action: Announce Next Voice -->
+      <button onclick="announceCurrentTurnVoice()" id="btnVoiceAnnounce" title="Llamar Próximo Turno por Voz y Timbre" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#131318] border border-[#23232c] text-xs font-mono-num text-gray-200 hover:border-[#d4ff00] hover:text-[#d4ff00] transition active:scale-95 shadow">
+        <span>🔔</span>
+        <span class="hidden sm:inline">Llamar</span>
+      </button>
+
+      <!-- Action: Refresh -->
+      <button onclick="fetchLiveAgenda(true)" title="Refrescar Ahora" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#131318] border border-[#23232c] text-xs font-mono-num text-gray-200 hover:border-white transition active:scale-95 shadow">
+        <span id="refreshIcon">🔄</span>
+      </button>
+
+      <!-- Link to Admin Panel -->
+      <a href="/admin.html" class="px-3 py-2 rounded-xl bg-[#1a1a22] border border-[#23232c] text-xs font-mono-num text-gray-400 hover:text-white transition">
+        Admin
+      </a>
     </div>
   </header>
 
@@ -138,7 +158,12 @@
     <button onclick="filterByBarber(null)" id="btnFilterAll" class="px-4 py-2 rounded-xl font-mono-num text-xs font-bold shrink-0 transition bg-[#d4ff00] text-black shadow">
       💈 Todos los Sillones
     </button>
-    <!-- Dynamic Barbers injected here -->
+  </div>
+
+  <!-- NOTIFICATION BANNER (FEEDBACK) -->
+  <div id="liveAlertBanner" class="w-full max-w-7xl mx-auto hidden my-2 p-3 rounded-2xl bg-[#d4ff00]/10 border border-[#d4ff00]/30 text-xs font-mono-num text-[#d4ff00] flex justify-between items-center transition">
+    <span id="liveAlertText">Aviso en vivo</span>
+    <button onclick="dismissAlertBanner()" class="text-white hover:text-gray-300 font-bold px-2">✕</button>
   </div>
 
   <!-- MAIN KIOSK BOARD -->
@@ -197,17 +222,17 @@
             <!-- Dynamic Next Up Content -->
             <div class="text-center py-8">
               <span class="text-3xl block mb-2">⏳</span>
-              <h3 class="text-lg font-mono-num font-bold text-gray-300">Sin turnos inmediatos</h3>
+              <h3 class="text-lg font-mono-num font-bold text-gray-300">Sin turnos pendientes</h3>
               <p class="text-xs text-gray-500 font-mono-num mt-1">La agenda para hoy se encuentra al día.</p>
             </div>
           </div>
         </div>
 
         <div class="pt-4 mt-2 border-t border-[#23232c] flex justify-between items-center text-xs font-mono-num">
-          <span class="text-gray-400">Atento a la llamada del barbero</span>
-          <button onclick="announceCurrentTurnVoice()" class="text-[#00f2fe] hover:underline font-bold">
-            🔔 Anunciar por altavoz
-          </button>
+          <span class="text-gray-400">Transmisión sincronizada con TV</span>
+          <a href="/display.html" target="_blank" class="text-[#00f2fe] hover:underline font-bold flex items-center gap-1">
+            <span>📺 Ver en Pantalla TV</span>
+          </a>
         </div>
       </div>
 
@@ -221,16 +246,19 @@
           <h2 class="text-lg font-mono-num font-extrabold text-white flex items-center gap-2">
             <span>📋</span> Agenda Completa del Día en Vivo
           </h2>
-          <p class="text-xs text-gray-400 font-mono-num">Cronograma ordenado por horario para seguimiento de clientes y barberos.</p>
+          <p class="text-xs text-gray-400 font-mono-num">Cronograma ordenado por horario para moderar, editar y llamar a pantalla TV.</p>
         </div>
 
         <div class="flex items-center gap-2 font-mono-num text-xs">
-          <span class="px-2.5 py-1 rounded-lg bg-[#1a1a22] border border-[#23232c] text-gray-300" id="statTotalToday">Total: 0</span>
-          <span class="px-2.5 py-1 rounded-lg bg-[#d4ff00]/10 text-[#d4ff00] border border-[#d4ff00]/20" id="statRemaining">Restantes: 0</span>
+          <button onclick="openWalkInModal()" class="px-3 py-1.5 rounded-lg bg-[#d4ff00]/10 text-[#d4ff00] border border-[#d4ff00]/30 hover:bg-[#d4ff00] hover:text-black font-bold transition">
+            + Añadir Walk-in
+          </button>
+          <span class="px-2.5 py-1.5 rounded-lg bg-[#1a1a22] border border-[#23232c] text-gray-300" id="statTotalToday">Total: 0</span>
+          <span class="px-2.5 py-1.5 rounded-lg bg-[#d4ff00]/10 text-[#d4ff00] border border-[#d4ff00]/20" id="statRemaining">Restantes: 0</span>
         </div>
       </div>
 
-      <!-- APPOINTMENTS TABLE / GRID -->
+      <!-- APPOINTMENTS TABLE -->
       <div class="overflow-x-auto">
         <table class="w-full text-left font-mono-num text-xs">
           <thead>
@@ -241,7 +269,7 @@
               <th class="py-3 px-3">SERVICIO</th>
               <th class="py-3 px-3">DURACIÓN</th>
               <th class="py-3 px-3">ESTADO</th>
-              <th class="py-3 px-3 text-right">ACCIÓN</th>
+              <th class="py-3 px-3 text-right">MODERAR / EDITAR</th>
             </tr>
           </thead>
           <tbody id="upcomingTableBody" class="divide-y divide-[#23232c]">
@@ -252,7 +280,7 @@
 
     </div>
 
-    <!-- COMPLETED SECTION (ACCORDION / STATS) -->
+    <!-- COMPLETED SECTION (ACCORDION) -->
     <div class="bg-[#131318] border border-[#23232c] rounded-3xl p-4 shadow flex flex-col gap-2">
       <div onclick="toggleCompletedSection()" class="flex justify-between items-center cursor-pointer p-2 rounded-xl hover:bg-white/5 transition">
         <div class="flex items-center gap-2">
@@ -274,15 +302,181 @@
 
   <!-- FOOTER -->
   <footer class="w-full max-w-7xl mx-auto pt-6 text-center text-xs font-mono-num text-gray-600 flex flex-col sm:flex-row justify-between items-center gap-2">
-    <div>SISTEMA DE TURNOS EN VIVO // BLADESYNC 2026</div>
+    <div>SISTEMA DE TURNOS & PANTALLA EN VIVO // BLADESYNC 2026</div>
     <div class="flex items-center gap-3">
-      <a href="/" class="hover:text-gray-400">Ir al Turnero</a>
+      <a href="/display.html" target="_blank" class="text-[#00f2fe] hover:underline">📺 Pantalla TV Billboard</a>
+      <span>•</span>
+      <a href="/" class="hover:text-gray-400">Turnero</a>
       <span>•</span>
       <a href="/shop.html" class="hover:text-gray-400">Shop Barber</a>
       <span>•</span>
-      <a href="/admin.html" class="hover:text-gray-400">Administración</a>
+      <a href="/admin.html" class="hover:text-gray-400">Panel Admin</a>
     </div>
   </footer>
+
+  <!-- ============================================== -->
+  <!-- MODAL 1: WALK-IN (CLIENTE ESPONTÁNEO EN ESPERA) -->
+  <!-- ============================================== -->
+  <div id="walkInModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 modal-backdrop">
+    <div class="w-full max-w-md bg-[#131318] border border-[#23232c] rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex justify-between items-center border-b border-[#23232c] pb-3">
+        <h3 class="text-base font-mono-num font-bold text-white flex items-center gap-2">
+          <span>⚡</span> Agregar Cliente Espontáneo (Walk-in)
+        </h3>
+        <button onclick="closeWalkInModal()" class="text-gray-400 hover:text-white font-bold p-1">✕</button>
+      </div>
+
+      <form id="formWalkIn" onsubmit="submitWalkIn(event)" class="flex flex-col gap-3 font-mono-num text-xs">
+        <div>
+          <label class="text-gray-400 block mb-1">Nombre Completo del Cliente *</label>
+          <input type="text" id="walkInName" required placeholder="Ej. Juan Pérez" class="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-[#23232c] text-white focus:border-[#d4ff00] focus:outline-none">
+        </div>
+
+        <div>
+          <label class="text-gray-400 block mb-1">Teléfono / WhatsApp (Opcional)</label>
+          <input type="text" id="walkInPhone" placeholder="Ej. 3834123456" class="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-[#23232c] text-white focus:border-[#d4ff00] focus:outline-none">
+        </div>
+
+        <div>
+          <label class="text-gray-400 block mb-1">Barbero Asignado</label>
+          <select id="walkInBarber" class="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-[#23232c] text-white focus:border-[#d4ff00] focus:outline-none">
+            <option value="">Cualquier Barbero Disponible</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-gray-400 block mb-1">Servicio Solicitado</label>
+          <input type="text" id="walkInService" value="Corte Clásico / Fade" class="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-[#23232c] text-white focus:border-[#d4ff00] focus:outline-none">
+        </div>
+
+        <div>
+          <label class="text-gray-400 block mb-1">Duración Estimada (Minutos)</label>
+          <input type="number" id="walkInDuration" value="30" min="10" max="180" class="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-[#23232c] text-white focus:border-[#d4ff00] focus:outline-none">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-[#23232c] mt-2">
+          <button type="button" onclick="closeWalkInModal()" class="px-4 py-2.5 rounded-xl bg-[#1a1a22] text-gray-300 hover:text-white transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-[#d4ff00] text-black font-bold hover:bg-[#d4ff00]/90 transition">
+            ✓ Añadir a la Fila
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- MODAL 2: EDITAR TURNO EN VIVO (CLIENTE, BARBERO, ETC) -->
+  <!-- ============================================== -->
+  <div id="editLiveModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 modal-backdrop">
+    <div class="w-full max-w-md bg-[#131318] border border-[#23232c] rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex justify-between items-center border-b border-[#23232c] pb-3">
+        <h3 class="text-base font-mono-num font-bold text-white flex items-center gap-2">
+          <span>✏️</span> Editar Turno en Vivo
+        </h3>
+        <button onclick="closeEditLiveModal()" class="text-gray-400 hover:text-white font-bold p-1">✕</button>
+      </div>
+
+      <form id="formEditLive" onsubmit="submitEditLive(event)" class="flex flex-col gap-3 font-mono-num text-xs">
+        <input type="hidden" id="editApptId">
+
+        <div>
+          <label class="text-gray-400 block mb-1">Nombre del Cliente *</label>
+          <input type="text" id="editClientName" required class="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-[#23232c] text-white focus:border-[#00f2fe] focus:outline-none">
+        </div>
+
+        <div>
+          <label class="text-gray-400 block mb-1">Barbero Asignado</label>
+          <select id="editBarberSelect" class="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-[#23232c] text-white focus:border-[#00f2fe] focus:outline-none">
+          </select>
+        </div>
+
+        <div>
+          <label class="text-gray-400 block mb-1">Servicio</label>
+          <input type="text" id="editService" class="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-[#23232c] text-white focus:border-[#00f2fe] focus:outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-gray-400 block mb-1">Horario (HH:MM)</label>
+            <input type="text" id="editTimeStr" placeholder="15:30" class="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-[#23232c] text-white focus:border-[#00f2fe] focus:outline-none">
+          </div>
+          <div>
+            <label class="text-gray-400 block mb-1">Estado</label>
+            <select id="editStatus" class="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-[#23232c] text-white focus:border-[#00f2fe] focus:outline-none">
+              <option value="PENDIENTE">PENDIENTE</option>
+              <option value="CONFIRMADO">CONFIRMADO</option>
+              <option value="EN_ATENCION">EN ATENCIÓN (SILLÓN)</option>
+              <option value="COMPLETADO">COMPLETADO</option>
+              <option value="CANCELADO">CANCELADO</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-[#23232c] mt-2">
+          <button type="button" onclick="closeEditLiveModal()" class="px-4 py-2.5 rounded-xl bg-[#1a1a22] text-gray-300 hover:text-white transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-[#00f2fe] text-black font-bold hover:bg-[#00f2fe]/90 transition">
+            ✓ Guardar Cambios
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- MODAL 3: CONFIGURACIÓN DE PANTALLA TV & MARQUESINA -->
+  <!-- ============================================== -->
+  <div id="tvConfigModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 modal-backdrop">
+    <div class="w-full max-w-lg bg-[#131318] border border-[#23232c] rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex justify-between items-center border-b border-[#23232c] pb-3">
+        <h3 class="text-base font-mono-num font-bold text-white flex items-center gap-2">
+          <span>⚙️</span> Configuración Pantalla TV & Cartelera
+        </h3>
+        <button onclick="closeTvConfigModal()" class="text-gray-400 hover:text-white font-bold p-1">✕</button>
+      </div>
+
+      <form id="formTvConfig" onsubmit="submitTvConfig(event)" class="flex flex-col gap-3 font-mono-num text-xs">
+        <div>
+          <label class="text-gray-400 block mb-1">Título Principal de Pantalla TV</label>
+          <input type="text" id="cfgTvTitle" class="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-[#23232c] text-white focus:border-[#d4ff00] focus:outline-none">
+        </div>
+
+        <div>
+          <label class="text-gray-400 block mb-1">Subtítulo de Pantalla</label>
+          <input type="text" id="cfgTvSubtitle" class="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-[#23232c] text-white focus:border-[#d4ff00] focus:outline-none">
+        </div>
+
+        <div>
+          <label class="text-gray-400 block mb-1">Texto de Marquesina / Zócalo Animado</label>
+          <textarea id="cfgTvMarquee" rows="2" class="w-full px-3 py-2 rounded-xl bg-black/60 border border-[#23232c] text-white focus:border-[#d4ff00] focus:outline-none"></textarea>
+          <span class="text-[10px] text-gray-500">Aparece desplazándose en la parte inferior de la Pantalla TV.</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 pt-2">
+          <label class="flex items-center gap-2 cursor-pointer bg-black/40 p-2.5 rounded-xl border border-[#23232c]">
+            <input type="checkbox" id="cfgTvVoice" class="accent-[#d4ff00]">
+            <span class="text-gray-300 text-[11px]">Voz al Llamar Turno</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer bg-black/40 p-2.5 rounded-xl border border-[#23232c]">
+            <input type="checkbox" id="cfgTvChime" class="accent-[#d4ff00]">
+            <span class="text-gray-300 text-[11px]">Timbre Aeropuerto (Chime)</span>
+          </label>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-[#23232c] mt-2">
+          <button type="button" onclick="closeTvConfigModal()" class="px-4 py-2.5 rounded-xl bg-[#1a1a22] text-gray-300 hover:text-white transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-[#d4ff00] text-black font-bold hover:bg-[#d4ff00]/90 transition">
+            ✓ Guardar en TV
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- SCRIPT CONTROLLER -->
   <script>
@@ -290,12 +484,10 @@
       selectedBarberId: null,
       agendaData: null,
       autoRefreshTimer: null,
-      progressTimer: null,
-      secondsRemaining: 12,
-      refreshInterval: 12
+      refreshInterval: 8
     };
 
-    // UI Sound Synthesizer
+    // UI Sound Synthesizer (Airport Pleasant Chime)
     const UISound = {
       ctx: null,
       init() {
@@ -310,7 +502,6 @@
         if (!this.ctx) return;
         try {
           const now = this.ctx.currentTime;
-          // Dual pleasant chime (E5 -> G5 -> C6)
           const notes = [659.25, 783.99, 1046.50];
           notes.forEach((freq, idx) => {
             const osc = this.ctx.createOscillator();
@@ -333,11 +524,6 @@
       initDigitalClock();
       fetchLiveAgenda();
       startAutoRefresh();
-
-      // Fullscreen change handler
-      document.addEventListener("fullscreenchange", () => {
-        const btn = document.getElementById("btnVoiceAnnounce");
-      });
     });
 
     function initDigitalClock() {
@@ -392,7 +578,7 @@
       if (titleEl && data.barber_name) {
         titleEl.innerHTML = `${escapeHtml(data.barber_name.toUpperCase())}<span class="text-[#d4ff00]">_</span>`;
       }
-      document.title = `${data.barber_name} // Agenda en Vivo`;
+      document.title = `${data.barber_name} // Moderador en Vivo`;
 
       // Render Barbers Filter Bar
       renderBarbersFilterBar(data.barbers);
@@ -420,7 +606,6 @@
       const container = document.getElementById("barberFilterBar");
       if (!container || !barbers) return;
 
-      // Keep only first button (Todos) and append barbers
       const allBtn = document.getElementById("btnFilterAll");
       container.innerHTML = "";
       if (allBtn) {
@@ -503,9 +688,15 @@
             </div>
           </div>
 
-          <button onclick="changeAppointmentStatus(${cur.id}, 'COMPLETADO')" class="w-full mt-2 py-3 rounded-xl bg-[#d4ff00] text-black font-mono-num font-bold text-xs hover:bg-[#d4ff00]/90 transition shadow flex items-center justify-center gap-1.5">
-            <span>✓ FINALIZAR CORTE</span>
-          </button>
+          <div class="grid grid-cols-3 gap-2 mt-2">
+            <button onclick="changeAppointmentStatus(${cur.id}, 'COMPLETADO')" class="col-span-2 py-3 rounded-xl bg-[#d4ff00] text-black font-mono-num font-bold text-xs hover:bg-[#d4ff00]/90 transition shadow flex items-center justify-center gap-1.5">
+              <span>✓ FINALIZAR CORTE</span>
+            </button>
+            <button onclick="openEditLiveModal(${cur.id}, '${escapeHtml(cur.client_name)}', '${escapeHtml(cur.barber_name)}', '${escapeHtml(cur.service)}', '${cur.time_str}', 'EN_ATENCION')" class="py-3 rounded-xl bg-[#1a1a22] border border-[#23232c] text-gray-300 font-mono-num font-bold text-xs hover:text-white hover:border-white transition flex items-center justify-center gap-1">
+              <span>✏️</span>
+              <span class="hidden sm:inline">Editar</span>
+            </button>
+          </div>
         </div>
       `;
     }
@@ -549,12 +740,16 @@
             </div>
           </div>
 
-          <div class="flex items-center gap-2 mt-1">
-            <button onclick="changeAppointmentStatus(${nxt.id}, 'EN_ATENCION')" class="flex-1 py-3 rounded-xl bg-[#00f2fe] text-black font-mono-num font-bold text-xs hover:bg-[#00f2fe]/90 transition shadow flex items-center justify-center gap-1.5">
-              <span>💺 PASAR A SILLÓN</span>
+          <!-- Moderation Actions -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
+            <button onclick="changeAppointmentStatus(${nxt.id}, 'EN_ATENCION')" class="sm:col-span-1 py-3 rounded-xl bg-[#00f2fe] text-black font-mono-num font-bold text-xs hover:bg-[#00f2fe]/90 transition shadow flex items-center justify-center gap-1.5">
+              <span>💺 AL SILLÓN</span>
             </button>
-            <button onclick="announceSpecificClient('${escapeHtml(nxt.client_name)}', '${escapeHtml(nxt.barber_name)}')" class="px-4 py-3 rounded-xl bg-[#1a1a22] border border-[#23232c] text-[#00f2fe] font-mono-num font-bold text-xs hover:border-[#00f2fe] transition" title="Llamar Cliente">
-              🔔
+            <button onclick="callAppointmentToTv(${nxt.id}, '${escapeHtml(nxt.client_name)}')" class="sm:col-span-1 py-3 rounded-xl bg-[#d4ff00] text-black font-mono-num font-bold text-xs hover:bg-[#d4ff00]/90 transition shadow flex items-center justify-center gap-1.5" title="Llamar a Pantalla TV con Sonido">
+              <span>🔔 LLAMAR TV</span>
+            </button>
+            <button onclick="openEditLiveModal(${nxt.id}, '${escapeHtml(nxt.client_name)}', '${escapeHtml(nxt.barber_name)}', '${escapeHtml(nxt.service)}', '${nxt.time_str}', '${nxt.status}')" class="sm:col-span-1 py-3 rounded-xl bg-[#1a1a22] border border-[#23232c] text-gray-300 font-mono-num font-bold text-xs hover:text-white hover:border-white transition flex items-center justify-center gap-1">
+              <span>✏️ Editar</span>
             </button>
           </div>
         </div>
@@ -602,17 +797,25 @@
           </td>
           <td class="py-3 px-3">
             <span class="px-2 py-0.5 rounded text-[10px] font-bold ${
-              a.status === 'CONFIRMADO' ? 'bg-green-500/15 text-green-400 border border-green-500/30' : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+              a.status === 'CONFIRMADO' ? 'bg-green-500/15 text-green-400 border border-green-500/30' : 
+              a.status === 'LLAMANDO' ? 'bg-[#d4ff00]/20 text-[#d4ff00] border border-[#d4ff00]/40 animate-pulse' :
+              'bg-amber-500/15 text-amber-400 border border-amber-500/30'
             }">
               ${a.status}
             </span>
           </td>
           <td class="py-3 px-3 text-right">
             <div class="flex items-center justify-end gap-1">
-              <button onclick="changeAppointmentStatus(${a.id}, 'EN_ATENCION')" class="px-2.5 py-1 rounded bg-[#d4ff00]/10 border border-[#d4ff00]/30 text-[#d4ff00] hover:bg-[#d4ff00] hover:text-black transition text-[11px] font-bold" title="Iniciar">
-                Iniciar
+              <button onclick="callAppointmentToTv(${a.id}, '${escapeHtml(a.client_name)}')" class="px-2.5 py-1 rounded bg-[#d4ff00]/15 border border-[#d4ff00]/30 text-[#d4ff00] hover:bg-[#d4ff00] hover:text-black transition text-[11px] font-bold" title="Llamar a Pantalla TV">
+                🔔 Llamar TV
               </button>
-              <button onclick="changeAppointmentStatus(${a.id}, 'COMPLETADO')" class="px-2.5 py-1 rounded bg-white/5 border border-white/10 text-gray-300 hover:text-white transition text-[11px]" title="Completar">
+              <button onclick="openEditLiveModal(${a.id}, '${escapeHtml(a.client_name)}', '${escapeHtml(a.barber_name)}', '${escapeHtml(a.service)}', '${a.time_str}', '${a.status}')" class="px-2 py-1 rounded bg-white/5 border border-white/10 text-gray-300 hover:text-white transition text-[11px]" title="Editar Turno">
+                ✏️
+              </button>
+              <button onclick="changeAppointmentStatus(${a.id}, 'EN_ATENCION')" class="px-2 py-1 rounded bg-[#00f2fe]/10 border border-[#00f2fe]/30 text-[#00f2fe] hover:bg-[#00f2fe] hover:text-black transition text-[11px] font-bold" title="Pasar al Sillón">
+                💺
+              </button>
+              <button onclick="changeAppointmentStatus(${a.id}, 'COMPLETADO')" class="px-2 py-1 rounded bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500 hover:text-black transition text-[11px]" title="Finalizar">
                 ✓
               </button>
             </div>
@@ -663,6 +866,21 @@
       }
     }
 
+    // Call Appointment to TV Screen (Server-synced + local voice/chime)
+    async function callAppointmentToTv(apptId, clientName) {
+      try {
+        UISound.playChime();
+        showAlertBanner(`🔔 Llamando a "${clientName}" en la Pantalla TV...`);
+        const res = await fetch(`/api/live-agenda/${apptId}/call`, { method: "POST" });
+        if (res.ok) {
+          fetchLiveAgenda(true);
+        }
+      } catch (e) {
+        console.error("Error al llamar turno a TV:", e);
+      }
+    }
+
+    // Change status
     async function changeAppointmentStatus(apptId, newStatus) {
       try {
         UISound.playChime();
@@ -672,6 +890,7 @@
           body: JSON.stringify({ status: newStatus })
         });
         if (res.ok) {
+          showAlertBanner(`Estado actualizado a: ${newStatus}`);
           fetchLiveAgenda(true);
         }
       } catch (e) {
@@ -679,11 +898,12 @@
       }
     }
 
-    // Voice & Chime Announcer
+    // Announce with Web Speech
     function announceCurrentTurnVoice() {
       if (!liveState.agendaData) return;
       const nxt = liveState.agendaData.next_up && liveState.agendaData.next_up.length > 0 ? liveState.agendaData.next_up[0] : null;
       if (nxt) {
+        callAppointmentToTv(nxt.id, nxt.client_name);
         announceSpecificClient(nxt.client_name, nxt.barber_name);
       } else {
         announceText("No hay turnos inmediatos en espera.");
@@ -709,20 +929,188 @@
       }
     }
 
-    function toggleFullScreen() {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(err => {});
-      } else {
-        if (document.exitFullscreen) {
-          document.exitFullscreen();
+    // Modal: Walk-in
+    function openWalkInModal() {
+      const select = document.getElementById("walkInBarber");
+      if (select && liveState.agendaData && liveState.agendaData.barbers) {
+        select.innerHTML = `<option value="">Cualquier Barbero Disponible</option>`;
+        liveState.agendaData.barbers.forEach(b => {
+          select.innerHTML += `<option value="${b.id}">${escapeHtml(b.name)}</option>`;
+        });
+      }
+      document.getElementById("walkInModal").classList.remove("hidden");
+      document.getElementById("walkInName").focus();
+    }
+
+    function closeWalkInModal() {
+      document.getElementById("walkInModal").classList.add("hidden");
+    }
+
+    async function submitWalkIn(e) {
+      e.preventDefault();
+      const name = document.getElementById("walkInName").value.trim();
+      const phone = document.getElementById("walkInPhone").value.trim();
+      const barberId = document.getElementById("walkInBarber").value;
+      const service = document.getElementById("walkInService").value.trim();
+      const duration = parseInt(document.getElementById("walkInDuration").value) || 30;
+
+      if (!name) return;
+
+      try {
+        const res = await fetch("/api/live-agenda/walk-in", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            client_name: name,
+            client_phone: phone,
+            barber_id: barberId ? parseInt(barberId) : null,
+            service_name: service,
+            duration_min: duration
+          })
+        });
+
+        if (res.ok) {
+          closeWalkInModal();
+          document.getElementById("formWalkIn").reset();
+          showAlertBanner(`✓ Cliente espontáneo "${name}" añadido a la fila.`);
+          fetchLiveAgenda(true);
+        } else {
+          const err = await res.json();
+          alert(err.detail || "Error al agregar cliente.");
         }
+      } catch (err) {
+        console.error(err);
       }
     }
 
-    function startAutoRefresh() {
-      liveState.secondsRemaining = liveState.refreshInterval;
-      resetProgressTimer();
+    // Modal: Edit Live Appointment
+    function openEditLiveModal(id, clientName, barberName, service, timeStr, status) {
+      document.getElementById("editApptId").value = id;
+      document.getElementById("editClientName").value = clientName;
+      document.getElementById("editService").value = service;
+      document.getElementById("editTimeStr").value = timeStr;
+      document.getElementById("editStatus").value = status || "PENDIENTE";
 
+      const select = document.getElementById("editBarberSelect");
+      if (select && liveState.agendaData && liveState.agendaData.barbers) {
+        select.innerHTML = `<option value="">Sin cambio de barbero</option>`;
+        liveState.agendaData.barbers.forEach(b => {
+          const isSelected = b.name === barberName ? "selected" : "";
+          select.innerHTML += `<option value="${b.id}" ${isSelected}>${escapeHtml(b.name)}</option>`;
+        });
+      }
+
+      document.getElementById("editLiveModal").classList.remove("hidden");
+    }
+
+    function closeEditLiveModal() {
+      document.getElementById("editLiveModal").classList.add("hidden");
+    }
+
+    async function submitEditLive(e) {
+      e.preventDefault();
+      const id = document.getElementById("editApptId").value;
+      const clientName = document.getElementById("editClientName").value.trim();
+      const barberId = document.getElementById("editBarberSelect").value;
+      const service = document.getElementById("editService").value.trim();
+      const timeStr = document.getElementById("editTimeStr").value.trim();
+      const status = document.getElementById("editStatus").value;
+
+      try {
+        const payload = {
+          client_name: clientName,
+          service: service,
+          status: status,
+          time_str: timeStr
+        };
+        if (barberId) payload.barber_id = parseInt(barberId);
+
+        const res = await fetch(`/api/live-agenda/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          closeEditLiveModal();
+          showAlertBanner(`✓ Turno de "${clientName}" actualizado exitosamente.`);
+          fetchLiveAgenda(true);
+        } else {
+          const err = await res.json();
+          alert(err.detail || "Error al actualizar turno.");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Modal: TV Settings Config
+    async function openTvConfigModal() {
+      try {
+        const res = await fetch("/api/live-agenda/settings");
+        if (res.ok) {
+          const s = await res.json();
+          document.getElementById("cfgTvTitle").value = s.live_tv_title || "DON CARLOS BARBERSHOP";
+          document.getElementById("cfgTvSubtitle").value = s.live_tv_subtitle || "SALA DE ESPERA // TURNERO EN VIVO";
+          document.getElementById("cfgTvMarquee").value = s.live_tv_marquee || "";
+          document.getElementById("cfgTvVoice").checked = !!s.live_voice_enabled;
+          document.getElementById("cfgTvChime").checked = !!s.live_chime_enabled;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      document.getElementById("tvConfigModal").classList.remove("hidden");
+    }
+
+    function closeTvConfigModal() {
+      document.getElementById("tvConfigModal").classList.add("hidden");
+    }
+
+    async function submitTvConfig(e) {
+      e.preventDefault();
+      const data = {
+        live_tv_title: document.getElementById("cfgTvTitle").value.trim(),
+        live_tv_subtitle: document.getElementById("cfgTvSubtitle").value.trim(),
+        live_tv_marquee: document.getElementById("cfgTvMarquee").value.trim(),
+        live_voice_enabled: document.getElementById("cfgTvVoice").checked ? "true" : "false",
+        live_chime_enabled: document.getElementById("cfgTvChime").checked ? "true" : "false"
+      };
+
+      try {
+        const res = await fetch("/api/live-agenda/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+        if (res.ok) {
+          closeTvConfigModal();
+          showAlertBanner("✓ Configuración de Pantalla TV guardada.");
+          fetchLiveAgenda(true);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function showAlertBanner(msg) {
+      const banner = document.getElementById("liveAlertBanner");
+      const text = document.getElementById("liveAlertText");
+      if (!banner || !text) return;
+
+      text.textContent = msg;
+      banner.classList.remove("hidden");
+      setTimeout(() => {
+        banner.classList.add("hidden");
+      }, 5000);
+    }
+
+    function dismissAlertBanner() {
+      const banner = document.getElementById("liveAlertBanner");
+      if (banner) banner.classList.add("hidden");
+    }
+
+    function startAutoRefresh() {
+      resetProgressTimer();
       liveState.autoRefreshTimer = setInterval(() => {
         fetchLiveAgenda(false);
       }, liveState.refreshInterval * 1000);

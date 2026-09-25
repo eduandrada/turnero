@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timedelta
 import httpx
 from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from app.database import SessionLocal, get_argentina_now
 from app.models import Appointment
 
 logger = logging.getLogger("bladesync.scheduler")
@@ -109,7 +109,7 @@ async def check_upcoming_appointments():
     logger.info("Verificando citas próximas para envío de recordatorios...")
     db: Session = SessionLocal()
     try:
-        now = datetime.now()
+        now = get_argentina_now().replace(tzinfo=None)
         window_end = now + timedelta(hours=2, minutes=5)
 
         appointments = db.query(Appointment).filter(
