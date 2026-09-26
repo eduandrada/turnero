@@ -2479,6 +2479,7 @@ def serve_index():
 def serve_index_html():
     return serve_index()
 
+@app.get("/admin", include_in_schema=False)
 @app.get("/admin.html", include_in_schema=False)
 def serve_admin():
     admin_path = os.path.join(STATIC_DIR, "admin.html")
