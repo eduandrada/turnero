@@ -339,7 +339,7 @@ function applySettingsToUI() {
   }
 
   // 2. Identity & Branding
-  const bName = s.barber_name || s.app_name || "BladeSync Barber";
+  const bName = s.barber_name || s.app_name || "Turnero";
 
   const brand = document.getElementById("appBrandTitle");
   if (brand) {

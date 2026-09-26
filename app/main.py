@@ -565,7 +565,7 @@ def send_appointment_whatsapp_notifications(db: Session, appointment: Appointmen
         tmpl_client = get_setting(db, "wa_template_client", "Hola, {cliente}. Te confirmamos tu turno en {barberia}. Te atenderá {barbero} el {fecha} a las {hora} para {servicio}. Te esperamos en {direccion}.")
         tmpl_barber = get_setting(db, "wa_template_barber", "Hola, {barbero}. Tenés un nuevo turno confirmado: {cliente} — {servicio} — {fecha} — {hora}. Lugar: {direccion}.")
         
-        shop_name = get_setting(db, "barber_name", "BladeSync Barber")
+        shop_name = get_setting(db, "barber_name", "Turnero")
         shop_address = get_setting(db, "address", "Av. Principal 123")
         
         date_str = appointment.appointment_time.strftime("%d/%m/%Y")
@@ -1437,7 +1437,7 @@ def reassign_absent_barber_turnos(
     ).all()
 
     affected_list = []
-    shop_name = get_setting(db, "barber_name", "BladeSync Barber")
+    shop_name = get_setting(db, "barber_name", "Turnero")
 
     for a in appts:
         old_bname = a.barber_name
@@ -2263,7 +2263,7 @@ def serve_index():
     index_path = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-    return {"message": "BladeSync Barber Ecosystem API está corriendo."}
+    return {"message": "Turnero API está corriendo."}
 
 @app.get("/index.html", include_in_schema=False)
 def serve_index_html():

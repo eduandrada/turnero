@@ -166,7 +166,7 @@ async function loadShopSettings() {
         root.style.setProperty('--surface-border', s.color_border);
       }
 
-      const bName = s.barber_name || s.app_name || "BladeSync Barber";
+      const bName = s.barber_name || s.app_name || "Turnero";
       document.title = `${bName} // Shop Barber`;
 
       const shopBrand = document.getElementById("shopHeaderBrandTitle");

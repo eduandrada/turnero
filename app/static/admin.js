@@ -737,7 +737,7 @@ async function restoreBackup(filename) {
 // 13. SETTINGS, LOGO & VISUAL THEME
 function updateAdminBrandUI(sets) {
   if (!sets) return;
-  const bName = sets.barber_name || sets.app_name || "BladeSync Barber";
+  const bName = sets.barber_name || sets.app_name || "Turnero";
   const brandEl = document.getElementById("sidebarBrandName");
   if (brandEl) {
     if (sets.logo_url) {
