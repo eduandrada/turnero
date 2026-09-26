@@ -371,11 +371,43 @@ button:active, a:active, .btn-admin:active {
 @media (max-width: 900px) {
   .admin-sidebar {
     transform: translateX(-100%);
+    width: 280px;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.95);
   }
   .admin-sidebar.open {
     transform: translateX(0);
   }
   .admin-main {
     margin-left: 0;
+  }
+  .admin-topbar {
+    padding: 0 14px;
+  }
+  .mobile-only-btn {
+    display: inline-flex !important;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .admin-content {
+    padding: 14px;
+  }
+  .admin-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 8px;
+  }
+  .admin-table th, .admin-table td {
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+  .btn-admin {
+    min-height: 44px; /* Touch friendly */
+    display: inline-flex;
+    align-items: center;
   }
 }

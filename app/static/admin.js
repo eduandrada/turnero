@@ -93,6 +93,11 @@ function hideLoginOverlay() {
   document.getElementById("adminApp").style.display = "flex";
 }
 
+function toggleSidebar() {
+  const sidebar = document.getElementById("adminSidebar");
+  if (sidebar) sidebar.classList.toggle("open");
+}
+
 async function handleAdminLogin() {
   const u = document.getElementById("loginUsername").value.trim();
   const p = document.getElementById("loginPassword").value.trim();
@@ -106,6 +111,12 @@ async function handleAdminLogin() {
 
     const data = await res.json();
     if (res.ok && data.token) {
+      if (data.role === "encargado") {
+        alert("Acceso denegado. El usuario Encargado no tiene acceso al panel de administración. Serás redirigido a la recepción de Turnos.");
+        localStorage.setItem("bladesync_admin_token", data.token);
+        window.location.href = "/turnos.html";
+        return;
+      }
       adminToken = data.token;
       localStorage.setItem("bladesync_admin_token", adminToken);
       hideLoginOverlay();
@@ -124,6 +135,14 @@ async function verifyAdminSession() {
       headers: { "Authorization": `Bearer ${adminToken}` }
     });
     if (res.ok) {
+      const userData = await res.json();
+      if (userData.role === "encargado") {
+        alert("Acceso denegado. El usuario Encargado sólo tiene acceso a la pantalla de recepción (Turnos en Vivo). Redirigiendo...");
+        window.location.href = "/turnos.html";
+        return;
+      }
+      const badge = document.getElementById("adminUserBadge");
+      if (badge) badge.textContent = userData.username + (userData.role ? ` (${userData.role})` : '');
       hideLoginOverlay();
       loadAdminDashboard();
       loadSettingsToForm();
@@ -159,6 +178,10 @@ function switchSection(secId) {
   const target = document.getElementById(`section-${secId}`);
   if (target) target.style.display = "block";
 
+  // Close mobile sidebar after click
+  const sidebar = document.getElementById("adminSidebar");
+  if (sidebar) sidebar.classList.remove("open");
+
   const titles = {
     dashboard: "Dashboard",
     appointments: "Turnos & Agenda",
@@ -180,10 +203,13 @@ function switchSection(secId) {
     pwa: "Configuración PWA",
     security: "Seguridad",
     backups: "Copias de Seguridad",
-    audit: "🛡️ Auditoría de Cambios"
+    audit: "🛡️ Auditoría de Cambios",
+    staff: "👥 Gestión de Personal & Permisos",
+    shift_closures: "💵 Auditoría de Cajas & Rendiciones"
   };
 
-  document.getElementById("currentSectionTitle").textContent = titles[secId] || "Panel";
+  const titleEl = document.getElementById("currentSectionTitle");
+  if (titleEl) titleEl.textContent = titles[secId] || "Panel";
 
   if (secId === "dashboard") loadAdminDashboard();
   else if (secId === "appointments") loadAdminAppointments();
@@ -200,6 +226,194 @@ function switchSection(secId) {
   else if (secId === "identity" || secId === "appearance" || secId === "content" || secId === "pwa" || secId === "whatsapp") loadSettingsToForm();
   else if (secId === "backups") loadAdminBackups();
   else if (secId === "audit") loadAuditLogsData();
+  else if (secId === "staff") loadStaffData();
+  else if (secId === "shift_closures") loadShiftClosuresData();
+}
+
+// GESTIÓN DE PERSONAL & PERMISOS MODULARES
+async function loadStaffData() {
+  try {
+    const res = await fetch("/api/admin/staff", { headers: authHeaders() });
+    if (!res.ok) return;
+    const staffList = await res.json();
+    const tbody = document.getElementById("staffTableBody");
+    tbody.innerHTML = "";
+
+    staffList.forEach(u => {
+      const tr = document.createElement("tr");
+      const isEncargado = u.role === "encargado";
+      tr.innerHTML = `
+        <td><strong>${escapeHtml(u.username)}</strong></td>
+        <td><span class="badge ${isEncargado ? 'badge-pending' : 'badge-confirmed'}">${u.role ? u.role.toUpperCase() : 'ADMIN'}</span></td>
+        <td><span class="badge ${u.is_active ? 'badge-confirmed' : 'badge-canceled'}">${u.is_active ? 'ACTIVO' : 'INACTIVO'}</span></td>
+        <td>
+          <input type="checkbox" ${u.can_edit_stock ? 'checked' : ''} onchange="toggleStaffPermission(${u.id}, 'can_edit_stock', this.checked)" style="accent-color: #d4ff00; width: 18px; height: 18px; cursor: pointer;">
+        </td>
+        <td>
+          <input type="checkbox" ${u.can_view_finances ? 'checked' : ''} onchange="toggleStaffPermission(${u.id}, 'can_view_finances', this.checked)" style="accent-color: #d4ff00; width: 18px; height: 18px; cursor: pointer;">
+        </td>
+        <td>
+          <input type="checkbox" ${u.can_cancel_appointments ? 'checked' : ''} onchange="toggleStaffPermission(${u.id}, 'can_cancel_appointments', this.checked)" style="accent-color: #d4ff00; width: 18px; height: 18px; cursor: pointer;">
+        </td>
+        <td>
+          <input type="checkbox" ${u.can_manage_shop ? 'checked' : ''} onchange="toggleStaffPermission(${u.id}, 'can_manage_shop', this.checked)" style="accent-color: #d4ff00; width: 18px; height: 18px; cursor: pointer;">
+        </td>
+        <td>
+          <button class="btn-admin btn-admin-sm btn-admin-secondary" onclick="openChangeStaffPasswordModal(${u.id}, '${escapeHtml(u.username)}')">🔑 Pass</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (e) {
+    console.error("Error al cargar personal:", e);
+  }
+}
+
+async function toggleStaffPermission(userId, permName, value) {
+  try {
+    const payload = {};
+    payload[permName] = value;
+    const res = await fetch(`/api/admin/staff/${userId}/permissions`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) alert("Error al actualizar permisos.");
+  } catch (e) {
+    alert("Error de conexión al actualizar permisos.");
+  }
+}
+
+function openCreateStaffModal() {
+  document.getElementById("newStaffUsername").value = "";
+  document.getElementById("newStaffPassword").value = "";
+  document.getElementById("createStaffModal").style.display = "flex";
+}
+
+function closeCreateStaffModal() {
+  document.getElementById("createStaffModal").style.display = "none";
+}
+
+async function submitCreateStaff() {
+  const u = document.getElementById("newStaffUsername").value.trim();
+  const p = document.getElementById("newStaffPassword").value.trim();
+  const r = document.getElementById("newStaffRole").value;
+  const cStock = document.getElementById("newStaffCanStock").checked;
+  const cFin = document.getElementById("newStaffCanFinances").checked;
+  const cCancel = document.getElementById("newStaffCanCancel").checked;
+  const cShop = document.getElementById("newStaffCanShop").checked;
+
+  try {
+    const res = await fetch("/api/admin/staff", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        username: u,
+        password: p,
+        role: r,
+        is_active: true,
+        can_edit_stock: cStock,
+        can_view_finances: cFin,
+        can_cancel_appointments: cCancel,
+        can_manage_shop: cShop
+      })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alert(`Usuario staff '${u}' creado correctamente.`);
+      closeCreateStaffModal();
+      loadStaffData();
+    } else {
+      alert(data.detail || "Error al crear usuario.");
+    }
+  } catch (e) {
+    alert("Error de conexión.");
+  }
+}
+
+function openChangeStaffPasswordModal(userId, username) {
+  document.getElementById("changePasswordStaffId").value = userId;
+  document.getElementById("changePasswordStaffUsername").value = username;
+  document.getElementById("changePasswordNewPass").value = "";
+  document.getElementById("changeStaffPasswordModal").style.display = "flex";
+}
+
+function closeChangeStaffPasswordModal() {
+  document.getElementById("changeStaffPasswordModal").style.display = "none";
+}
+
+async function submitChangeStaffPassword() {
+  const userId = document.getElementById("changePasswordStaffId").value;
+  const newPass = document.getElementById("changePasswordNewPass").value.trim();
+  if (!newPass) return;
+
+  try {
+    const res = await fetch(`/api/admin/staff/${userId}/password`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ new_password: newPass })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alert("Contraseña actualizada con éxito.");
+      closeChangeStaffPasswordModal();
+    } else {
+      alert(data.detail || "Error al cambiar contraseña.");
+    }
+  } catch (e) {
+    alert("Error de conexión.");
+  }
+}
+
+// AUDITORÍA DE CAJAS Y RENDICIÓN DE TURNO
+async function loadShiftClosuresData() {
+  try {
+    const res = await fetch("/api/admin/shift-closures", { headers: authHeaders() });
+    if (!res.ok) return;
+    const closures = await res.json();
+    const tbody = document.getElementById("shiftClosuresTableBody");
+    tbody.innerHTML = "";
+
+    if (closures.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="12" style="text-align: center; padding: 40px; color: #9ca3af;">
+            No hay registros de arqueo o cierre de caja.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    closures.forEach(c => {
+      const tr = document.createElement("tr");
+      const diff = c.diferencia || 0;
+      let diffBadge = `<span class="badge badge-confirmed">$0.00</span>`;
+      if (diff < 0) {
+        diffBadge = `<span class="badge badge-canceled">-$${Math.abs(diff).toLocaleString("es-AR", {minimumFractionDigits: 2})} (FALTANTE)</span>`;
+      } else if (diff > 0) {
+        diffBadge = `<span class="badge badge-pending">+$${diff.toLocaleString("es-AR", {minimumFractionDigits: 2})} (SOBRANTE)</span>`;
+      }
+
+      tr.innerHTML = `
+        <td>${c.fecha_cierre ? c.fecha_cierre.replace("T", " ").substring(0, 16) : '-'} hs</td>
+        <td><strong style="color: #d4ff00;">${escapeHtml(c.encargado_name)}</strong></td>
+        <td>$${c.fondo_inicial.toLocaleString("es-AR", {minimumFractionDigits: 2})}</td>
+        <td>$${c.total_efectivo.toLocaleString("es-AR", {minimumFractionDigits: 2})}</td>
+        <td>$${c.total_transferencia.toLocaleString("es-AR", {minimumFractionDigits: 2})}</td>
+        <td>$${c.total_cortes.toLocaleString("es-AR", {minimumFractionDigits: 2})}</td>
+        <td>$${c.total_productos.toLocaleString("es-AR", {minimumFractionDigits: 2})}</td>
+        <td style="font-weight: bold; color: #ffffff;">$${c.total_calculado.toLocaleString("es-AR", {minimumFractionDigits: 2})}</td>
+        <td style="font-weight: bold; color: #00f2fe;">$${c.balance_declarado.toLocaleString("es-AR", {minimumFractionDigits: 2})}</td>
+        <td>${diffBadge}</td>
+        <td><strong>${c.total_turnos_atendidos}</strong></td>
+        <td style="font-size: 0.75rem; color: #9ca3af;">${escapeHtml(c.notas || '-')}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (e) {
+    console.error("Error al cargar auditoría de cajas:", e);
+  }
 }
 
 // 1. DASHBOARD

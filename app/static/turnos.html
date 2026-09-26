@@ -242,6 +242,9 @@
 
       <!-- BOTONES DE ACCIÓN Y SEGURIDAD -->
       <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+        <button onclick="openShiftClosureModal()" class="btn-admin" style="background: #10b981; color: #000; font-weight: 800; padding: 10px 14px;">
+          💵 Cerrar Turno / Rendición
+        </button>
         <button class="btn-contingencia" onclick="openContingencyModal()">
           ⚠️ Barbero Ausente / Reasignar
         </button>
@@ -468,6 +471,65 @@
             💾 Guardar Producto & Registrar Audit
           </button>
         </div>
+  <!-- MODAL DE ARQUEO DE CAJA Y RENDICIÓN DE TURNO -->
+  <div id="shiftClosureModal" style="position: fixed; inset: 0; background: rgba(10, 10, 12, 0.94); backdrop-filter: blur(12px); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 20px; width: 100%; max-width: 580px; padding: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.9); max-height: 92vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <div>
+          <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #10b981; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">FIN DE JORNADA & AUDITORÍA</span>
+          <h3 style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 4px 0 0 0; font-size: 1.3rem;">💵 Cerrar Turno / Rendición de Caja</h3>
+        </div>
+        <button onclick="closeShiftClosureModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.4rem; cursor: pointer;">✕</button>
+      </div>
+
+      <form id="shiftClosureForm" onsubmit="event.preventDefault(); submitShiftClosure();">
+        <div style="background: #1a1a22; border: 1px solid #23232c; border-radius: 14px; padding: 16px; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #9ca3af; margin-bottom: 10px;">
+            <span>Periodo de Rendición:</span>
+            <span id="closurePeriodText" style="color: #fff; font-family: monospace; font-weight: bold;">Cargando...</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem; border-top: 1px dashed #23232c; margin-top: 8px; padding-top: 8px;">
+            <div><span style="color: #9ca3af;">Total Cortes:</span> <strong id="closureCortesText" style="color: #d2ff00;">$0</strong></div>
+            <div><span style="color: #9ca3af;">Total Productos:</span> <strong id="closureProductsText" style="color: #00f2fe;">$0</strong></div>
+            <div><span style="color: #9ca3af;">Efectivo Estimado:</span> <strong id="closureCashText" style="color: #fff;">$0</strong></div>
+            <div><span style="color: #9ca3af;">Transferencias:</span> <strong id="closureTransfersText" style="color: #fff;">$0</strong></div>
+            <div><span style="color: #9ca3af;">Turnos Atendidos:</span> <strong id="closureTurnosCount" style="color: #fff;">0</strong></div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace; font-weight: bold;">FONDO INICIAL DE CAJA ($)</label>
+          <input type="number" step="0.01" min="0" id="closureFondoInicial" class="form-control" value="0" oninput="recalculateClosureBalance()" style="margin-top: 4px;">
+        </div>
+
+        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.8rem; font-family: monospace; color: #9ca3af;">TOTAL CALCULADO POR SISTEMA:</span>
+            <strong id="closureCalculatedTotal" style="font-size: 1.2rem; font-family: monospace; color: #10b981;">$0.00</strong>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace; font-weight: bold;">DINERO REAL EN CAJA DECLARADO ($) *</label>
+          <input type="number" step="0.01" min="0" id="closureBalanceDeclarado" class="form-control" placeholder="Ingrese el dinero contado en caja..." required oninput="recalculateClosureBalance()" style="margin-top: 4px; font-size: 1.1rem; color: #d2ff00; font-weight: bold;">
+        </div>
+
+        <div id="closureDiffContainer" style="padding: 12px; border-radius: 10px; margin-bottom: 16px; text-align: center; font-family: monospace; font-weight: bold; font-size: 0.9rem;">
+          <!-- Calculado dinámicamente -->
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">NOTAS / OBSERVACIONES DEL ENCARGADO</label>
+          <textarea id="closureNotas" class="form-control" rows="2" placeholder="Ej: Arqueo sin novedades / Retiro de efectivo..." style="margin-top: 4px; resize: vertical;"></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px;">
+          <button type="button" onclick="closeShiftClosureModal()" class="btn-admin btn-admin-secondary">Cancelar</button>
+          <button type="submit" id="btnSubmitClosure" class="btn-admin" style="background: #10b981; color: #000; font-weight: 800;">
+            💵 Confirmar y Cerrar Turno
+          </button>
+        </div>
       </form>
     </div>
   </div>
@@ -480,6 +542,7 @@
   <script>
     let opToken = localStorage.getItem("bladesync_admin_token") || "";
     let currentTab = "today"; // "today" or "tomorrow"
+    let currentCalculation = null;
     let allLiveAppointments = [];
     let allBarbersList = [];
     let shopStockProductsList = [];
@@ -1032,6 +1095,125 @@
         `;
         container.appendChild(card);
       });
+    }
+
+    // --- ARQUEO DE CAJA Y RENDICIÓN DE TURNO ---
+    async function openShiftClosureModal() {
+      document.getElementById("shiftClosureModal").style.display = "flex";
+      document.getElementById("closureFondoInicial").value = "0";
+      document.getElementById("closureBalanceDeclarado").value = "";
+      document.getElementById("closureNotas").value = "";
+      await loadShiftClosureCalculation();
+    }
+
+    function closeShiftClosureModal() {
+      document.getElementById("shiftClosureModal").style.display = "none";
+    }
+
+    async function loadShiftClosureCalculation() {
+      const fondo = parseFloat(document.getElementById("closureFondoInicial").value) || 0.0;
+      try {
+        const res = await fetch(`/api/shift-closures/calculate?fondo_inicial=${fondo}`, {
+          headers: authHeaders()
+        });
+        if (res.ok) {
+          currentCalculation = await res.json();
+          renderShiftClosureCalculation();
+        }
+      } catch (e) {
+        showToast("Error al calcular totales de rendición.", "error");
+      }
+    }
+
+    function renderShiftClosureCalculation() {
+      if (!currentCalculation) return;
+      const c = currentCalculation;
+      const startStr = c.fecha_inicio ? c.fecha_inicio.replace('T', ' ').substring(0, 16) : '';
+      const endStr = c.fecha_cierre ? c.fecha_cierre.replace('T', ' ').substring(0, 16) : '';
+      document.getElementById("closurePeriodText").textContent = `${startStr} a ${endStr}`;
+      document.getElementById("closureCortesText").textContent = `$${c.total_cortes.toLocaleString("es-AR", {minimumFractionDigits: 2})}`;
+      document.getElementById("closureProductsText").textContent = `$${c.total_productos.toLocaleString("es-AR", {minimumFractionDigits: 2})}`;
+      document.getElementById("closureCashText").textContent = `$${c.total_efectivo.toLocaleString("es-AR", {minimumFractionDigits: 2})}`;
+      document.getElementById("closureTransfersText").textContent = `$${c.total_transferencia.toLocaleString("es-AR", {minimumFractionDigits: 2})}`;
+      document.getElementById("closureTurnosCount").textContent = c.total_turnos_atendidos;
+      
+      recalculateClosureBalance();
+    }
+
+    function recalculateClosureBalance() {
+      if (!currentCalculation) return;
+      const fondo = parseFloat(document.getElementById("closureFondoInicial").value) || 0.0;
+      const totalCalc = fondo + currentCalculation.total_efectivo + currentCalculation.total_transferencia;
+      document.getElementById("closureCalculatedTotal").textContent = `$${totalCalc.toLocaleString("es-AR", {minimumFractionDigits: 2})}`;
+
+      const declVal = document.getElementById("closureBalanceDeclarado").value;
+      const diffDiv = document.getElementById("closureDiffContainer");
+
+      if (!declVal) {
+        diffDiv.style.background = "rgba(255,255,255,0.05)";
+        diffDiv.style.color = "#9ca3af";
+        diffDiv.innerHTML = "Ingrese el dinero en caja para calcular la diferencia.";
+        return;
+      }
+
+      const decl = parseFloat(declVal) || 0.0;
+      const diff = decl - totalCalc;
+
+      if (Math.abs(diff) < 0.01) {
+        diffDiv.style.background = "rgba(16, 185, 129, 0.15)";
+        diffDiv.style.color = "#10b981";
+        diffDiv.innerHTML = "✅ Balance Exacto (Sin diferencias)";
+      } else if (diff < 0) {
+        diffDiv.style.background = "rgba(239, 68, 68, 0.15)";
+        diffDiv.style.color = "#ef4444";
+        diffDiv.innerHTML = `⚠️ FALTANTE EN CAJA: -$${Math.abs(diff).toLocaleString("es-AR", {minimumFractionDigits: 2})}`;
+      } else {
+        diffDiv.style.background = "rgba(234, 179, 8, 0.15)";
+        diffDiv.style.color = "#eab308";
+        diffDiv.innerHTML = `ℹ️ SOBRANTE EN CAJA: +$${diff.toLocaleString("es-AR", {minimumFractionDigits: 2})}`;
+      }
+    }
+
+    async function submitShiftClosure() {
+      if (!currentCalculation) return;
+      const fondo = parseFloat(document.getElementById("closureFondoInicial").value) || 0.0;
+      const decl = parseFloat(document.getElementById("closureBalanceDeclarado").value);
+      if (isNaN(decl)) {
+        alert("Ingrese un monto válido para el dinero en caja.");
+        return;
+      }
+      const notas = document.getElementById("closureNotas").value.trim();
+
+      const payload = {
+        fecha_inicio: currentCalculation.fecha_inicio,
+        fecha_cierre: currentCalculation.fecha_cierre,
+        fondo_inicial: fondo,
+        total_efectivo: currentCalculation.total_efectivo,
+        total_transferencia: currentCalculation.total_transferencia,
+        total_cortes: currentCalculation.total_cortes,
+        total_productos: currentCalculation.total_productos,
+        total_calculado: fondo + currentCalculation.total_efectivo + currentCalculation.total_transferencia,
+        balance_declarado: decl,
+        total_turnos_atendidos: currentCalculation.total_turnos_atendidos,
+        notas: notas
+      };
+
+      try {
+        const res = await fetch("/api/shift-closures", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast("Rendición de caja guardada exitosamente.");
+          closeShiftClosureModal();
+        } else {
+          alert(data.detail || "Error al guardar rendición de caja.");
+        }
+      } catch (e) {
+        alert("Error de conexión.");
+      }
     }
 
     function escapeHtml(str) {

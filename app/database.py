@@ -135,6 +135,25 @@ def init_db_and_migrate():
                 conn.execute(text("ALTER TABLE audit_logs ADD COLUMN ip_address VARCHAR(50)"))
                 conn.commit()
 
+        # 6. Migration for admin_users
+        if "admin_users" in tables:
+            columns = [c["name"] for c in inspector.get_columns("admin_users")]
+            if "role" not in columns:
+                conn.execute(text("ALTER TABLE admin_users ADD COLUMN role VARCHAR(30) DEFAULT 'admin'"))
+                conn.commit()
+            if "can_edit_stock" not in columns:
+                conn.execute(text("ALTER TABLE admin_users ADD COLUMN can_edit_stock BOOLEAN DEFAULT 1"))
+                conn.commit()
+            if "can_view_finances" not in columns:
+                conn.execute(text("ALTER TABLE admin_users ADD COLUMN can_view_finances BOOLEAN DEFAULT 0"))
+                conn.commit()
+            if "can_cancel_appointments" not in columns:
+                conn.execute(text("ALTER TABLE admin_users ADD COLUMN can_cancel_appointments BOOLEAN DEFAULT 1"))
+                conn.commit()
+            if "can_manage_shop" not in columns:
+                conn.execute(text("ALTER TABLE admin_users ADD COLUMN can_manage_shop BOOLEAN DEFAULT 1"))
+                conn.commit()
+
 def get_db():
     """Dependency for obtaining a database session per request."""
     db = SessionLocal()

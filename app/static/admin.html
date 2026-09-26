@@ -85,6 +85,9 @@
         <a class="admin-nav-item" href="/inventario.html" target="_blank" style="color: #d2ff00; font-weight: bold;">
           <span class="icon">📦</span> Control Inventario & Alertas ↗
         </a>
+        <a class="admin-nav-item" onclick="switchSection('shift_closures')" style="color: #10b981; font-weight: bold;">
+          <span class="icon">💵</span> Auditoría de Cajas
+        </a>
         <a class="admin-nav-item" onclick="switchSection('products')">
           <span class="icon">🏷️</span> Catálogo de Productos
         </a>
@@ -107,6 +110,9 @@
         </a>
 
         <div class="admin-menu-category">Configuración</div>
+        <a class="admin-nav-item" onclick="switchSection('staff')">
+          <span class="icon">👥</span> Gestión de Personal
+        </a>
         <a class="admin-nav-item" onclick="switchSection('identity')">
           <span class="icon">🏷️</span> Identidad & Barbería
         </a>
@@ -977,8 +983,176 @@
           </div>
         </div>
 
+        <!-- SECTION: GESTIÓN DE PERSONAL Y PERMISOS MODULARES -->
+        <div id="section-staff" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <div>
+                <h3 class="admin-card-title">👥 Gestión de Personal & Permisos Modulares</h3>
+                <p style="color: #9ca3af; font-size: 0.8rem; margin: 4px 0 0 0;">Gestión de encargados, operadores y control granular de accesos al sistema.</p>
+              </div>
+              <button class="btn-admin btn-admin-sm" onclick="openCreateStaffModal()">+ Crear Usuario Staff</button>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Usuario</th>
+                    <th>Rol</th>
+                    <th>Estado</th>
+                    <th>📦 Stock</th>
+                    <th>💵 Finanzas</th>
+                    <th>❌ Cancelar Turnos</th>
+                    <th>🛍️ Shop</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="staffTableBody">
+                  <tr>
+                    <td colspan="8" style="text-align: center; padding: 40px; color: #9ca3af;">
+                      Cargando lista de personal...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: AUDITORÍA DE CAJAS Y RENDICIÓN DE TURNO -->
+        <div id="section-shift_closures" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <div>
+                <h3 class="admin-card-title">💵 Auditoría de Cajas & Rendiciones de Turno</h3>
+                <p style="color: #9ca3af; font-size: 0.8rem; margin: 4px 0 0 0;">Desglose de rendiciones por encargado, turnos atendidos, efectivo, transferencias y reporte de faltantes/sobrantes.</p>
+              </div>
+              <button class="btn-admin btn-admin-secondary btn-admin-sm" onclick="loadShiftClosuresData()">🔄 Actualizar Audit</button>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Fecha / Hora Cierre</th>
+                    <th>Encargado</th>
+                    <th>Fondo Inicial</th>
+                    <th>Efectivo</th>
+                    <th>Transferencia</th>
+                    <th>Total Cortes</th>
+                    <th>Total Productos</th>
+                    <th>Total Calculado</th>
+                    <th>Balance Declarado</th>
+                    <th>Diferencia</th>
+                    <th>Clientes</th>
+                    <th>Notas</th>
+                  </tr>
+                </thead>
+                <tbody id="shiftClosuresTableBody">
+                  <tr>
+                    <td colspan="12" style="text-align: center; padding: 40px; color: #9ca3af;">
+                      Cargando histórico de cierres de caja...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
       </div>
     </main>
+  </div>
+
+  <!-- MODAL CREACIÓN DE USUARIO STAFF -->
+  <div id="createStaffModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.88); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; width: 100%; max-width: 480px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.9); max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <div>
+          <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #d4ff00; letter-spacing: 2px;">GESTIÓN DE PERSONAL</span>
+          <h3 style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 2px 0 0 0; font-size: 1.2rem;">👤 Crear Usuario de Staff</h3>
+        </div>
+        <button onclick="closeCreateStaffModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <form id="createStaffForm" onsubmit="event.preventDefault(); submitCreateStaff();">
+        <div class="form-group">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace; font-weight: bold;">NOMBRE DE USUARIO *</label>
+          <input type="text" id="newStaffUsername" class="form-control" placeholder="Ej: Encargado2" required>
+        </div>
+
+        <div class="form-group">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace; font-weight: bold;">CONTRASEÑA *</label>
+          <input type="password" id="newStaffPassword" class="form-control" placeholder="••••••••" required>
+        </div>
+
+        <div class="form-group">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace; font-weight: bold;">ROL DE ACCESO *</label>
+          <select id="newStaffRole" class="form-control" required>
+            <option value="encargado" selected>Encargado (Operador Recepción)</option>
+            <option value="admin">Administrador Total</option>
+          </select>
+        </div>
+
+        <div style="background: #1a1a22; border: 1px solid #23232c; border-radius: 12px; padding: 14px; margin-top: 14px;">
+          <span style="font-family: 'Space Grotesk', monospace; font-size: 0.75rem; color: #d4ff00; font-weight: bold; block; margin-bottom: 10px;">PERMISOS MODULARES (SWITCHES):</span>
+          
+          <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.8rem; color: #e5e7eb;">
+            <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+              <span>📦 Editar Stock & Inventario</span>
+              <input type="checkbox" id="newStaffCanStock" checked style="accent-color: #d4ff00; width: 18px; height: 18px;">
+            </label>
+            <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+              <span>💵 Ver Finanzas & Facturación</span>
+              <input type="checkbox" id="newStaffCanFinances" style="accent-color: #d4ff00; width: 18px; height: 18px;">
+            </label>
+            <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+              <span>❌ Cancelar / Eliminar Turnos</span>
+              <input type="checkbox" id="newStaffCanCancel" checked style="accent-color: #d4ff00; width: 18px; height: 18px;">
+            </label>
+            <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+              <span>🛍️ Gestionar Shop Barber</span>
+              <input type="checkbox" id="newStaffCanShop" style="accent-color: #d4ff00; width: 18px; height: 18px;">
+            </label>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; border-top: 1px solid #23232c; padding-top: 16px;">
+          <button type="button" onclick="closeCreateStaffModal()" class="btn-admin btn-admin-secondary">Cancelar</button>
+          <button type="submit" class="btn-admin">💾 Crear Usuario Staff</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL CAMBIO DE CONTRASEÑA STAFF -->
+  <div id="changeStaffPasswordModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.88); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; width: 100%; max-width: 420px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.9);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <div>
+          <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #d4ff00; letter-spacing: 2px;">SEGURIDAD</span>
+          <h3 style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 2px 0 0 0; font-size: 1.2rem;">🔑 Cambiar Contraseña</h3>
+        </div>
+        <button onclick="closeChangeStaffPasswordModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <form id="changeStaffPasswordForm" onsubmit="event.preventDefault(); submitChangeStaffPassword();">
+        <input type="hidden" id="changePasswordStaffId">
+        <div class="form-group">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">USUARIO</label>
+          <input type="text" id="changePasswordStaffUsername" class="form-control" readonly style="opacity: 0.7;">
+        </div>
+
+        <div class="form-group">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace; font-weight: bold;">NUEVA CONTRASEÑA *</label>
+          <input type="password" id="changePasswordNewPass" class="form-control" placeholder="••••••••" required>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; border-top: 1px solid #23232c; padding-top: 16px;">
+          <button type="button" onclick="closeChangeStaffPasswordModal()" class="btn-admin btn-admin-secondary">Cancelar</button>
+          <button type="submit" class="btn-admin">🔑 Actualizar Contraseña</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- MODAL CONTENEDOR REUTILIZABLE PARA CREAR Y EDITAR -->
@@ -1000,6 +1174,7 @@
         </div>
       </form>
     </div>
+  </div>
   <!-- MODAL DE DETALLE Y COORDINACIÓN DE PEDIDOS -->
   <div id="orderDetailModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
     <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; width: 100%; max-width: 620px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); max-height: 90vh; overflow-y: auto;">

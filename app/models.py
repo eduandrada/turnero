@@ -9,6 +9,11 @@ class AdminUser(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, nullable=False, index=True)
     password_hash = Column(String(200), nullable=False)
+    role = Column(String(30), default="admin") # "admin" o "encargado"
+    can_edit_stock = Column(Boolean, default=True)
+    can_view_finances = Column(Boolean, default=False)
+    can_cancel_appointments = Column(Boolean, default=True)
+    can_manage_shop = Column(Boolean, default=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -278,3 +283,23 @@ class NotificationLog(Base):
     status = Column(String(20), default="ENVIADO") # ENVIADO, PENDIENTE, ERROR
     error_details = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ShiftClosure(Base):
+    __tablename__ = "shift_closures"
+
+    id = Column(Integer, primary_key=True, index=True)
+    encargado_id = Column(Integer, ForeignKey("admin_users.id"), nullable=True)
+    encargado_name = Column(String(80), nullable=False)
+    fecha_inicio = Column(DateTime, nullable=False)
+    fecha_cierre = Column(DateTime, default=datetime.utcnow)
+    fondo_inicial = Column(Float, default=0.0)
+    total_efectivo = Column(Float, default=0.0)
+    total_transferencia = Column(Float, default=0.0)
+    total_cortes = Column(Float, default=0.0)
+    total_productos = Column(Float, default=0.0)
+    total_calculado = Column(Float, default=0.0)
+    balance_declarado = Column(Float, default=0.0)
+    diferencia = Column(Float, default=0.0)
+    total_turnos_atendidos = Column(Integer, default=0)
+    notas = Column(Text, nullable=True)

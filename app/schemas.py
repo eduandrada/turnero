@@ -12,6 +12,7 @@ class LoginRequest(BaseModel):
 class LoginResponse(BaseModel):
     token: str
     username: str
+    role: Optional[str] = "admin"
     message: str
 
 class PasswordChangeRequest(BaseModel):
@@ -488,3 +489,83 @@ class StyleAdviceResponse(BaseModel):
     recommended_service: str
     fade_type: str
     confidence_score: float
+
+# ==========================================
+# STAFF & PERMISSIONS SCHEMAS
+# ==========================================
+class StaffUserBase(BaseModel):
+    username: str
+    role: str = "encargado"
+    can_edit_stock: bool = True
+    can_view_finances: bool = False
+    can_cancel_appointments: bool = True
+    can_manage_shop: bool = True
+    is_active: bool = True
+
+class StaffUserCreate(StaffUserBase):
+    password: str = Field(..., min_length=4)
+
+class StaffUserUpdate(BaseModel):
+    role: Optional[str] = None
+    can_edit_stock: Optional[bool] = None
+    can_view_finances: Optional[bool] = None
+    can_cancel_appointments: Optional[bool] = None
+    can_manage_shop: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+class StaffPasswordUpdate(BaseModel):
+    new_password: str = Field(..., min_length=4)
+
+class StaffUserRead(StaffUserBase):
+    id: int
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+# ==========================================
+# SHIFT CLOSURE & CASH CONTROL SCHEMAS
+# ==========================================
+class ShiftClosureCreate(BaseModel):
+    fecha_inicio: datetime
+    fecha_cierre: datetime
+    fondo_inicial: float = 0.0
+    total_efectivo: float = 0.0
+    total_transferencia: float = 0.0
+    total_cortes: float = 0.0
+    total_productos: float = 0.0
+    total_calculado: float = 0.0
+    balance_declarado: float = 0.0
+    total_turnos_atendidos: int = 0
+    notas: Optional[str] = None
+
+class ShiftClosureRead(BaseModel):
+    id: int
+    encargado_id: Optional[int] = None
+    encargado_name: str
+    fecha_inicio: datetime
+    fecha_cierre: datetime
+    fondo_inicial: float
+    total_efectivo: float
+    total_transferencia: float
+    total_cortes: float
+    total_productos: float
+    total_calculado: float
+    balance_declarado: float
+    diferencia: float
+    total_turnos_atendidos: int
+    notas: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class ShiftCalculationResponse(BaseModel):
+    fecha_inicio: datetime
+    fecha_cierre: Optional[datetime] = None
+    fondo_inicial: float = 0.0
+    total_cortes_efectivo: float = 0.0
+    total_cortes_transferencia: float = 0.0
+    total_productos_efectivo: float = 0.0
+    total_productos_transferencia: float = 0.0
+    total_cortes: float = 0.0
+    total_productos: float = 0.0
+    total_efectivo: float = 0.0
+    total_transferencia: float = 0.0
+    total_calculado: float = 0.0
+    total_turnos_atendidos: int = 0

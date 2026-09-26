@@ -68,12 +68,13 @@ def _base64url_decode(data_str: str) -> bytes:
     padding = '=' * (4 - (len(data_str) % 4))
     return base64.urlsafe_b64decode(data_str + padding)
 
-def create_admin_token(username: str, expires_delta_minutes: Optional[int] = None) -> str:
-    """Creates a signed HMAC-SHA256 token with expiration timestamp."""
+def create_admin_token(username: str, expires_delta_minutes: Optional[int] = None, role: str = "admin") -> str:
+    """Creates a signed HMAC-SHA256 token with expiration timestamp and user role."""
     expire_minutes = expires_delta_minutes if expires_delta_minutes is not None else ACCESS_TOKEN_EXPIRE_MINUTES
     now = int(time.time())
     payload = {
         "sub": username,
+        "role": role,
         "iat": now,
         "exp": now + (expire_minutes * 60),
         "jti": secrets.token_hex(8)
@@ -157,11 +158,11 @@ def get_current_admin(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
     db: Session = Depends(get_db)
 ) -> AdminUser:
-    """Dependency that enforces admin authentication."""
+    """Dependency that enforces user authentication (Admin or Encargado)."""
     if not credentials or not credentials.credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales de autenticación requeridas para acceder al panel de administración.",
+            detail="Credenciales de autenticación requeridas para acceder al tablero de control.",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -176,13 +177,22 @@ def get_current_admin(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    admin = db.query(AdminUser).filter(AdminUser.username == username, AdminUser.is_active == True).first()
-    if not admin:
+    user = db.query(AdminUser).filter(AdminUser.username == username, AdminUser.is_active == True).first()
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuario administrador no encontrado o inactivo.",
+            detail="Usuario no encontrado o inactivo.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return admin
+    return user
+
+def require_admin_role(current_user: AdminUser = Depends(get_current_admin)) -> AdminUser:
+    """Dependency that ensures the authenticated user is an Administrator (not Encargado)."""
+    if current_user.role and current_user.role.lower() != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado. Se requieren permisos de Administrador para acceder a esta sección."
+        )
+    return current_user
 
 

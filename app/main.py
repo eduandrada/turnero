@@ -19,7 +19,7 @@ from sqlalchemy import or_, and_, func
 from app.database import Base, engine, get_db, SessionLocal, init_db_and_migrate, get_argentina_now
 from app.models import (
     AdminUser, ShopSetting, Barber, Service, Style, Client, Appointment,
-    Category, Product, StockMovement, DeliveryZone, Order, OrderItem, Promotion, AppNotification, AuditLog, NotificationLog
+    Category, Product, StockMovement, DeliveryZone, Order, OrderItem, Promotion, AppNotification, AuditLog, NotificationLog, ShiftClosure
 )
 from app.schemas import (
     LoginRequest, LoginResponse, PasswordChangeRequest,
@@ -37,9 +37,11 @@ from app.schemas import (
     PromotionRead, PromotionCreate,
     AppNotificationRead, AppNotificationCreate,
     AuditLogRead, AuditLogResponse, NotificationLogRead, DashboardStatsResponse,
-    StyleAdviceRequest, StyleAdviceResponse, BulkSettingsUpdate
+    StyleAdviceRequest, StyleAdviceResponse, BulkSettingsUpdate,
+    StaffUserRead, StaffUserCreate, StaffUserUpdate, StaffPasswordUpdate,
+    ShiftClosureCreate, ShiftClosureRead, ShiftCalculationResponse
 )
-from app.auth import get_current_admin, create_admin_token, hash_password, verify_password, revoke_token, security_bearer
+from app.auth import get_current_admin, require_admin_role, create_admin_token, hash_password, verify_password, revoke_token, security_bearer
 from app.settings_helper import get_all_settings, get_setting, bulk_set_settings, DEFAULT_SETTINGS
 from app.backup_helper import create_database_backup, list_backups, restore_database_backup, BACKUP_DIR
 from app.scheduler import start_scheduler, shutdown_scheduler
@@ -61,17 +63,48 @@ def seed_initial_data():
     """Siembra usuario administrador, barberos, servicios, productos y configuraciones iniciales."""
     db: Session = SessionLocal()
     try:
-        # 1. Admin User
-        if db.query(AdminUser).count() == 0:
+        # 1. Admin User & Default Encargado Operator
+        admin_user = db.query(AdminUser).filter(AdminUser.username == "admin").first()
+        if not admin_user:
             initial_password = os.getenv("ADMIN_INITIAL_PASSWORD", "admin123")
             default_admin = AdminUser(
                 username="admin",
                 password_hash=hash_password(initial_password),
-                is_active=True
+                role="admin",
+                is_active=True,
+                can_edit_stock=True,
+                can_view_finances=True,
+                can_cancel_appointments=True,
+                can_manage_shop=True
             )
             db.add(default_admin)
             db.commit()
-            logger.info(f"Usuario administrador inicial creado ('admin').")
+            logger.info("Usuario administrador inicial creado ('admin').")
+        else:
+            if not admin_user.role:
+                admin_user.role = "admin"
+                admin_user.can_edit_stock = True
+                admin_user.can_view_finances = True
+                admin_user.can_cancel_appointments = True
+                admin_user.can_manage_shop = True
+                db.commit()
+
+        # Operador / Encargado por defecto (Usuario: Encargado, Pass: barber, Rol: encargado)
+        encargado_user = db.query(AdminUser).filter(AdminUser.username == "Encargado").first()
+        if not encargado_user:
+            default_encargado = AdminUser(
+                username="Encargado",
+                password_hash=hash_password("barber"),
+                role="encargado",
+                is_active=True,
+                can_edit_stock=True,
+                can_view_finances=False,
+                can_cancel_appointments=True,
+                can_manage_shop=False
+            )
+            db.add(default_encargado)
+            db.commit()
+            logger.info("Usuario encargado por defecto creado ('Encargado' / 'barber').")
 
         # 2. Settings iniciales
         for k, v in DEFAULT_SETTINGS.items():
@@ -1107,6 +1140,7 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
 # ==============================================================================
 
 # 1. AUTH ADMIN
+@app.post("/api/auth/login", response_model=LoginResponse)
 @app.post("/api/admin/login", response_model=LoginResponse)
 def admin_login(creds: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(AdminUser).filter(AdminUser.username == creds.username, AdminUser.is_active == True).first()
@@ -1118,10 +1152,12 @@ def admin_login(creds: LoginRequest, db: Session = Depends(get_db)):
         user.password_hash = hash_password(creds.password)
         db.commit()
 
-    token = create_admin_token(user.username)
+    user_role = user.role or "admin"
+    token = create_admin_token(user.username, role=user_role)
     return LoginResponse(
         token=token,
         username=user.username,
+        role=user_role,
         message="Autenticación exitosa."
     )
 
@@ -1136,7 +1172,245 @@ def admin_logout(
 
 @app.get("/api/admin/me")
 def get_admin_me(admin: AdminUser = Depends(get_current_admin)):
-    return {"username": admin.username, "id": admin.id}
+    return {
+        "id": admin.id,
+        "username": admin.username,
+        "role": admin.role or "admin",
+        "is_active": admin.is_active,
+        "can_edit_stock": admin.can_edit_stock if admin.can_edit_stock is not None else True,
+        "can_view_finances": admin.can_view_finances if admin.can_view_finances is not None else True,
+        "can_cancel_appointments": admin.can_cancel_appointments if admin.can_cancel_appointments is not None else True,
+        "can_manage_shop": admin.can_manage_shop if admin.can_manage_shop is not None else True
+    }
+
+
+# ==========================================
+# GESTIÓN DE PERSONAL Y PERMISOS MODULARES
+# ==========================================
+@app.get("/api/admin/staff", response_model=List[StaffUserRead])
+def list_staff_users(
+    admin: AdminUser = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Lista los usuarios encargados y administradores del sistema."""
+    return db.query(AdminUser).all()
+
+@app.post("/api/admin/staff", response_model=StaffUserRead)
+def create_staff_user(
+    staff_in: StaffUserCreate,
+    admin: AdminUser = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Crea un nuevo usuario encargado o administrador."""
+    existing = db.query(AdminUser).filter(AdminUser.username == staff_in.username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="El nombre de usuario ya existe.")
+    
+    new_user = AdminUser(
+        username=staff_in.username,
+        password_hash=hash_password(staff_in.password),
+        role=staff_in.role,
+        is_active=staff_in.is_active,
+        can_edit_stock=staff_in.can_edit_stock,
+        can_view_finances=staff_in.can_view_finances,
+        can_cancel_appointments=staff_in.can_cancel_appointments,
+        can_manage_shop=staff_in.can_manage_shop
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Gestión de Personal",
+        action="Crear Personal",
+        record_id=str(new_user.id),
+        new_value=f"{new_user.username} ({new_user.role})"
+    ))
+    db.commit()
+    return new_user
+
+@app.put("/api/admin/staff/{user_id}/permissions", response_model=StaffUserRead)
+def update_staff_permissions(
+    user_id: int,
+    staff_in: StaffUserUpdate,
+    admin: AdminUser = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Actualiza rol, estado activo y switches de permisos de un usuario."""
+    target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    
+    for k, v in staff_in.model_dump(exclude_unset=True).items():
+        setattr(target, k, v)
+    
+    db.commit()
+    db.refresh(target)
+    
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Gestión de Personal",
+        action="Actualizar Permisos",
+        record_id=str(target.id),
+        new_value=f"Permisos actualizados para {target.username}"
+    ))
+    db.commit()
+    return target
+
+@app.put("/api/admin/staff/{user_id}/password")
+def update_staff_password(
+    user_id: int,
+    data: StaffPasswordUpdate,
+    admin: AdminUser = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Cambia la contraseña de un encargado/administrador desde el panel."""
+    target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    
+    target.password_hash = hash_password(data.new_password)
+    db.commit()
+    
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Gestión de Personal",
+        action="Cambiar Contraseña",
+        record_id=str(target.id),
+        new_value=f"Contraseña modificada para {target.username}"
+    ))
+    db.commit()
+    return {"message": f"Contraseña actualizada para {target.username}."}
+
+
+# ==========================================
+# ARQUEO DE CAJA Y RENDICIÓN DE TURNO
+# ==========================================
+@app.get("/api/shift-closures/calculate", response_model=ShiftCalculationResponse)
+def calculate_shift_totals(
+    fondo_inicial: float = Query(0.0),
+    current_user: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Calcula los totales en caja y ventas registradas desde la última rendición."""
+    last_closure = db.query(ShiftClosure).order_by(ShiftClosure.fecha_cierre.desc()).first()
+    now_naive = get_argentina_now().replace(tzinfo=None)
+    
+    if last_closure and last_closure.fecha_cierre:
+        fecha_inicio = last_closure.fecha_cierre
+    else:
+        fecha_inicio = datetime.combine(now_naive.date(), time.min)
+
+    fecha_cierre = now_naive
+
+    # Citas completadas entre fecha_inicio y fecha_cierre
+    appts = db.query(Appointment).filter(
+        Appointment.appointment_time >= fecha_inicio,
+        Appointment.appointment_time <= fecha_cierre,
+        Appointment.canceled == False,
+        Appointment.status != "CANCELADO"
+    ).all()
+
+    total_cortes = 0.0
+    services = db.query(Service).all()
+    srv_price_map = {s.name.lower(): s.price for s in services}
+
+    for a in appts:
+        p = srv_price_map.get((a.service or "").lower(), 4500.0)
+        total_cortes += p
+
+    # Pedidos del shop entre fecha_inicio y fecha_cierre
+    orders = db.query(Order).filter(
+        Order.created_at >= fecha_inicio,
+        Order.created_at <= fecha_cierre,
+        Order.status != "CANCELADO"
+    ).all()
+
+    total_productos = 0.0
+    total_efectivo = 0.0
+    total_transferencia = 0.0
+
+    # Los turnos se asumen en efectivo por defecto
+    total_efectivo += total_cortes
+
+    for o in orders:
+        total_productos += (o.total or 0.0)
+        pm = (o.payment_method or "").lower()
+        if "efectivo" in pm:
+            total_efectivo += (o.total or 0.0)
+        else:
+            total_transferencia += (o.total or 0.0)
+
+    total_calculado = fondo_inicial + total_efectivo + total_transferencia
+
+    prod_efectivo = sum(o.total or 0.0 for o in orders if "efectivo" in (o.payment_method or "").lower())
+    prod_transferencia = sum(o.total or 0.0 for o in orders if "efectivo" not in (o.payment_method or "").lower())
+
+    return ShiftCalculationResponse(
+        fecha_inicio=fecha_inicio,
+        fecha_cierre=fecha_cierre,
+        fondo_inicial=fondo_inicial,
+        total_cortes_efectivo=total_cortes,
+        total_cortes_transferencia=0.0,
+        total_productos_efectivo=prod_efectivo,
+        total_productos_transferencia=prod_transferencia,
+        total_efectivo=total_efectivo,
+        total_transferencia=total_transferencia,
+        total_cortes=total_cortes,
+        total_productos=total_productos,
+        total_calculado=total_calculado,
+        total_turnos_atendidos=len(appts)
+    )
+
+@app.post("/api/shift-closures", response_model=ShiftClosureRead)
+def create_shift_closure(
+    data: ShiftClosureCreate,
+    current_user: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Registra el cierre de turno y rendición de caja."""
+    diferencia = data.balance_declarado - data.total_calculado
+
+    closure = ShiftClosure(
+        encargado_id=current_user.id,
+        encargado_name=current_user.username,
+        fecha_inicio=data.fecha_inicio,
+        fecha_cierre=data.fecha_cierre,
+        fondo_inicial=data.fondo_inicial,
+        total_efectivo=data.total_efectivo,
+        total_transferencia=data.total_transferencia,
+        total_cortes=data.total_cortes,
+        total_productos=data.total_productos,
+        total_calculado=data.total_calculado,
+        balance_declarado=data.balance_declarado,
+        diferencia=diferencia,
+        total_turnos_atendidos=data.total_turnos_atendidos,
+        notas=data.notas
+    )
+    db.add(closure)
+    db.commit()
+    db.refresh(closure)
+
+    db.add(AuditLog(
+        user_name=current_user.username,
+        module="Arqueo de Caja",
+        action="Cierre de Turno",
+        record_id=str(closure.id),
+        new_value=f"Declarado: ${data.balance_declarado:,.2f} | Dif: ${diferencia:,.2f}"
+    ))
+    db.commit()
+
+    return closure
+
+@app.get("/api/admin/shift-closures", response_model=List[ShiftClosureRead])
+def get_shift_closures(
+    current_user: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Retorna la lista histórica de cierres de caja y auditorías."""
+    closures = db.query(ShiftClosure).order_by(ShiftClosure.fecha_cierre.desc()).all()
+    return closures
 
 @app.post("/api/admin/change-password")
 def change_admin_password(

@@ -126,17 +126,17 @@
             <span id="audioText">Música</span>
           </button>
           
-          <a href="/live.html" title="Abrir Pantalla Sala de Espera en Vivo" class="flex items-center gap-1.5 bg-surface hover:bg-white/5 hover:border-neonVolt/50 transition px-2.5 py-1 rounded-full border border-surfaceBorder shadow-sm text-gray-200 hover:text-white">
+          <button type="button" onclick="openAgendaLoginModal()" title="Abrir Pantalla Sala de Espera en Vivo" class="flex items-center gap-1.5 bg-surface hover:bg-white/5 hover:border-neonVolt/50 transition px-2.5 py-1 rounded-full border border-surfaceBorder shadow-sm text-gray-200 hover:text-white">
             <span class="relative flex h-2 w-2">
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-neonVolt opacity-75"></span>
               <span class="relative inline-flex rounded-full h-2 w-2 bg-neonVolt"></span>
             </span>
             <span class="text-[11px] font-mono font-medium">AGENDA EN VIVO →</span>
-          </a>
+          </button>
         </div>
 
         <div class="flex items-center gap-2">
-          <a href="/turnos.html" class="text-[11px] font-mono text-[#d4ff00] hover:underline font-bold">📋 Turnos en Vivo</a>
+          <button type="button" onclick="openAgendaLoginModal()" class="text-[11px] font-mono text-[#d4ff00] hover:underline font-bold bg-transparent border-none p-0 cursor-pointer">📋 Turnos en Vivo</button>
           <span class="text-gray-600">•</span>
           <a href="/shop.html" class="text-[11px] font-mono text-neonCyan hover:underline">🛍️ Shop Barber</a>
           <span class="text-gray-600">•</span>
@@ -442,6 +442,65 @@
     </div>
   </div>
 
+  <!-- Unified Login Modal ("Agenda en Vivo") -->
+  <div id="unifiedLoginModal" class="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden">
+    <div class="glass-card max-w-sm w-full rounded-2xl p-6 border border-surfaceBorder shadow-cyber flex flex-col gap-4 relative">
+      <button onclick="closeUnifiedLoginModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white font-mono text-lg">✕</button>
+      <div class="text-center">
+        <span class="text-[10px] font-mono tracking-widest text-neonVolt uppercase font-bold px-2 py-0.5 rounded bg-neonVolt/10 border border-neonVolt/20">RECEPCIÓN & ENCARGADO</span>
+        <h3 class="text-xl font-extrabold font-mono text-white mt-1">AGENDA EN VIVO</h3>
+        <p class="text-xs text-gray-400 mt-1">Ingresá tus credenciales de operador o administrador para acceder al tablero de turnos.</p>
+      </div>
+
+      <form id="unifiedLoginForm" onsubmit="event.preventDefault(); handleUnifiedLogin();" class="flex flex-col gap-3">
+        <div>
+          <label class="text-[10px] font-mono text-gray-300 block mb-1">USUARIO</label>
+          <input type="text" id="unifiedUsername" value="Encargado" placeholder="Encargado / admin" required class="w-full bg-black/60 border border-surfaceBorder text-xs rounded-xl p-3 text-gray-100 outline-none focus:border-neonVolt transition font-mono">
+        </div>
+        <div>
+          <label class="text-[10px] font-mono text-gray-300 block mb-1">CONTRASEÑA</label>
+          <input type="password" id="unifiedPassword" value="barber" placeholder="••••••••" required class="w-full bg-black/60 border border-surfaceBorder text-xs rounded-xl p-3 text-gray-100 outline-none focus:border-neonVolt transition font-mono">
+        </div>
+        <button type="submit" class="w-full py-3.5 rounded-xl bg-neonVolt text-black font-mono font-bold text-xs hover:bg-neonVolt/90 transition shadow-volt-sm mt-1">
+          🔓 INGRESAR A LA AGENDA →
+        </button>
+      </form>
+    </div>
+  </div>
+
   <script src="/static/app.js"></script>
+  <script>
+    function openAgendaLoginModal() {
+      const token = localStorage.getItem("bladesync_admin_token");
+      if (token) {
+        window.location.href = "/turnos.html";
+      } else {
+        document.getElementById("unifiedLoginModal").classList.remove("hidden");
+      }
+    }
+    function closeUnifiedLoginModal() {
+      document.getElementById("unifiedLoginModal").classList.add("hidden");
+    }
+    async function handleUnifiedLogin() {
+      const u = document.getElementById("unifiedUsername").value.trim();
+      const p = document.getElementById("unifiedPassword").value.trim();
+      try {
+        const res = await fetch("/api/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: u, password: p })
+        });
+        const data = await res.json();
+        if (res.ok && data.token) {
+          localStorage.setItem("bladesync_admin_token", data.token);
+          window.location.href = "/turnos.html";
+        } else {
+          alert(data.detail || "Credenciales incorrectas.");
+        }
+      } catch (e) {
+        alert("Error de conexión con el servidor.");
+      }
+    }
+  </script>
 </body>
 </html>
