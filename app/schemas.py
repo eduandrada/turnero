@@ -39,24 +39,37 @@ class BarberBase(BaseModel):
     specialties: Optional[str] = "Master Barber"
     description: Optional[str] = None
     avatar_url: Optional[str] = None
+    experience: Optional[str] = None
+    instagram: Optional[str] = None
+    facebook: Optional[str] = None
+    featured_styles: Optional[str] = None
     working_days: Optional[str] = "Lunes,Martes,Miércoles,Jueves,Viernes,Sábado"
     is_active: bool = True
     display_order: int = 0
 
 class BarberCreate(BarberBase):
-    pass
+    phone: Optional[str] = None # Datos privados del barbero
 
 class BarberUpdate(BaseModel):
     name: Optional[str] = None
+    phone: Optional[str] = None
     specialties: Optional[str] = None
     description: Optional[str] = None
     avatar_url: Optional[str] = None
+    experience: Optional[str] = None
+    instagram: Optional[str] = None
+    facebook: Optional[str] = None
+    featured_styles: Optional[str] = None
     working_days: Optional[str] = None
     is_active: Optional[bool] = None
     display_order: Optional[int] = None
 
 class BarberRead(BarberBase):
     id: int
+    model_config = ConfigDict(from_attributes=True)
+
+class BarberAdminRead(BarberRead):
+    phone: Optional[str] = None # Expuesto SOLO al Administrador
     model_config = ConfigDict(from_attributes=True)
 
 # ==========================================
@@ -373,6 +386,18 @@ class AuditLogRead(BaseModel):
     old_value: Optional[str] = None
     new_value: Optional[str] = None
     timestamp: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class NotificationLogRead(BaseModel):
+    id: int
+    appointment_id: Optional[int] = None
+    recipient: str
+    recipient_role: str
+    message_type: str
+    message_body: str
+    status: str
+    error_details: Optional[str] = None
+    created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 class DashboardStatsResponse(BaseModel):

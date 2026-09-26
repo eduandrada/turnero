@@ -270,6 +270,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   initDatePicker();
   initAudio();
 
+  // Requerimiento 1: Atajo Ctrl + Shift + A para redirigir al Admin desde vista pública
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey && e.shiftKey && (e.key === "A" || e.key === "a")) {
+      e.preventDefault();
+      window.location.href = "/admin.html";
+    }
+  });
+
   await loadPublicSettings();
   await loadBarbers();
   await loadServices();
@@ -303,11 +311,55 @@ function applySettingsToUI() {
   const s = state.settings;
   if (!s) return;
 
-  const bName = s.barber_name || s.app_name || "DON CARLOS";
+  // 1. CSS Theme Variables
+  const root = document.documentElement;
+  if (s.color_primary) {
+    root.style.setProperty('--color-primary', s.color_primary);
+    root.style.setProperty('--neon-volt', s.color_primary);
+  }
+  if (s.color_secondary) root.style.setProperty('--color-secondary', s.color_secondary);
+  if (s.color_accent) root.style.setProperty('--color-accent', s.color_accent);
+  if (s.color_background) {
+    root.style.setProperty('--color-background', s.color_background);
+    root.style.setProperty('--obsidian', s.color_background);
+  }
+  if (s.color_surface) {
+    root.style.setProperty('--color-surface', s.color_surface);
+    root.style.setProperty('--surface', s.color_surface);
+  }
+  if (s.color_text) root.style.setProperty('--color-text', s.color_text);
+  if (s.color_muted) root.style.setProperty('--color-muted', s.color_muted);
+  if (s.color_button) root.style.setProperty('--color-button', s.color_button);
+  if (s.color_border) {
+    root.style.setProperty('--color-border', s.color_border);
+    root.style.setProperty('--surface-border', s.color_border);
+  }
+  if (s.border_radius) {
+    root.style.setProperty('--border-radius', s.border_radius + 'px');
+  }
+
+  // 2. Identity & Branding
+  const bName = s.barber_name || s.app_name || "BladeSync Barber";
 
   const brand = document.getElementById("appBrandTitle");
   if (brand) {
-    brand.innerHTML = `${escapeHtml(bName.toUpperCase())}<span class="text-neonVolt animate-pulse">_</span>`;
+    if (s.logo_url) {
+      brand.innerHTML = `<img src="${s.logo_url}" alt="${escapeHtml(bName)}" class="h-8 md:h-10 object-contain inline-block mr-2" /> <span class="hidden md:inline">${escapeHtml(bName.toUpperCase())}</span>`;
+    } else {
+      brand.innerHTML = `${escapeHtml(bName.toUpperCase())}<span class="text-neonVolt animate-pulse">_</span>`;
+    }
+  }
+
+  // Splash Logo
+  const splashImg = document.getElementById("splashLogoImg");
+  const splashIcon = document.getElementById("splashDefaultIcon");
+  if (s.logo_url && splashImg) {
+    splashImg.src = s.logo_url;
+    splashImg.classList.remove("hidden");
+    if (splashIcon) splashIcon.classList.add("hidden");
+  } else if (splashImg && splashIcon) {
+    splashImg.classList.add("hidden");
+    splashIcon.classList.remove("hidden");
   }
 
   const st = document.getElementById("splashTitleText");
@@ -423,25 +475,44 @@ function renderBarbers() {
 
   state.barbers.forEach(barber => {
     const isSelected = state.selectedBarber && state.selectedBarber.id === barber.id;
-    const card = document.createElement("button");
-    card.type = "button";
+    const card = document.createElement("div");
     card.className = `glass-card-interactive p-4 rounded-2xl border ${
       isSelected ? "neon-border-active shadow-volt-sm" : "border-surfaceBorder hover:border-white/20"
-    } flex flex-col items-center text-center transition-all cursor-pointer`;
+    } flex flex-col items-center text-center transition-all cursor-pointer relative overflow-hidden`;
+
+    const experienceTag = barber.experience ? `<span class="text-[9px] font-mono text-[#00f2fe] bg-[#00f2fe]/10 border border-[#00f2fe]/20 px-2 py-0.5 rounded-full mb-1">⚡ ${escapeHtml(barber.experience)}</span>` : "";
+    const stylesTag = barber.featured_styles ? `<span class="text-[9px] font-mono text-gray-300 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md mt-1 truncate max-w-full">✂️ ${escapeHtml(barber.featured_styles)}</span>` : "";
+
+    let socialLinks = "";
+    if (barber.instagram || barber.facebook) {
+      socialLinks = `<div class="flex items-center gap-2.5 mt-2" onclick="event.stopPropagation()">`;
+      if (barber.instagram) {
+        const handle = barber.instagram.startsWith('@') ? barber.instagram.slice(1) : barber.instagram;
+        socialLinks += `<a href="https://instagram.com/${escapeHtml(handle)}" target="_blank" class="text-[10px] text-gray-400 hover:text-[#d4ff00] font-mono">📸 Instagram</a>`;
+      }
+      if (barber.facebook) {
+        socialLinks += `<a href="https://facebook.com/${escapeHtml(barber.facebook)}" target="_blank" class="text-[10px] text-gray-400 hover:text-[#00f2fe] font-mono">👥 Facebook</a>`;
+      }
+      socialLinks += `</div>`;
+    }
 
     card.innerHTML = `
-      <div class="relative w-16 h-16 mb-2.5 rounded-full overflow-hidden border-2 ${
-        isSelected ? "border-neonVolt" : "border-surfaceBorder"
+      <div class="relative w-20 h-20 mb-2.5 rounded-full overflow-hidden border-2 ${
+        isSelected ? "border-[#d4ff00] shadow-volt-sm" : "border-surfaceBorder"
       }">
-        <img src="${barber.avatar_url || 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=400&q=80'}" alt="${escapeHtml(barber.name)}" class="w-full h-full object-cover">
+        <img src="${barber.avatar_url || 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=400&q=80'}" alt="${escapeHtml(barber.name)}" class="w-full h-full object-cover" style="object-fit: cover; width: 100%; height: 100%;">
       </div>
+      ${experienceTag}
       <span class="text-sm font-bold text-white block truncate max-w-full">${escapeHtml(barber.name)}</span>
-      <span class="text-[10px] text-gray-400 font-mono truncate max-w-full mt-0.5">${escapeHtml(barber.specialties ? barber.specialties.split('//')[0] : 'Master Barber')}</span>
-      <span class="mt-3 text-[9px] font-mono px-2.5 py-1 rounded-full ${
-        isSelected ? 'bg-neonVolt text-obsidian font-extrabold' : 'bg-white/5 text-gray-400'
+      <span class="text-[10px] text-[#d4ff00] font-mono font-bold truncate max-w-full mt-0.5">${escapeHtml(barber.specialties || 'Master Barber')}</span>
+      ${barber.description ? `<p class="text-[10px] text-gray-400 mt-1 line-clamp-2 px-1 leading-tight">${escapeHtml(barber.description)}</p>` : ''}
+      ${stylesTag}
+      ${socialLinks}
+      <button type="button" class="mt-3 text-[10px] font-mono px-3 py-1 rounded-full w-full ${
+        isSelected ? 'bg-[#d4ff00] text-black font-extrabold shadow' : 'bg-white/5 text-gray-300 border border-white/10 hover:border-white/20'
       }">
-        ${isSelected ? '✓ SELECCIONADO' : 'ELEGIR'}
-      </span>
+        ${isSelected ? '✓ SELECCIONADO' : 'ELEGIR PROFESIONAL'}
+      </button>
     `;
 
     card.onclick = () => selectBarber(barber.id, true);
@@ -770,6 +841,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const btn = e.target.closest("button, a, select, input[type='submit']");
     if (btn && !btn.hasAttribute("data-no-sound")) {
       UISound.play("click");
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const successModal = document.getElementById("successModal");
+      if (successModal && !successModal.classList.contains("hidden")) {
+        closeModal();
+      }
     }
   });
 });

@@ -27,9 +27,14 @@ class Barber(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
+    phone = Column(String(40), nullable=True) # Datos privados del barbero (WhatsApp interno)
     specialties = Column(String(250), default="Master Barber")
     description = Column(Text, nullable=True)
     avatar_url = Column(String(500), nullable=True)
+    experience = Column(String(100), nullable=True) # e.g. "5 años de experiencia"
+    instagram = Column(String(100), nullable=True)
+    facebook = Column(String(100), nullable=True)
+    featured_styles = Column(String(250), nullable=True) # e.g. "Skin Fade, Visagismo, Ritual de Barba"
     working_days = Column(String(100), default="Lunes,Martes,Miércoles,Jueves,Viernes,Sábado")
     is_active = Column(Boolean, default=True)
     display_order = Column(Integer, default=0)
@@ -238,3 +243,17 @@ class AuditLog(Base):
     old_value = Column(Text, nullable=True)
     new_value = Column(Text, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
+
+
+class NotificationLog(Base):
+    __tablename__ = "notification_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=True)
+    recipient = Column(String(50), nullable=False)
+    recipient_role = Column(String(20), default="CLIENTE") # CLIENTE, BARBERO
+    message_type = Column(String(50), default="WHATSAPP_CONFIRMACION")
+    message_body = Column(Text, nullable=False)
+    status = Column(String(20), default="ENVIADO") # ENVIADO, PENDIENTE, ERROR
+    error_details = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

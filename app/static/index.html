@@ -2,10 +2,10 @@
 <html lang="es" class="dark scroll-smooth">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0c">
-  <meta name="description" content="Barbería Don Carlos - Sistema de reservas de alta gama para barberías de autor y shop de productos profesionales.">
-  <title id="headTitle">BARBERÍA DON CARLOS // Turnero & Shop</title>
+  <meta name="description" content="BladeSync AI / Turnero & Shop Barber - Sistema de reservas de alta gama para barberías de autor y shop de productos profesionales.">
+  <title id="headTitle">BladeSync Barber // Turnero & Shop</title>
   <link rel="manifest" href="/manifest.json">
 
   <!-- Tailwind CSS CDN -->
@@ -26,12 +26,12 @@
             mono: ['"Space Grotesk"', 'monospace'],
           },
           colors: {
-            obsidian: '#0a0a0c',
-            surface: '#131318',
+            obsidian: 'var(--color-background, #0a0a0c)',
+            surface: 'var(--color-surface, #131318)',
             surfaceElevated: '#1a1a22',
-            surfaceBorder: '#23232c',
-            neonVolt: '#d4ff00',
-            neonCyan: '#00f2fe',
+            surfaceBorder: 'var(--color-border, #23232c)',
+            neonVolt: 'var(--color-primary, #d4ff00)',
+            neonCyan: 'var(--color-secondary, #00f2fe)',
             neonPurple: '#a855f7'
           },
           boxShadow: {
@@ -47,16 +47,16 @@
 
   <style>
     ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #0a0a0c; }
-    ::-webkit-scrollbar-thumb { background: #23232c; border-radius: 9999px; }
-    ::-webkit-scrollbar-thumb:hover { background: #d4ff00; }
+    ::-webkit-scrollbar-track { background: var(--color-background, #0a0a0c); }
+    ::-webkit-scrollbar-thumb { background: var(--color-border, #23232c); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--color-primary, #d4ff00); }
 
     body {
-      background-color: #0a0a0c;
+      background-color: var(--color-background, #0a0a0c);
       background-image: 
         radial-gradient(at 15% 10%, rgba(212, 255, 0, 0.05) 0px, transparent 40%),
         radial-gradient(at 85% 90%, rgba(0, 242, 254, 0.04) 0px, transparent 45%);
-      color: #f3f4f6;
+      color: var(--color-text, #f3f4f6);
       min-height: 100vh;
       -webkit-tap-highlight-color: transparent;
     }
@@ -84,7 +84,7 @@
     }
 
     .neon-border-active {
-      border-color: #d4ff00 !important;
+      border-color: var(--color-primary, #d4ff00) !important;
       box-shadow: 0 0 18px rgba(212, 255, 0, 0.22);
       background: rgba(212, 255, 0, 0.05) !important;
     }
@@ -114,7 +114,7 @@
           <span class="text-[10px] font-mono tracking-widest text-neonCyan uppercase font-bold" id="badgeSub">ATELIER DE AUTOR</span>
         </div>
         <h1 class="text-xl sm:text-2xl font-extrabold font-mono tracking-tight text-white mt-0.5 flex items-center group-hover:text-neonVolt transition" id="appBrandTitle">
-          DON CARLOS<span class="text-neonVolt animate-pulse">_</span>
+          BARBERÍA<span class="text-neonVolt animate-pulse">_</span>
         </h1>
       </div>
 
@@ -136,9 +136,9 @@
         </div>
 
         <div class="flex items-center gap-2">
-          <a href="/shop.html" class="text-[11px] font-mono text-neonCyan hover:underline">🛍️ Shop Barber</a>
+          <a href="/turnos.html" class="text-[11px] font-mono text-[#d4ff00] hover:underline font-bold">📋 Turnos en Vivo</a>
           <span class="text-gray-600">•</span>
-          <a href="/admin.html" class="text-[11px] font-mono text-gray-400 hover:text-white">🔑 Admin</a>
+          <a href="/shop.html" class="text-[11px] font-mono text-neonCyan hover:underline">🛍️ Shop Barber</a>
           <span class="text-gray-600">•</span>
           <span class="text-[10px] font-mono text-gray-400" id="liveClock">00:00:00</span>
         </div>
@@ -178,7 +178,8 @@
 
       <!-- Logo Badge -->
       <div class="relative w-28 h-28 rounded-full bg-gradient-to-tr from-surfaceElevated to-surface flex items-center justify-center border-2 border-neonVolt/40 shadow-volt-md">
-        <svg class="w-16 h-16 text-neonVolt" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <img id="splashLogoImg" class="w-20 h-20 object-contain hidden" alt="Logo" />
+        <svg id="splashDefaultIcon" class="w-16 h-16 text-neonVolt" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="32" cy="32" r="30" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.3"/>
           <path d="M20 18L44 46M24 16C21 16 18 19 18 22C18 25 21 28 24 28C27 28 30 25 30 22C30 19 27 16 24 16Z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
           <path d="M44 18L20 46M40 16C43 16 46 19 46 22C46 25 43 28 40 28C37 28 34 25 34 22C34 19 37 16 40 16Z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
@@ -192,7 +193,7 @@
 
       <div class="flex flex-col gap-1.5 max-w-sm">
         <h2 class="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-white" id="splashTitleText">
-          BARBERÍA DON CARLOS
+          BARBERÍA & SHOP
         </h2>
         <p class="text-xs sm:text-sm text-gray-300 leading-relaxed" id="splashSubText">
           Tu estilo comienza acá. Reservá tu turno en 60 segundos o visitá nuestra tienda Shop Barber.
@@ -426,7 +427,7 @@
 
     <!-- Footer -->
     <footer class="text-center text-xs text-gray-600 font-mono pt-4 flex flex-col gap-1">
-      <div id="footerText">BARBERÍA DON CARLOS // TURNERO & SHOP © 2026</div>
+      <div id="footerText">RESERVAS & SHOP © 2026</div>
     </footer>
 
   </div>

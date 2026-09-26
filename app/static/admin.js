@@ -71,6 +71,16 @@ document.addEventListener("DOMContentLoaded", () => {
       UISound.play("click");
     }
   });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      document.querySelectorAll(".modal-overlay, .modal, [id$='Modal'], [id$='Overlay']").forEach(el => {
+        if (el.id !== "loginOverlay" && el.style.display && el.style.display !== "none") {
+          el.style.display = "none";
+        }
+      });
+    }
+  });
 });
 
 function showLoginOverlay() {
@@ -185,6 +195,7 @@ function switchSection(secId) {
   else if (secId === "products") loadAdminProducts();
   else if (secId === "orders") loadAdminOrders();
   else if (secId === "delivery") loadAdminDelivery();
+  else if (secId === "notifications") loadAdminNotificationLogs();
   else if (secId === "identity" || secId === "appearance" || secId === "content" || secId === "pwa" || secId === "whatsapp") loadSettingsToForm();
   else if (secId === "backups") loadAdminBackups();
 }
@@ -322,13 +333,36 @@ async function loadAdminClients() {
       tr.innerHTML = `
         <td>#${c.id}</td>
         <td><strong>${escapeHtml(c.name)}</strong></td>
-        <td>${escapeHtml(c.phone)}</td>
+        <td><a href="https://wa.me/${c.phone.replace(/\D/g, '')}" target="_blank" style="color: #00f2fe;">${escapeHtml(c.phone)}</a></td>
         <td>${escapeHtml(c.email || '-')}</td>
         <td>${c.created_at ? c.created_at.substring(0, 10) : '-'}</td>
+        <td>
+          <button class="btn-admin btn-admin-sm btn-admin-danger" onclick="deleteClient(${c.id}, '${escapeHtml(c.name)}')">Eliminar</button>
+        </td>
       `;
       tbody.appendChild(tr);
     });
   } catch (e) { console.error(e); }
+}
+
+async function deleteClient(clientId, clientName) {
+  if (!confirm(`¿Deseas eliminar al cliente ${clientName}? Se desvinculará de sus turnos pasados sin romper el historial.`)) return;
+
+  try {
+    const res = await fetch(`/api/admin/clients/${clientId}`, {
+      method: "DELETE",
+      headers: authHeaders()
+    });
+    if (res.ok) {
+      alert(`Cliente '${clientName}' eliminado correctamente.`);
+      loadAdminClients();
+    } else {
+      const data = await res.json();
+      alert(data.detail || "Error al eliminar cliente.");
+    }
+  } catch (e) {
+    alert("Error de conexión al eliminar cliente.");
+  }
 }
 
 // Global cache for editing
@@ -350,8 +384,11 @@ async function loadAdminBarbers() {
     adminBarbersList.forEach(b => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td><img src="${b.avatar_url || ''}" style="width: 36px; height: 36px; object-fit: cover; border-radius: 50%;"></td>
-        <td><strong>${escapeHtml(b.name)}</strong></td>
+        <td><img src="${b.avatar_url || ''}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 50%;"></td>
+        <td>
+          <strong>${escapeHtml(b.name)}</strong>
+          ${b.phone ? `<br><small style="color: #00f2fe;">🔒 WA: ${escapeHtml(b.phone)}</small>` : ''}
+        </td>
         <td>${escapeHtml(b.specialties || '')}</td>
         <td>${escapeHtml(b.working_days || '')}</td>
         <td><span class="badge ${b.is_active ? 'badge-confirmed' : 'badge-canceled'}">${b.is_active ? 'ACTIVO' : 'INACTIVO'}</span></td>
@@ -697,15 +734,49 @@ async function restoreBackup(filename) {
   } catch (e) { alert("Error al restaurar."); }
 }
 
-// 13. SETTINGS & IDENTITY
+// 13. SETTINGS, LOGO & VISUAL THEME
 function updateAdminBrandUI(sets) {
   if (!sets) return;
-  const bName = sets.barber_name || sets.app_name || "DON CARLOS";
+  const bName = sets.barber_name || sets.app_name || "BladeSync Barber";
   const brandEl = document.getElementById("sidebarBrandName");
   if (brandEl) {
-    brandEl.innerHTML = `${escapeHtml(bName.toUpperCase())}<span>_</span>`;
+    if (sets.logo_url) {
+      brandEl.innerHTML = `<img src="${sets.logo_url}" alt="${escapeHtml(bName)}" style="max-height: 36px; max-width: 140px; object-fit: contain;">`;
+    } else {
+      brandEl.innerHTML = `${escapeHtml(bName.toUpperCase())}<span>_</span>`;
+    }
   }
   document.title = `${bName} // Panel Administrativo`;
+  applyThemeVariablesToRoot(sets);
+}
+
+function applyThemeVariablesToRoot(sets) {
+  if (!sets) return;
+  const root = document.documentElement;
+  if (sets.color_primary) {
+    root.style.setProperty('--color-primary', sets.color_primary);
+    root.style.setProperty('--neon-volt', sets.color_primary);
+  }
+  if (sets.color_secondary) root.style.setProperty('--color-secondary', sets.color_secondary);
+  if (sets.color_accent) root.style.setProperty('--color-accent', sets.color_accent);
+  if (sets.color_background) {
+    root.style.setProperty('--color-background', sets.color_background);
+    root.style.setProperty('--obsidian', sets.color_background);
+  }
+  if (sets.color_surface) {
+    root.style.setProperty('--color-surface', sets.color_surface);
+    root.style.setProperty('--surface', sets.color_surface);
+  }
+  if (sets.color_text) root.style.setProperty('--color-text', sets.color_text);
+  if (sets.color_muted) root.style.setProperty('--color-muted', sets.color_muted);
+  if (sets.color_button) root.style.setProperty('--color-button', sets.color_button);
+  if (sets.color_border) {
+    root.style.setProperty('--color-border', sets.color_border);
+    root.style.setProperty('--surface-border', sets.color_border);
+  }
+  if (sets.border_radius) {
+    root.style.setProperty('--border-radius', sets.border_radius + 'px');
+  }
 }
 
 async function loadSettingsToForm() {
@@ -716,17 +787,217 @@ async function loadSettingsToForm() {
     for (const [k, v] of Object.entries(sets)) {
       const el = document.getElementById(`setting_${k}`);
       if (el) el.value = v;
+
+      // Sync color pickers
+      const picker = document.getElementById(`setting_${k}_picker`);
+      if (picker && v && v.startsWith('#')) {
+        picker.value = v;
+      }
     }
+
+    // Logo preview setup
+    const logoPreviewContainer = document.getElementById("logoPreviewContainer");
+    const logoPlaceholder = document.getElementById("logoPlaceholder");
+    const logoPreviewImage = document.getElementById("logoPreviewImage");
+
+    if (sets.logo_url && logoPreviewContainer && logoPreviewImage && logoPlaceholder) {
+      logoPreviewImage.src = sets.logo_url;
+      logoPreviewContainer.style.display = "block";
+      logoPlaceholder.style.display = "none";
+    } else if (logoPreviewContainer && logoPlaceholder) {
+      logoPreviewContainer.style.display = "none";
+      logoPlaceholder.style.display = "block";
+    }
+
     updateAdminBrandUI(sets);
+    updateLiveThemePreview();
   } catch (e) { console.error(e); }
+}
+
+async function handleLogoUpload(input) {
+  if (!input || !input.files || input.files.length === 0) return;
+  const file = input.files[0];
+
+  // Client side validation
+  const allowedExts = ["png", "jpg", "jpeg", "webp", "svg"];
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!allowedExts.includes(ext)) {
+    alert(`Formato de archivo no válido (.${ext}). Por favor selecciona una imagen PNG (preferente transparente), JPG, WebP o SVG.`);
+    input.value = "";
+    return;
+  }
+
+  const maxSize = 5 * 1024 * 1024; // 5 MB
+  if (file.size > maxSize) {
+    alert(`El archivo seleccionado dura ${(file.size / (1024 * 1024)).toFixed(2)} MB. El tamaño máximo permitido es 5 MB.`);
+    input.value = "";
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const res = await fetch("/api/admin/logo/upload", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${adminToken}`
+      },
+      body: formData
+    });
+
+    const data = await res.json();
+    if (res.ok && data.logo_url) {
+      const settingInput = document.getElementById("setting_logo_url");
+      if (settingInput) settingInput.value = data.logo_url;
+
+      const logoPreviewContainer = document.getElementById("logoPreviewContainer");
+      const logoPlaceholder = document.getElementById("logoPlaceholder");
+      const logoPreviewImage = document.getElementById("logoPreviewImage");
+
+      if (logoPreviewContainer && logoPreviewImage && logoPlaceholder) {
+        logoPreviewImage.src = data.logo_url;
+        logoPreviewContainer.style.display = "block";
+        logoPlaceholder.style.display = "none";
+      }
+
+      await loadSettingsToForm();
+      alert("¡Logo subido y aplicado exitosamente a toda la aplicación!");
+    } else {
+      alert(data.detail || "Error al subir el logo.");
+    }
+  } catch (e) {
+    alert("Error de conexión al subir el logo.");
+  }
+}
+
+async function removeLogo() {
+  if (!confirm("¿Estás seguro de eliminar el logo de la barbería? Se restaurará la visualización de texto por defecto.")) return;
+
+  try {
+    const res = await fetch("/api/admin/logo/delete", {
+      method: "DELETE",
+      headers: authHeaders()
+    });
+
+    if (res.ok) {
+      const settingInput = document.getElementById("setting_logo_url");
+      if (settingInput) settingInput.value = "";
+
+      const fileInput = document.getElementById("setting_logo_file");
+      if (fileInput) fileInput.value = "";
+
+      const logoPreviewContainer = document.getElementById("logoPreviewContainer");
+      const logoPlaceholder = document.getElementById("logoPlaceholder");
+      if (logoPreviewContainer && logoPlaceholder) {
+        logoPreviewContainer.style.display = "none";
+        logoPlaceholder.style.display = "block";
+      }
+
+      await loadSettingsToForm();
+      alert("Logo eliminado correctamente.");
+    } else {
+      alert("Error al eliminar el logo.");
+    }
+  } catch (e) {
+    alert("Error de conexión al eliminar logo.");
+  }
+}
+
+function syncColorPicker(key) {
+  const textInput = document.getElementById(`setting_${key}`);
+  const pickerInput = document.getElementById(`setting_${key}_picker`);
+  if (textInput && pickerInput) {
+    textInput.value = pickerInput.value;
+  }
+  updateLiveThemePreview();
+}
+
+function updateLiveThemePreview() {
+  const getColor = (key, fallback) => {
+    const el = document.getElementById(`setting_${key}`);
+    return el && el.value ? el.value : fallback;
+  };
+
+  const primary = getColor("color_primary", "#d4ff00");
+  const secondary = getColor("color_secondary", "#00f2fe");
+  const accent = getColor("color_accent", "#ff0055");
+  const bg = getColor("color_background", "#0a0a0c");
+  const surface = getColor("color_surface", "#131318");
+  const text = getColor("color_text", "#f3f4f6");
+  const muted = getColor("color_muted", "#9ca3af");
+  const button = getColor("color_button", "#d4ff00");
+  const border = getColor("color_border", "#23232c");
+  const radius = getColor("border_radius", "16");
+
+  // Live CSS injection into main root
+  const root = document.documentElement;
+  root.style.setProperty('--color-primary', primary);
+  root.style.setProperty('--color-secondary', secondary);
+  root.style.setProperty('--color-accent', accent);
+  root.style.setProperty('--color-background', bg);
+  root.style.setProperty('--color-surface', surface);
+  root.style.setProperty('--color-text', text);
+  root.style.setProperty('--color-muted', muted);
+  root.style.setProperty('--color-button', button);
+  root.style.setProperty('--color-border', border);
+  root.style.setProperty('--border-radius', radius + 'px');
+  root.style.setProperty('--neon-volt', primary);
+  root.style.setProperty('--obsidian', bg);
+  root.style.setProperty('--surface', surface);
+
+  // Live preview card element updates
+  const previewBox = document.getElementById("themePreviewCard");
+  if (previewBox) {
+    previewBox.style.backgroundColor = bg;
+    previewBox.style.borderColor = border;
+    previewBox.style.borderRadius = radius + 'px';
+  }
+
+  const previewHeading = document.getElementById("themePreviewHeading");
+  if (previewHeading) {
+    previewHeading.style.color = text;
+  }
+
+  const previewText = document.getElementById("themePreviewText");
+  if (previewText) {
+    previewText.style.color = muted;
+  }
+
+  const previewBadge = document.getElementById("themePreviewBadge");
+  if (previewBadge) {
+    previewBadge.style.backgroundColor = primary;
+    previewBadge.style.color = bg;
+  }
+
+  const previewSecondaryBadge = document.getElementById("themePreviewSecondaryBadge");
+  if (previewSecondaryBadge) {
+    previewSecondaryBadge.style.backgroundColor = secondary;
+    previewSecondaryBadge.style.color = bg;
+  }
+
+  const previewAccentBadge = document.getElementById("themePreviewAccentBadge");
+  if (previewAccentBadge) {
+    previewAccentBadge.style.backgroundColor = accent;
+    previewAccentBadge.style.color = '#ffffff';
+  }
+
+  const previewBtn = document.getElementById("themePreviewBtnPrimary");
+  if (previewBtn) {
+    previewBtn.style.backgroundColor = button;
+    previewBtn.style.color = bg;
+    previewBtn.style.borderRadius = radius + 'px';
+  }
 }
 
 async function saveSettingsSection(secName) {
   const fields = document.querySelectorAll("[id^='setting_']");
   const updates = {};
   fields.forEach(el => {
-    const key = el.id.replace("setting_", "");
-    updates[key] = el.value;
+    if (el.type !== "file" && !el.id.endsWith("_picker")) {
+      const key = el.id.replace("setting_", "");
+      updates[key] = el.value;
+    }
   });
 
   try {
@@ -737,10 +1008,12 @@ async function saveSettingsSection(secName) {
     });
     if (res.ok) {
       const updatedSets = await res.json();
-      updateAdminBrandUI(updatedSets);
-      alert("Configuración guardada exitosamente.");
+      updateAdminBrandUI(updatedSets.settings || updatedSets);
+      alert("Configuración e identidad visual guardadas exitosamente.");
+    } else {
+      alert("Error al guardar la configuración.");
     }
-  } catch (e) { alert("Error al guardar configuración."); }
+  } catch (e) { alert("Error de conexión al guardar configuración."); }
 }
 
 async function updateAdminPassword() {
@@ -788,6 +1061,27 @@ function openBarberModal() {
       <input type="text" id="modal_barber_name" class="form-control" placeholder="Ej: Mateo Rossi" required>
     </div>
     <div class="form-group">
+      <label>📱 TELÉFONO / WHATSAPP (PRIVADO - NOTIFICACIONES)</label>
+      <input type="text" id="modal_barber_phone" class="form-control" placeholder="5493834123456" required>
+      <small style="color: #94a3b8; font-size: 0.7rem;">⚠️ Uso interno del negocio. NUNCA se mostrará en el perfil público.</small>
+    </div>
+    <div class="form-group">
+      <label>EXPERIENCIA / DESCRIPCIÓN</label>
+      <input type="text" id="modal_barber_experience" class="form-control" placeholder="Ej: 5 años - Master Barber especialista en Fade & Barba">
+    </div>
+    <div class="form-group">
+      <label>ESTILOS DESTACADOS (Separados por coma)</label>
+      <input type="text" id="modal_barber_featured_styles" class="form-control" placeholder="Skin Fade, Mullet, Barba Exfoliante">
+    </div>
+    <div class="form-group">
+      <label>INSTAGRAM (Opcional)</label>
+      <input type="text" id="modal_barber_instagram" class="form-control" placeholder="@mateobarber">
+    </div>
+    <div class="form-group">
+      <label>FACEBOOK (Opcional)</label>
+      <input type="text" id="modal_barber_facebook" class="form-control" placeholder="mateo.barber">
+    </div>
+    <div class="form-group">
       <label>ESPECIALIDADES</label>
       <input type="text" id="modal_barber_specialties" class="form-control" placeholder="Ej: Fade, Barba, Profilado">
     </div>
@@ -813,6 +1107,27 @@ function editBarberModal(id) {
     <div class="form-group">
       <label>NOMBRE COMPLETO</label>
       <input type="text" id="modal_barber_name" class="form-control" value="${escapeHtml(b.name)}" required>
+    </div>
+    <div class="form-group">
+      <label>📱 TELÉFONO / WHATSAPP (PRIVADO - NOTIFICACIONES)</label>
+      <input type="text" id="modal_barber_phone" class="form-control" value="${escapeHtml(b.phone || '')}" required>
+      <small style="color: #94a3b8; font-size: 0.7rem;">⚠️ Uso interno del negocio. NUNCA se mostrará en el perfil público.</small>
+    </div>
+    <div class="form-group">
+      <label>EXPERIENCIA / DESCRIPCIÓN</label>
+      <input type="text" id="modal_barber_experience" class="form-control" value="${escapeHtml(b.experience || '')}">
+    </div>
+    <div class="form-group">
+      <label>ESTILOS DESTACADOS (Separados por coma)</label>
+      <input type="text" id="modal_barber_featured_styles" class="form-control" value="${escapeHtml(b.featured_styles || '')}">
+    </div>
+    <div class="form-group">
+      <label>INSTAGRAM (Opcional)</label>
+      <input type="text" id="modal_barber_instagram" class="form-control" value="${escapeHtml(b.instagram || '')}">
+    </div>
+    <div class="form-group">
+      <label>FACEBOOK (Opcional)</label>
+      <input type="text" id="modal_barber_facebook" class="form-control" value="${escapeHtml(b.facebook || '')}">
     </div>
     <div class="form-group">
       <label>ESPECIALIDADES</label>
@@ -1093,6 +1408,11 @@ async function submitAdminModal() {
 
     if (currentModalType === "barber") {
       const name = document.getElementById("modal_barber_name").value.trim();
+      const phone = document.getElementById("modal_barber_phone").value.trim();
+      const experience = document.getElementById("modal_barber_experience").value.trim();
+      const featured_styles = document.getElementById("modal_barber_featured_styles").value.trim();
+      const instagram = document.getElementById("modal_barber_instagram").value.trim();
+      const facebook = document.getElementById("modal_barber_facebook").value.trim();
       const specialties = document.getElementById("modal_barber_specialties").value.trim();
       const working_days = document.getElementById("modal_barber_days").value.trim();
       const avatar_url = document.getElementById("modal_barber_avatar").value.trim();
@@ -1101,7 +1421,7 @@ async function submitAdminModal() {
       const res = await fetch(url, {
         method: method,
         headers: authHeaders(),
-        body: JSON.stringify({ name, specialties, working_days, avatar_url, is_active: true })
+        body: JSON.stringify({ name, phone, experience, featured_styles, instagram, facebook, specialties, working_days, avatar_url, is_active: true })
       });
       if (res.ok) {
         closeAdminModal();
@@ -1282,6 +1602,34 @@ function openOrderDetailsModal(orderId) {
   `;
 
   document.getElementById("orderDetailModal").style.display = "flex";
+}
+
+async function loadAdminNotificationLogs() {
+  try {
+    const res = await fetch("/api/admin/notifications/logs", { headers: authHeaders() });
+    if (!res.ok) return;
+    const logs = await res.json();
+    const tbody = document.getElementById("notificationLogsBody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+    if (logs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #9ca3af; padding: 20px;">No hay notificaciones enviadas aún.</td></tr>`;
+      return;
+    }
+    logs.forEach(l => {
+      const tr = document.createElement("tr");
+      const statusBadge = l.status === "enviado" ? "badge-confirmed" : (l.status === "error" ? "badge-canceled" : "badge-pending");
+      tr.innerHTML = `
+        <td>${l.sent_at ? l.sent_at.replace("T", " ").substring(0, 19) : '-'}</td>
+        <td><strong>${escapeHtml(l.recipient_name || '-')}</strong> (${escapeHtml(l.recipient_type)})</td>
+        <td><a href="https://wa.me/${(l.recipient_phone || '').replace(/\D/g, '')}" target="_blank" style="color: #00f2fe;">${escapeHtml(l.recipient_phone || '-')}</a></td>
+        <td><span class="badge ${l.message_type === 'CLIENT_CONFIRMATION' ? 'badge-confirmed' : 'badge-pending'}">${escapeHtml(l.message_type)}</span></td>
+        <td>#${l.appointment_id || '-'}</td>
+        <td><span class="badge ${statusBadge}">${escapeHtml(l.status.toUpperCase())}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (e) { console.error("Error loading notification logs:", e); }
 }
 
 

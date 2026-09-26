@@ -2,7 +2,7 @@
 <html lang="es" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Panel Administrativo // Barbería</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -43,7 +43,7 @@
       <div class="admin-sidebar-header">
         <a href="/" style="text-decoration: none; color: inherit;" title="Ir al Inicio / App Pública">
           <div class="admin-sidebar-brand" id="sidebarBrandName">
-            DON CARLOS<span>_</span>
+            BARBERÍA<span>_</span>
           </div>
         </a>
       </div>
@@ -56,7 +56,10 @@
         <a class="admin-nav-item" onclick="switchSection('appointments')">
           <span class="icon">📅</span> Turnos
         </a>
-        <a class="admin-nav-item" href="/live.html" target="_blank" style="color: #d4ff00;">
+        <a class="admin-nav-item" href="/turnos.html" target="_blank" style="color: #d4ff00; font-weight: bold;">
+          <span class="icon">📋</span> Turnos en Vivo (Recepción) ↗
+        </a>
+        <a class="admin-nav-item" href="/live.html" target="_blank" style="color: #00f2fe;">
           <span class="icon">📺</span> Pantalla en Vivo (TV) ↗
         </a>
         <a class="admin-nav-item" onclick="switchSection('clients')">
@@ -246,6 +249,7 @@
                     <th>WhatsApp</th>
                     <th>Email</th>
                     <th>Registrado</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="clientsTableBody"></tbody>
@@ -453,104 +457,348 @@
 
         <!-- SECTION: WHATSAPP -->
         <div id="section-whatsapp" class="admin-section" style="display: none;">
-          <div class="admin-card">
+          <div class="admin-card" style="margin-bottom: 24px;">
             <div class="admin-card-header">
-              <h3 class="admin-card-title">Integración WhatsApp Business API</h3>
+              <h3 class="admin-card-title">💬 WhatsApp & Notificaciones Automáticas</h3>
+              <button class="btn-admin btn-admin-sm" onclick="saveSettingsSection('whatsapp')">Guardar Configuración</button>
             </div>
-            <div class="form-grid">
+            <p style="color: #9ca3af; font-size: 0.85rem; margin-bottom: 16px;">
+              Configurá el envío automático de mensajes de WhatsApp al cliente y al barbero cada vez que se confirme un turno.
+            </p>
+
+            <div class="form-grid" style="margin-bottom: 20px;">
+              <div class="form-group">
+                <label>ENVIAR WHATSAPP AL CLIENTE AL CONFIRMAR</label>
+                <select id="setting_wa_notify_client" class="form-control">
+                  <option value="true">Activado (Envío automático al cliente)</option>
+                  <option value="false">Desactivado</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>ENVIAR WHATSAPP AL BARBERO AL CONFIRMAR</label>
+                <select id="setting_wa_notify_barber" class="form-control">
+                  <option value="true">Activado (Notificar turno al barbero)</option>
+                  <option value="false">Desactivado</option>
+                </select>
+              </div>
               <div class="form-group">
                 <label>NÚMERO DE WHATSAPP NEGOCIO</label>
                 <input type="text" id="setting_whatsapp" class="form-control" placeholder="5493834123456">
               </div>
               <div class="form-group">
-                <label>TOKEN DE VERIFICACIÓN WEBHOOK</label>
-                <input type="text" id="setting_whatsapp_verify" class="form-control" value="bladesync_webhook_secret_token_2026" readonly>
+                <label>FIRMA DEL MENSAJE</label>
+                <input type="text" id="setting_wa_signature" class="form-control" placeholder="Ej: Atte. Equipo Pereyras Barber">
               </div>
             </div>
-            <button class="btn-admin" onclick="saveSettingsSection('whatsapp')">Guardar WhatsApp</button>
+
+            <div style="background: rgba(212,255,0,0.05); border: 1px solid rgba(212,255,0,0.2); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+              <h4 style="color: #d4ff00; margin: 0 0 8px 0; font-family: 'Space Grotesk', monospace; font-size: 0.85rem;">VARIABLES DISPONIBLES EN PLANTILLAS:</h4>
+              <p style="color: #cbd5e1; font-size: 0.8rem; margin: 0; font-family: monospace;">
+                <code>{cliente}</code> — Nombre del cliente<br>
+                <code>{barbero}</code> — Nombre del barbero asignado<br>
+                <code>{servicio}</code> — Servicio reservado<br>
+                <code>{fecha}</code> — Fecha del turno<br>
+                <code>{hora}</code> — Hora del turno<br>
+                <code>{direccion}</code> — Dirección de la barbería<br>
+                <code>{barberia}</code> — Nombre de la barbería
+              </p>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group" style="grid-column: 1 / -1;">
+                <label>PLANTILLA DE MENSAJE AL CLIENTE</label>
+                <textarea id="setting_wa_template_client" class="form-control" rows="4" style="font-family: monospace; font-size: 0.85rem;"></textarea>
+              </div>
+              <div class="form-group" style="grid-column: 1 / -1;">
+                <label>PLANTILLA DE MENSAJE AL BARBERO</label>
+                <textarea id="setting_wa_template_barber" class="form-control" rows="4" style="font-family: monospace; font-size: 0.85rem;"></textarea>
+              </div>
+            </div>
+            <button class="btn-admin" onclick="saveSettingsSection('whatsapp')">Guardar WhatsApp & Plantillas</button>
           </div>
         </div>
 
-        <!-- SECTION: NOTIFICACIONES -->
+        <!-- SECTION: NOTIFICACIONES LOGS -->
         <div id="section-notifications" class="admin-section" style="display: none;">
           <div class="admin-card">
             <div class="admin-card-header">
-              <h3 class="admin-card-title">Avisos & Notificaciones PWA</h3>
+              <h3 class="admin-card-title">🔔 Registro de Notificaciones de WhatsApp</h3>
+              <button class="btn-admin btn-admin-sm" onclick="loadAdminNotificationLogs()">🔄 Refrescar Logs</button>
+            </div>
+            <p style="color: #9ca3af; font-size: 0.85rem; margin-bottom: 16px;">
+              Historial de envíos automáticos de mensajes a clientes y barberos con estado y timestamp.
+            </p>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Fecha & Hora</th>
+                    <th>Destinatario</th>
+                    <th>Teléfono</th>
+                    <th>Tipo</th>
+                    <th>Turno ID</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="notificationLogsBody"></tbody>
+              </table>
             </div>
           </div>
         </div>
 
-        <!-- SECTION: IDENTIDAD & DATOS -->
+        <!-- SECTION: IDENTIDAD & TEXTOS DE LA BARBERÍA -->
         <div id="section-identity" class="admin-section" style="display: none;">
+          <!-- LOGO DE LA BARBERÍA -->
+          <div class="admin-card" style="margin-bottom: 24px;">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">📷 Logo de la Barbería</h3>
+            </div>
+            <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 16px;">
+              Subí el logo oficial de tu barbería. Se aplicará automáticamente en el Turnero público, Login, Panel Admin, Shop Barber, PWA, Splash y Pantalla TV. Se recomienda imagen PNG con fondo transparente (máx. 5MB).
+            </p>
+
+            <div style="display: flex; gap: 24px; flex-wrap: wrap; align-items: center;">
+              <div id="logoPreviewContainer" style="background: rgba(255,255,255,0.04); border: 2px dashed rgba(255,255,255,0.15); border-radius: 12px; padding: 16px; min-width: 160px; min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                <img id="logoPreviewImg" src="" alt="Vista previa de logo" style="max-height: 80px; max-width: 180px; object-fit: contain; display: none;">
+                <span id="logoPreviewPlaceholder" style="color: #64748b; font-size: 0.8rem; font-family: monospace;">Sin logo cargado</span>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="hidden" id="setting_logo_url">
+                <input type="file" id="logoFileInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display: none;" onchange="handleLogoUpload(this)">
+                <button type="button" class="btn-admin" onclick="document.getElementById('logoFileInput').click()">
+                  📁 Subir / Reemplazar Logo
+                </button>
+                <button type="button" class="btn-admin btn-admin-secondary" onclick="removeLogo()" style="color: #ef4444; border-color: rgba(239,68,68,0.3);">
+                  🗑️ Eliminar Logo
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- IDENTIDAD Y TEXTOS PRINCIPALES -->
           <div class="admin-card">
             <div class="admin-card-header">
-              <h3 class="admin-card-title">Identidad & Textos de la Barbería</h3>
+              <h3 class="admin-card-title">🏷️ Identidad & Textos de la Barbería</h3>
               <button class="btn-admin btn-admin-sm" onclick="saveSettingsSection('identity')">Guardar Cambios</button>
             </div>
             <div class="form-grid">
               <div class="form-group">
-                <label>NOMBRE DE LA BARBERÍA</label>
-                <input type="text" id="setting_barber_name" class="form-control" placeholder="Ej: BARBERÍA PEREYRAS BARBER">
+                <label>NOMBRE COMPLETO DE LA BARBERÍA</label>
+                <input type="text" id="setting_barber_name" class="form-control" placeholder="Ej: ATELIER PEREYRAS BARBER">
               </div>
               <div class="form-group">
-                <label>TÍTULO PRINCIPAL (ENCABEZADO / SPLASH)</label>
-                <input type="text" id="setting_splash_title" class="form-control" placeholder="Ej: BARBERÍA PEREYRAS BARBER">
+                <label>NOMBRE CORTO (PWA / BOTONES)</label>
+                <input type="text" id="setting_short_name" class="form-control" placeholder="Ej: Pereyras Barber">
+              </div>
+              <div class="form-group">
+                <label>TÍTULO PRINCIPAL DE BIENVENIDA (SPLASH / LANDING)</label>
+                <input type="text" id="setting_welcome_title" class="form-control" placeholder="Ej: ATELIER DE AUTOR">
               </div>
               <div class="form-group">
                 <label>SUBTÍTULO DE BIENVENIDA</label>
-                <input type="text" id="setting_splash_subtitle" class="form-control" placeholder="Ej: Tu estilo comienza acá. Reservá tu turno en 60 segundos.">
+                <input type="text" id="setting_welcome_sub" class="form-control" placeholder="Ej: Experiencia premium en degradados milimétricos y barboterapia.">
               </div>
               <div class="form-group">
-                <label>TÍTULO EN PESTAÑA DE NAVEGADOR</label>
-                <input type="text" id="setting_browser_title" class="form-control" placeholder="Ej: Barbería Pereyras // Turnero & Shop">
+                <label>TÍTULO EN PESTAÑA DEL NAVEGADOR</label>
+                <input type="text" id="setting_browser_title" class="form-control" placeholder="Ej: Barbería Digital // Turnero & Shop">
               </div>
               <div class="form-group">
-                <label>TEXTO PIE DE PÁGINA (FOOTER)</label>
-                <input type="text" id="setting_text_footer" class="form-control" placeholder="Ej: BARBERÍA PEREYRAS // RESERVAS & SHOP © 2026">
+                <label>DESCRIPCIÓN DE LA BARBERÍA</label>
+                <input type="text" id="setting_description" class="form-control" placeholder="Ej: Barbería y peluquería masculina de autor.">
               </div>
               <div class="form-group">
-                <label>TELÉFONO DE CONTACTO / WHATSAPP</label>
-                <input type="text" id="setting_phone" class="form-control">
+                <label>TELÉFONO DE CONTACTO</label>
+                <input type="text" id="setting_phone" class="form-control" placeholder="Ej: 5493834123456">
+              </div>
+              <div class="form-group">
+                <label>WHATSAPP OFICIAL</label>
+                <input type="text" id="setting_whatsapp" class="form-control" placeholder="Ej: 5493834123456">
               </div>
               <div class="form-group">
                 <label>EMAIL</label>
-                <input type="email" id="setting_email" class="form-control">
+                <input type="email" id="setting_email" class="form-control" placeholder="Ej: contacto@barberia.app">
               </div>
               <div class="form-group">
-                <label>DIRECCIÓN</label>
-                <input type="text" id="setting_address" class="form-control">
+                <label>DIRECCIÓN FÍSICA</label>
+                <input type="text" id="setting_address" class="form-control" placeholder="Ej: Av. Belgrano 1234">
+              </div>
+              <div class="form-group">
+                <label>CIUDAD</label>
+                <input type="text" id="setting_city" class="form-control" placeholder="Ej: Catamarca">
+              </div>
+              <div class="form-group">
+                <label>PROVINCIA / ESTADO</label>
+                <input type="text" id="setting_province" class="form-control" placeholder="Ej: Catamarca">
               </div>
               <div class="form-group">
                 <label>INSTAGRAM</label>
-                <input type="text" id="setting_instagram" class="form-control">
+                <input type="text" id="setting_instagram" class="form-control" placeholder="Ej: @barberia_oficial">
               </div>
               <div class="form-group">
                 <label>FACEBOOK</label>
-                <input type="text" id="setting_facebook" class="form-control">
+                <input type="text" id="setting_facebook" class="form-control" placeholder="Ej: barberia.oficial">
+              </div>
+              <div class="form-group">
+                <label>TIKTOK</label>
+                <input type="text" id="setting_tiktok" class="form-control" placeholder="Ej: @barberia">
+              </div>
+              <div class="form-group">
+                <label>SITIO WEB OFICIAL</label>
+                <input type="text" id="setting_website" class="form-control" placeholder="Ej: https://barberia.app">
+              </div>
+              <div class="form-group" style="grid-column: 1 / -1;">
+                <label>LINK ENLACE GOOGLE MAPS</label>
+                <input type="text" id="setting_google_maps" class="form-control" placeholder="Ej: https://maps.google.com/...">
+              </div>
+              <div class="form-group" style="grid-column: 1 / -1;">
+                <label>TEXTO PIE DE PÁGINA (FOOTER)</label>
+                <input type="text" id="setting_text_footer" class="form-control" placeholder="Ej: BARBERÍA DIGITAL // RESERVAS & SHOP © 2026">
+              </div>
+            </div>
+          </div>
+
+          <!-- MENSAJES PRINCIPALES Y CRÉDITOS -->
+          <div class="admin-card" style="margin-top: 24px;">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">💬 Mensajes de Confirmación & Créditos</h3>
+              <button class="btn-admin btn-admin-sm" onclick="saveSettingsSection('identity')">Guardar Mensajes</button>
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>MENSAJE ÉXITO RESERVA</label>
+                <input type="text" id="setting_msg_success" class="form-control">
+              </div>
+              <div class="form-group">
+                <label>MENSAJE TURNO CANCELADO</label>
+                <input type="text" id="setting_msg_cancel" class="form-control">
+              </div>
+              <div class="form-group">
+                <label>DESARROLLADO POR</label>
+                <input type="text" id="setting_developed_by" class="form-control" placeholder="Ej: BladeSync Software">
+              </div>
+              <div class="form-group">
+                <label>DERECHOS / COPYRIGHT</label>
+                <input type="text" id="setting_copyright" class="form-control" placeholder="Ej: Todos los derechos reservados.">
               </div>
             </div>
           </div>
         </div>
 
-        <!-- SECTION: APARIENCIA -->
+        <!-- SECTION: APARIENCIA & TEMA VISUAL -->
         <div id="section-appearance" class="admin-section" style="display: none;">
-          <div class="admin-card">
-            <div class="admin-card-header">
-              <h3 class="admin-card-title">Apariencia & Tema Visual</h3>
-              <button class="btn-admin btn-admin-sm" onclick="saveSettingsSection('appearance')">Publicar Cambios</button>
+          <div style="display: grid; grid-template-columns: 1fr 340px; gap: 24px;">
+            <div class="admin-card">
+              <div class="admin-card-header">
+                <h3 class="admin-card-title">🎨 Selector de Colores & Tema Visual</h3>
+                <button class="btn-admin btn-admin-sm" onclick="saveSettingsSection('appearance')">Publicar Cambios</button>
+              </div>
+
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>COLOR PRINCIPAL (--color-primary)</label>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="color" id="setting_color_primary" class="form-control" style="height: 40px; width: 60px; padding: 2px;" oninput="updateLiveThemePreview()">
+                    <input type="text" id="setting_color_primary_text" class="form-control" style="font-family: monospace;" oninput="syncColorPicker('color_primary')">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>COLOR SECUNDARIO (--color-secondary)</label>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="color" id="setting_color_secondary" class="form-control" style="height: 40px; width: 60px; padding: 2px;" oninput="updateLiveThemePreview()">
+                    <input type="text" id="setting_color_secondary_text" class="form-control" style="font-family: monospace;" oninput="syncColorPicker('color_secondary')">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>COLOR DE ACENTO (--color-accent)</label>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="color" id="setting_color_accent" class="form-control" style="height: 40px; width: 60px; padding: 2px;" oninput="updateLiveThemePreview()">
+                    <input type="text" id="setting_color_accent_text" class="form-control" style="font-family: monospace;" oninput="syncColorPicker('color_accent')">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>COLOR DE FONDO DE PANTALLA (--color-background)</label>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="color" id="setting_color_background" class="form-control" style="height: 40px; width: 60px; padding: 2px;" oninput="updateLiveThemePreview()">
+                    <input type="text" id="setting_color_background_text" class="form-control" style="font-family: monospace;" oninput="syncColorPicker('color_background')">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>COLOR DE TARJETAS / SUPERFICIE (--color-surface)</label>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="color" id="setting_color_surface" class="form-control" style="height: 40px; width: 60px; padding: 2px;" oninput="updateLiveThemePreview()">
+                    <input type="text" id="setting_color_surface_text" class="form-control" style="font-family: monospace;" oninput="syncColorPicker('color_surface')">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>COLOR DE TEXTO PRINCIPAL (--color-text)</label>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="color" id="setting_color_text" class="form-control" style="height: 40px; width: 60px; padding: 2px;" oninput="updateLiveThemePreview()">
+                    <input type="text" id="setting_color_text_text" class="form-control" style="font-family: monospace;" oninput="syncColorPicker('color_text')">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>COLOR DE TEXTO ATENUADO (--color-muted)</label>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="color" id="setting_color_muted" class="form-control" style="height: 40px; width: 60px; padding: 2px;" oninput="updateLiveThemePreview()">
+                    <input type="text" id="setting_color_muted_text" class="form-control" style="font-family: monospace;" oninput="syncColorPicker('color_muted')">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>COLOR DE BOTONES PRINCIPALES (--color-button)</label>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="color" id="setting_color_button" class="form-control" style="height: 40px; width: 60px; padding: 2px;" oninput="updateLiveThemePreview()">
+                    <input type="text" id="setting_color_button_text_val" class="form-control" style="font-family: monospace;" oninput="syncColorPicker('color_button')">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>RADIO DE BORDES (--border-radius)</label>
+                  <select id="setting_border_radius" class="form-control" onchange="updateLiveThemePreview()">
+                    <option value="4px">Rectos Sutiles (4px)</option>
+                    <option value="8px">Redondeados Medios (8px)</option>
+                    <option value="16px" selected>Redondeados Modernos (16px)</option>
+                    <option value="24px">Curvos Suaves (24px)</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label>MODO DE TEMA</label>
+                  <select id="setting_theme_mode" class="form-control" onchange="updateLiveThemePreview()">
+                    <option value="dark" selected>Modo Oscuro (Dark Mode Premium)</option>
+                    <option value="light">Modo Claro (Light Mode)</option>
+                  </select>
+                </div>
+
+                <div class="form-group" style="grid-column: 1 / -1;">
+                  <label>MÚSICA DE FONDO (URL VIDEO MP4/MP3)</label>
+                  <input type="text" id="setting_bg_music_url" class="form-control" value="/static/musica punchi/punchi.mp4">
+                </div>
+              </div>
             </div>
-            <div class="form-grid">
-              <div class="form-group">
-                <label>COLOR PRINCIPAL</label>
-                <input type="color" id="setting_primary_color" class="form-control" style="height: 40px; padding: 2px;">
+
+            <!-- CARD VISTA PREVIA EN TIEMPO REAL -->
+            <div class="admin-card" style="position: sticky; top: 80px;">
+              <div class="admin-card-header">
+                <h3 class="admin-card-title">👁️ Vista Previa en Vivo</h3>
               </div>
-              <div class="form-group">
-                <label>COLOR SECUNDARIO</label>
-                <input type="color" id="setting_secondary_color" class="form-control" style="height: 40px; padding: 2px;">
-              </div>
-              <div class="form-group">
-                <label>MÚSICA DE FONDO (URL)</label>
-                <input type="text" id="setting_bg_music_url" class="form-control" value="/static/musica punchi/punchi.mp4">
+              <div id="themePreviewCard" style="background: #121216; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 20px; color: #ffffff;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                  <span id="prevBadge" style="background: rgba(212,255,0,0.15); color: #d4ff00; border: 1px solid #d4ff00; font-size: 10px; font-family: monospace; font-weight: bold; padding: 2px 8px; border-radius: 4px;">TARJETA MOCK</span>
+                  <span id="prevSec" style="color: #00f2fe; font-size: 11px; font-family: monospace;">$4,500</span>
+                </div>
+                <h4 id="prevTitle" style="font-size: 1.1rem; font-weight: 800; margin-bottom: 6px; color: #ffffff;">Corte Signature Fade</h4>
+                <p id="prevMuted" style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 16px;">Degradado milimétrico a elección con lavado exfoliante.</p>
+                <button id="prevBtn" type="button" style="width: 100%; background: #d4ff00; color: #0a0a0c; font-weight: bold; font-family: monospace; padding: 10px; border-radius: 12px; border: none; cursor: pointer;">
+                  RESERVAR TURNO
+                </button>
               </div>
             </div>
           </div>

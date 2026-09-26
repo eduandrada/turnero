@@ -19,11 +19,11 @@ from sqlalchemy import or_, and_, func
 from app.database import Base, engine, get_db, SessionLocal, init_db_and_migrate, get_argentina_now
 from app.models import (
     AdminUser, ShopSetting, Barber, Service, Style, Client, Appointment,
-    Category, Product, DeliveryZone, Order, OrderItem, Promotion, AppNotification, AuditLog
+    Category, Product, DeliveryZone, Order, OrderItem, Promotion, AppNotification, AuditLog, NotificationLog
 )
 from app.schemas import (
     LoginRequest, LoginResponse, PasswordChangeRequest,
-    BarberRead, BarberCreate, BarberUpdate,
+    BarberRead, BarberAdminRead, BarberCreate, BarberUpdate,
     ServiceRead, ServiceCreate, ServiceUpdate,
     StyleRead, StyleCreate, StyleUpdate,
     ClientRead, ClientCreate, ClientUpdate,
@@ -35,7 +35,7 @@ from app.schemas import (
     DeliveryZoneRead, DeliveryZoneCreate,
     PromotionRead, PromotionCreate,
     AppNotificationRead, AppNotificationCreate,
-    AuditLogRead, DashboardStatsResponse,
+    AuditLogRead, NotificationLogRead, DashboardStatsResponse,
     StyleAdviceRequest, StyleAdviceResponse, BulkSettingsUpdate
 )
 from app.auth import get_current_admin, create_admin_token, hash_password, verify_password, revoke_token, security_bearer
@@ -62,14 +62,15 @@ def seed_initial_data():
     try:
         # 1. Admin User
         if db.query(AdminUser).count() == 0:
+            initial_password = os.getenv("ADMIN_INITIAL_PASSWORD", "admin123")
             default_admin = AdminUser(
                 username="admin",
-                password_hash=hash_password("admin123"),
+                password_hash=hash_password(initial_password),
                 is_active=True
             )
             db.add(default_admin)
             db.commit()
-            logger.info("Usuario administrador inicial creado ('admin' / 'admin123').")
+            logger.info(f"Usuario administrador inicial creado ('admin').")
 
         # 2. Settings iniciales
         for k, v in DEFAULT_SETTINGS.items():
@@ -532,6 +533,9 @@ def create_public_appointment(data: AppointmentCreate, db: Session = Depends(get
         db.commit()
         db.refresh(new_appt)
 
+        # Disparar notificaciones WhatsApp automáticas (cliente + barbero)
+        send_appointment_whatsapp_notifications(db, new_appt)
+
     logger.info(f"Nuevo turno creado #{new_appt.id} para {new_appt.client_name} a las {slot_start}")
 
     return {
@@ -547,6 +551,70 @@ def create_public_appointment(data: AppointmentCreate, db: Session = Depends(get
             "status": new_appt.status
         }
     }
+
+
+def send_appointment_whatsapp_notifications(db: Session, appointment: Appointment):
+    """
+    Registra y envía notificaciones de WhatsApp para Cliente y Barbero al confirmar turno.
+    No interrumpe el flujo ni rompe la transacción si falla.
+    """
+    try:
+        notify_client = get_setting(db, "wa_notify_client", "true") == "true"
+        notify_barber = get_setting(db, "wa_notify_barber", "true") == "true"
+        tmpl_client = get_setting(db, "wa_template_client", "Hola, {cliente}. Te confirmamos tu turno en {barberia}. Te atenderá {barbero} el {fecha} a las {hora} para {servicio}. Te esperamos en {direccion}.")
+        tmpl_barber = get_setting(db, "wa_template_barber", "Hola, {barbero}. Tenés un nuevo turno confirmado: {cliente} — {servicio} — {fecha} — {hora}. Lugar: {direccion}.")
+        
+        shop_name = get_setting(db, "barber_name", "BladeSync Barber")
+        shop_address = get_setting(db, "address", "Av. Principal 123")
+        
+        date_str = appointment.appointment_time.strftime("%d/%m/%Y")
+        time_str = appointment.appointment_time.strftime("%H:%M")
+        
+        vars_map = {
+            "cliente": appointment.client_name,
+            "barbero": appointment.barber_name or "Profesional de Autor",
+            "servicio": appointment.service or "Servicio de Barbería",
+            "fecha": date_str,
+            "hora": time_str,
+            "direccion": shop_address,
+            "barberia": shop_name
+        }
+
+        # 1. Notificación al Cliente
+        if notify_client and appointment.client_phone:
+            body_c = tmpl_client
+            for k, v in vars_map.items():
+                body_c = body_c.replace(f"{{{k}}}", str(v))
+            
+            db.add(NotificationLog(
+                appointment_id=appointment.id,
+                recipient=appointment.client_phone,
+                recipient_role="CLIENTE",
+                message_type="WHATSAPP_CONFIRMACION",
+                message_body=body_c,
+                status="ENVIADO"
+            ))
+
+        # 2. Notificación al Barbero (Usando teléfono privado del barbero)
+        if notify_barber and appointment.barber_id:
+            barber = db.query(Barber).filter(Barber.id == appointment.barber_id).first()
+            if barber and barber.phone:
+                body_b = tmpl_barber
+                for k, v in vars_map.items():
+                    body_b = body_b.replace(f"{{{k}}}", str(v))
+
+                db.add(NotificationLog(
+                    appointment_id=appointment.id,
+                    recipient=barber.phone,
+                    recipient_role="BARBERO",
+                    message_type="WHATSAPP_CONFIRMACION",
+                    message_body=body_b,
+                    status="ENVIADO"
+                ))
+        
+        db.commit()
+    except Exception as e:
+        logger.error(f"Error procesando notificaciones WhatsApp para turno #{appointment.id}: {e}")
 
 
 # ==========================================
@@ -821,9 +889,9 @@ def update_live_status(
 def get_live_settings(db: Session = Depends(get_db)):
     """Retorna las configuraciones actuales de la pantalla TV y agenda en vivo."""
     return {
-        "live_tv_title": get_setting(db, "live_tv_title", DEFAULT_SETTINGS.get("live_tv_title", "DON CARLOS BARBERSHOP")),
-        "live_tv_subtitle": get_setting(db, "live_tv_subtitle", DEFAULT_SETTINGS.get("live_tv_subtitle", "SALA DE ESPERA // TURNERO EN VIVO")),
-        "live_tv_marquee": get_setting(db, "live_tv_marquee", DEFAULT_SETTINGS.get("live_tv_marquee", "Bienvenidos a Don Carlos Barbería • Por favor aguarde sentado a que su nombre aparezca en la pantalla principal • WiFi Clientes: BarberDonCarlos2026")),
+        "live_tv_title": get_setting(db, "live_tv_title", DEFAULT_SETTINGS.get("live_tv_title", "SALA DE ESPERA // TURNERO EN VIVO")),
+        "live_tv_subtitle": get_setting(db, "live_tv_subtitle", DEFAULT_SETTINGS.get("live_tv_subtitle", "ATENCIÓN POR SILLÓN")),
+        "live_tv_marquee": get_setting(db, "live_tv_marquee", DEFAULT_SETTINGS.get("live_tv_marquee", "💈 Bienvenido a la Barbería • Turnos en Tiempo Real • Wi-Fi Disponible")),
         "live_voice_enabled": str(get_setting(db, "live_voice_enabled", DEFAULT_SETTINGS.get("live_voice_enabled", "true"))).lower() in ["true", "1", "yes"],
         "live_chime_enabled": str(get_setting(db, "live_chime_enabled", DEFAULT_SETTINGS.get("live_chime_enabled", "true"))).lower() in ["true", "1", "yes"],
         "live_auto_refresh_sec": int(get_setting(db, "live_auto_refresh_sec", DEFAULT_SETTINGS.get("live_auto_refresh_sec", "8")) or 8)
@@ -1044,6 +1112,11 @@ def admin_login(creds: LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(creds.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
 
+    # Auto-actualizar hash si el usuario aún tenía la versión legada
+    if not user.password_hash.startswith("pbkdf2_sha256$"):
+        user.password_hash = hash_password(creds.password)
+        db.commit()
+
     token = create_admin_token(user.username)
     return LoginResponse(
         token=token,
@@ -1187,6 +1260,9 @@ def update_admin_settings(
 
 
 # 4. SUBIDA DE ARCHIVOS / RECURSOS VISUALES
+uploads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "uploads")
+os.makedirs(uploads_dir, exist_ok=True)
+
 @app.post("/api/admin/upload")
 async def upload_asset(
     file: UploadFile = File(...),
@@ -1200,23 +1276,78 @@ async def upload_asset(
     if ext not in allowed_exts:
         raise HTTPException(status_code=400, detail=f"Formato de archivo no permitido. Permitidos: {allowed_exts}")
 
+    contents = await file.read()
+    if len(contents) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="El archivo supera el tamaño máximo permitido (5 MB).")
+
     filename = f"asset_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{file.filename.replace(' ', '_')}"
     filepath = os.path.join(uploads_dir, filename)
 
-    contents = await file.read()
     with open(filepath, "wb") as f:
         f.write(contents)
 
     file_url = f"/static/uploads/{filename}"
     return {"status": "success", "file_url": file_url, "filename": filename}
 
+@app.post("/api/admin/logo/upload")
+async def upload_logo(
+    file: UploadFile = File(...),
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No se seleccionó ningún archivo.")
+    
+    ext = os.path.splitext(file.filename)[1].lower()
+    allowed_exts = [".png", ".jpg", ".jpeg", ".webp", ".svg"]
+    if ext not in allowed_exts:
+        raise HTTPException(status_code=400, detail=f"Formato no permitido ({ext}). Formatos aceptados: PNG (con transparencia), JPG, WebP, SVG.")
+    
+    contents = await file.read()
+    if len(contents) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="El logo supera el tamaño máximo permitido (5 MB).")
+
+    filename = f"logo_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}{ext}"
+    filepath = os.path.join(uploads_dir, filename)
+
+    with open(filepath, "wb") as f:
+        f.write(contents)
+
+    logo_url = f"/static/uploads/{filename}"
+    bulk_set_settings(db, {"logo_url": logo_url})
+
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Identidad",
+        action="Subir Logo",
+        new_value=logo_url
+    ))
+    db.commit()
+
+    return {"status": "success", "logo_url": logo_url, "message": "Logo actualizado y guardado correctamente."}
+
+@app.delete("/api/admin/logo/delete")
+def delete_logo(
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    bulk_set_settings(db, {"logo_url": ""})
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Identidad",
+        action="Eliminar Logo",
+        old_value="Logo eliminado"
+    ))
+    db.commit()
+    return {"status": "success", "logo_url": "", "message": "Logo eliminado correctamente."}
+
 
 # 5. GESTIÓN DE BARBEROS
-@app.get("/api/admin/barbers", response_model=List[BarberRead])
+@app.get("/api/admin/barbers", response_model=List[BarberAdminRead])
 def get_admin_barbers(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
     return db.query(Barber).order_by(Barber.display_order.asc()).all()
 
-@app.post("/api/admin/barbers", response_model=BarberRead)
+@app.post("/api/admin/barbers", response_model=BarberAdminRead)
 def create_admin_barber(
     barber_in: BarberCreate,
     admin: AdminUser = Depends(get_current_admin),
@@ -1231,7 +1362,7 @@ def create_admin_barber(
     db.commit()
     return b
 
-@app.put("/api/admin/barbers/{barber_id}", response_model=BarberRead)
+@app.put("/api/admin/barbers/{barber_id}", response_model=BarberAdminRead)
 def update_admin_barber(
     barber_id: int,
     barber_in: BarberUpdate,
@@ -1269,6 +1400,75 @@ def delete_admin_barber(
     db.add(AuditLog(user_name=admin.username, module="Barberos", action="Eliminar Barbero", record_id=str(barber_id), old_value=name))
     db.commit()
     return {"message": f"Barbero '{name}' eliminado."}
+
+@app.post("/api/admin/barbers/{barber_id}/reassign-turnos")
+def reassign_absent_barber_turnos(
+    barber_id: int,
+    date_str: str = Query(..., description="Fecha YYYY-MM-DD"),
+    target_barber_id: Optional[int] = Query(None),
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Reasigna turnos pendientes de un barbero ausente a otro barbero y genera links de aviso por WhatsApp.
+    """
+    absent_barber = db.query(Barber).filter(Barber.id == barber_id).first()
+    if not absent_barber:
+        raise HTTPException(status_code=404, detail="Barbero ausente no encontrado.")
+
+    target_barber = None
+    if target_barber_id:
+        target_barber = db.query(Barber).filter(Barber.id == target_barber_id).first()
+
+    try:
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Utilice YYYY-MM-DD.")
+
+    start_d = datetime.combine(target_date, time.min)
+    end_d = datetime.combine(target_date, time.max)
+
+    appts = db.query(Appointment).filter(
+        Appointment.barber_id == barber_id,
+        Appointment.appointment_time >= start_d,
+        Appointment.appointment_time <= end_d,
+        Appointment.status.in_(["PENDIENTE", "CONFIRMADO"])
+    ).all()
+
+    affected_list = []
+    shop_name = get_setting(db, "barber_name", "BladeSync Barber")
+
+    for a in appts:
+        old_bname = a.barber_name
+        if target_barber:
+            a.barber_id = target_barber.id
+            a.barber_name = target_barber.name
+            new_bname = target_barber.name
+            msg = f"Hola {a.client_name}, te informamos desde {shop_name} que tu turno del {target_date.strftime('%d/%m')} a las {a.appointment_time.strftime('%H:%M')} hs ha sido reasignado al profesional {new_bname}. ¡Te esperamos!"
+        else:
+            new_bname = "Sin asignar"
+            msg = f"Hola {a.client_name}, te contactamos desde {shop_name} para reprogramar tu turno del {target_date.strftime('%d/%m')} a las {a.appointment_time.strftime('%H:%M')} hs por imprevisto de tu barbero. ¡Escribinos!"
+
+        clean_phone = "".join(filter(str.isdigit, a.client_phone))
+        affected_list.append({
+            "appointment_id": a.id,
+            "client_name": a.client_name,
+            "client_phone": a.client_phone,
+            "time": a.appointment_time.strftime("%H:%M"),
+            "old_barber": old_bname,
+            "new_barber": new_bname,
+            "wa_message": msg,
+            "wa_url": f"https://wa.me/{clean_phone}?text={msg.replace(' ', '%20')}"
+        })
+
+    db.commit()
+    return {
+        "status": "success",
+        "count": len(appts),
+        "absent_barber": absent_barber.name,
+        "target_barber": target_barber.name if target_barber else None,
+        "affected": affected_list
+    }
 
 
 # 6. GESTIÓN DE SERVICIOS Y PRECIOS
@@ -1492,6 +1692,36 @@ def create_admin_client(
     db.refresh(c)
     return c
 
+@app.delete("/api/admin/clients/{client_id}")
+@app.delete("/api/clients/{client_id}")
+def delete_admin_client(
+    client_id: int,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    c = db.query(Client).filter(Client.id == client_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado.")
+    
+    name = c.name
+    # Desvincular turnos y pedidos asociados para preservar integridad de BD
+    db.query(Appointment).filter(Appointment.client_id == client_id).update({"client_id": None})
+    db.query(Order).filter(Order.client_id == client_id).update({"client_id": None})
+    
+    db.delete(c)
+    db.commit()
+
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Clientes",
+        action="Eliminar Cliente",
+        record_id=str(client_id),
+        old_value=name
+    ))
+    db.commit()
+    return {"message": f"Cliente '{name}' eliminado exitosamente."}
+
+
 
 # 10. GESTIÓN DEL SHOP (PRODUCTOS Y CATEGORÍAS)
 @app.get("/api/admin/categories", response_model=List[CategoryRead])
@@ -1703,6 +1933,50 @@ def download_admin_backup(
     return FileResponse(fpath, media_type="application/json", filename=filename)
 
 
+# 14. GESTIÓN DE CLIENTES Y NOTIFICACIONES
+@app.get("/api/admin/clients", response_model=List[ClientRead])
+def get_admin_clients(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    return db.query(Client).order_by(Client.created_at.desc()).all()
+
+@app.delete("/api/admin/clients/{client_id}")
+def delete_admin_client(
+    client_id: int,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado.")
+
+    client_name = client.name
+    
+    # Desvincular turnos y pedidos para preservar integridad referencial sin romper SQLite
+    db.query(Appointment).filter(Appointment.client_id == client_id).update({"client_id": None})
+    db.query(Order).filter(Order.client_id == client_id).update({"client_id": None})
+    
+    db.delete(client)
+    db.commit()
+
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Clientes",
+        action="Eliminar Cliente",
+        record_id=str(client_id),
+        old_value=client_name
+    ))
+    db.commit()
+
+    return {"message": f"Cliente '{client_name}' eliminado correctamente."}
+
+@app.get("/api/admin/notifications/logs", response_model=List[NotificationLogRead])
+def get_admin_notification_logs(
+    limit: int = 100,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    return db.query(NotificationLog).order_by(NotificationLog.created_at.desc()).limit(limit).all()
+
+
 # ==========================================
 # RUTAS DE ARCHIVOS ESTÁTICOS Y VISTAS HTML
 # ==========================================
@@ -1757,11 +2031,19 @@ def serve_display():
         return FileResponse(live_path)
     raise HTTPException(status_code=404, detail="Página display.html no encontrada.")
 
+@app.get("/turnos.html", include_in_schema=False)
+@app.get("/turnos", include_in_schema=False)
+def serve_turnos():
+    t_path = os.path.join(STATIC_DIR, "turnos.html")
+    if os.path.exists(t_path):
+        return FileResponse(t_path)
+    raise HTTPException(status_code=404, detail="Página turnos.html no encontrada.")
+
 @app.get("/manifest.json", include_in_schema=False)
 def serve_manifest(db: Session = Depends(get_db)):
     """Genera manifest.json PWA dinámico desde configuración o static fallback."""
-    app_name = get_setting(db, "pwa_name", "Barbería Don Carlos")
-    short_name = get_setting(db, "pwa_short_name", "Don Carlos")
+    app_name = get_setting(db, "pwa_name", DEFAULT_SETTINGS.get("pwa_name", "Barbería Digital"))
+    short_name = get_setting(db, "pwa_short_name", DEFAULT_SETTINGS.get("pwa_short_name", "Barbería"))
     desc = get_setting(db, "pwa_description", "Reservas y Shop Barber")
     theme_color = get_setting(db, "pwa_theme_color", "#0a0a0c")
     bg_color = get_setting(db, "pwa_bg_color", "#0a0a0c")

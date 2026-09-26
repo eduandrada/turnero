@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./barberia.db")
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 TIMEZONE_NAME = os.getenv("TIMEZONE", "America/Argentina/Buenos_Aires")
 
 ARGENTINA_OFFSET = timezone(timedelta(hours=-3))
@@ -65,6 +68,21 @@ def init_db_and_migrate():
         # 2. Migration for barbers
         if "barbers" in tables:
             columns = [c["name"] for c in inspector.get_columns("barbers")]
+            if "phone" not in columns:
+                conn.execute(text("ALTER TABLE barbers ADD COLUMN phone VARCHAR(50)"))
+                conn.commit()
+            if "experience" not in columns:
+                conn.execute(text("ALTER TABLE barbers ADD COLUMN experience VARCHAR(200)"))
+                conn.commit()
+            if "instagram" not in columns:
+                conn.execute(text("ALTER TABLE barbers ADD COLUMN instagram VARCHAR(100)"))
+                conn.commit()
+            if "facebook" not in columns:
+                conn.execute(text("ALTER TABLE barbers ADD COLUMN facebook VARCHAR(100)"))
+                conn.commit()
+            if "featured_styles" not in columns:
+                conn.execute(text("ALTER TABLE barbers ADD COLUMN featured_styles VARCHAR(200)"))
+                conn.commit()
             if "description" not in columns:
                 conn.execute(text("ALTER TABLE barbers ADD COLUMN description TEXT"))
                 conn.commit()

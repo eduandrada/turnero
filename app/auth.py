@@ -5,6 +5,7 @@ import base64
 import hmac
 import secrets
 import hashlib
+import logging
 from typing import Optional, Set
 from fastapi import HTTPException, Security, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -13,20 +14,52 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import AdminUser
 
-SECRET_KEY = os.getenv("SECRET_KEY", "bladesync_secret_key_barberia_2026_x99")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # Default 24 hours
+logger = logging.getLogger("bladesync.auth")
+
+APP_ENV = os.getenv("ENV", "development").lower()
+SECRET_KEY = os.getenv("APP_SECRET_KEY") or os.getenv("SECRET_KEY")
+
+DEFAULT_SECRET_KEY = "bladesync_secret_key_barberia_2026_x99"
+if not SECRET_KEY:
+    if APP_ENV == "production":
+        raise RuntimeError("CRÍTICO DE SEGURIDAD: Debe definir la variable de entorno APP_SECRET_KEY en producción.")
+    logger.warning("ATENCIÓN: Utilizando APP_SECRET_KEY por defecto para entorno de desarrollo.")
+    SECRET_KEY = DEFAULT_SECRET_KEY
+
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # Default 24 horas
 security_bearer = HTTPBearer(auto_error=False)
 
 # In-memory revocation list for logged-out tokens
 REVOKED_TOKENS: Set[str] = set()
 
 def hash_password(password: str) -> str:
-    """Hash password using SHA256 with salt."""
-    salt = "bladesync_salt_2026"
-    return hashlib.sha256((password + salt).encode("utf-8")).hexdigest()
+    """Hash password using PBKDF2-HMAC-SHA256 with 100,000 iterations and random salt."""
+    salt = secrets.token_bytes(16)
+    dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
+    return f"pbkdf2_sha256$100000${salt.hex()}${dk.hex()}"
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return hash_password(plain_password) == hashed_password
+    """Verifies plain password against PBKDF2 or legacy SHA256 format for backward compatibility."""
+    if not hashed_password or not plain_password:
+        return False
+    if hashed_password.startswith("pbkdf2_sha256$"):
+        try:
+            parts = hashed_password.split("$")
+            if len(parts) != 4:
+                return False
+            _, iter_str, salt_hex, hash_hex = parts
+            iterations = int(iter_str)
+            salt = bytes.fromhex(salt_hex)
+            expected_dk = bytes.fromhex(hash_hex)
+            actual_dk = hashlib.pbkdf2_hmac('sha256', plain_password.encode('utf-8'), salt, iterations)
+            return hmac.compare_digest(expected_dk, actual_dk)
+        except Exception:
+            return False
+    else:
+        # Legacy fallback verification for existing DB entries using SHA256 + salt
+        legacy_salt = "bladesync_salt_2026"
+        legacy_hash = hashlib.sha256((plain_password + legacy_salt).encode("utf-8")).hexdigest()
+        return hmac.compare_digest(legacy_hash, hashed_password)
 
 def _base64url_encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b'=').decode('utf-8')
@@ -151,4 +184,5 @@ def get_current_admin(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return admin
+
 

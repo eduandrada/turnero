@@ -139,17 +139,52 @@ async function loadShopSettings() {
   try {
     const res = await fetch("/api/public/settings");
     if (res.ok) {
-      shopState.shopSettings = await res.json();
-      const bName = shopState.shopSettings.barber_name || shopState.shopSettings.app_name || "DON CARLOS";
+      const s = await res.json();
+      shopState.shopSettings = s;
+
+      // CSS Theme Variables
+      const root = document.documentElement;
+      if (s.color_primary) {
+        root.style.setProperty('--color-primary', s.color_primary);
+        root.style.setProperty('--neon-volt', s.color_primary);
+      }
+      if (s.color_secondary) root.style.setProperty('--color-secondary', s.color_secondary);
+      if (s.color_accent) root.style.setProperty('--color-accent', s.color_accent);
+      if (s.color_background) {
+        root.style.setProperty('--color-background', s.color_background);
+        root.style.setProperty('--obsidian', s.color_background);
+      }
+      if (s.color_surface) {
+        root.style.setProperty('--color-surface', s.color_surface);
+        root.style.setProperty('--surface', s.color_surface);
+      }
+      if (s.color_text) root.style.setProperty('--color-text', s.color_text);
+      if (s.color_muted) root.style.setProperty('--color-muted', s.color_muted);
+      if (s.color_button) root.style.setProperty('--color-button', s.color_button);
+      if (s.color_border) {
+        root.style.setProperty('--color-border', s.color_border);
+        root.style.setProperty('--surface-border', s.color_border);
+      }
+
+      const bName = s.barber_name || s.app_name || "BladeSync Barber";
       document.title = `${bName} // Shop Barber`;
+
+      const shopBrand = document.getElementById("shopHeaderBrandTitle");
+      if (shopBrand) {
+        if (s.logo_url) {
+          shopBrand.innerHTML = `<img src="${s.logo_url}" alt="${escapeHtml(bName)}" class="h-8 md:h-10 object-contain inline-block mr-2" /> <span class="hidden md:inline">${escapeHtml(bName.toUpperCase())}</span>`;
+        } else {
+          shopBrand.innerHTML = `${escapeHtml(bName.toUpperCase())}<span class="text-[#d4ff00]">_</span>`;
+        }
+      }
 
       const title = document.getElementById("shopTitle");
       const desc = document.getElementById("shopDescription");
-      if (title && shopState.shopSettings.text_shop) {
-        title.textContent = shopState.shopSettings.text_shop;
+      if (title && s.text_shop) {
+        title.textContent = s.text_shop;
       }
-      if (desc && shopState.shopSettings.description) {
-        desc.textContent = shopState.shopSettings.description;
+      if (desc && s.description) {
+        desc.textContent = s.description;
       }
     }
   } catch (e) {}
@@ -503,3 +538,11 @@ function escapeHtml(str) {
   if (!str) return "";
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    if (typeof closeCart === "function") closeCart();
+    const modal = document.getElementById("productModal");
+    if (modal) modal.style.display = "none";
+  }
+});

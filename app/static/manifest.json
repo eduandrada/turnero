@@ -1,6 +1,6 @@
 {
-  "name": "Barbería Don Carlos",
-  "short_name": "Don Carlos",
+  "name": "Barbería Digital",
+  "short_name": "Barbería",
   "description": "Sistema Digital Integral para una Barbería (Turnos + Admin + Shop Barber)",
   "start_url": "/",
   "display": "standalone",

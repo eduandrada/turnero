@@ -7,7 +7,10 @@ from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.database import get_argentina_now
+from app.database import get_argentina_now, init_db_and_migrate
+
+# Run migrations on database schema before tests execute
+init_db_and_migrate()
 
 client = TestClient(app)
 
@@ -33,12 +36,32 @@ class TestBarberApp(unittest.TestCase):
         self.assertEqual(res_st.status_code, 200)
 
     def test_03_available_slots(self):
-        tomorrow = (get_argentina_now() + timedelta(days=1)).strftime("%Y-%m-%d")
-        res = client.get(f"/api/available-slots?date={tomorrow}&barber_id=1")
-        self.assertEqual(res.status_code, 200)
-        data = res.json()
-        self.assertIn("slots", data)
-        self.assertGreater(len(data["slots"]), 0)
+        now_dt = get_argentina_now()
+        open_date = None
+        closed_date = None
+
+        for days_ahead in range(1, 14):
+            candidate = now_dt + timedelta(days=days_ahead)
+            if candidate.weekday() != 6 and open_date is None:
+                open_date = candidate.strftime("%Y-%m-%d")
+            elif candidate.weekday() == 6 and closed_date is None:
+                closed_date = candidate.strftime("%Y-%m-%d")
+            if open_date and closed_date:
+                break
+
+        # 1. Test open day (Mon-Sat) returns available slots
+        res_open = client.get(f"/api/available-slots?date={open_date}&barber_id=1")
+        self.assertEqual(res_open.status_code, 200)
+        data_open = res_open.json()
+        self.assertIn("slots", data_open)
+        self.assertGreater(len(data_open["slots"]), 0)
+
+        # 2. Test closed day (Sunday) returns 0 slots
+        if closed_date:
+            res_closed = client.get(f"/api/available-slots?date={closed_date}&barber_id=1")
+            self.assertEqual(res_closed.status_code, 200)
+            data_closed = res_closed.json()
+            self.assertEqual(len(data_closed["slots"]), 0)
 
     def test_04_admin_endpoints_protection(self):
         res = client.get("/api/admin/dashboard/stats")
@@ -226,6 +249,13 @@ class TestBarberApp(unittest.TestCase):
         from app.models import DeliveryZone, Product
         db = SessionLocal()
         
+        prod = db.query(Product).first()
+        if prod:
+            prod.stock = 50
+            prod_id = prod.id
+        else:
+            prod_id = 1
+
         zone = db.query(DeliveryZone).filter(DeliveryZone.name == "Zona Test Exclusiva").first()
         if not zone:
             zone = DeliveryZone(name="Zona Test Exclusiva", cost=500.0, min_order_amount=5000.0, is_active=False)
@@ -237,9 +267,7 @@ class TestBarberApp(unittest.TestCase):
             zone.min_order_amount = 5000.0
             db.commit()
 
-        prod = db.query(Product).first()
         zone_id = zone.id
-        prod_id = prod.id if prod else 1
         db.close()
 
         # Try ordering with inactive zone
@@ -268,18 +296,29 @@ class TestBarberApp(unittest.TestCase):
         self.assertIn("mínimo", res_min.json()["detail"].lower())
 
     def test_13_unique_order_number_format(self):
-        res_p = client.get("/api/shop/products")
-        prod = res_p.json()[0]
+        from app.database import SessionLocal
+        from app.models import Product
+        db = SessionLocal()
+        prod_db = db.query(Product).first()
+        if prod_db:
+            prod_db.stock = 50
+            db.commit()
+            prod_id = prod_db.id
+        else:
+            prod_id = 1
+        db.close()
 
         order_payload = {
             "client_name": "Cliente Unique Order",
             "client_phone": "5493834999777",
             "delivery_type": "pickup",
             "payment_method": "Efectivo",
-            "items": [{"product_id": prod["id"], "quantity": 1}]
+            "items": [{"product_id": prod_id, "quantity": 1}]
         }
         res1 = client.post("/api/shop/orders", json=order_payload)
+        self.assertEqual(res1.status_code, 200)
         res2 = client.post("/api/shop/orders", json=order_payload)
+        self.assertEqual(res2.status_code, 200)
 
         num1 = res1.json()["order_number"]
         num2 = res2.json()["order_number"]
@@ -301,6 +340,25 @@ class TestBarberApp(unittest.TestCase):
         res_i512 = client.get("/static/icon-512.png")
         self.assertEqual(res_i512.status_code, 200)
         self.assertEqual(res_i512.headers["content-type"], "image/png")
+
+    def test_15_available_slots_edge_cases(self):
+        # 1. Invalid date format returns 400
+        res_invalid_date = client.get("/api/available-slots?date=2026-13-45&barber_id=1")
+        self.assertEqual(res_invalid_date.status_code, 400)
+        self.assertIn("inválido", res_invalid_date.json()["detail"].lower())
+
+        # 2. Appointment in past time returns 400
+        past_time = (get_argentina_now() - timedelta(days=1)).isoformat()
+        payload_past = {
+            "client_name": "Cliente Pasado",
+            "client_phone": "5493834000999",
+            "barber_id": 1,
+            "service_id": 1,
+            "appointment_time": past_time
+        }
+        res_past = client.post("/api/appointments", json=payload_past)
+        self.assertEqual(res_past.status_code, 400)
+        self.assertIn("transcurridos", res_past.json()["detail"].lower())
 
 if __name__ == "__main__":
     unittest.main()

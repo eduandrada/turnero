@@ -1,18 +1,27 @@
-# Environments
+# Environments & Virtual Envs
 venv/
 .venv/
 env/
 ENV/
 
-# Python cache & bytecode
+# Python Cache & Bytecode
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
 
-# Databases & local state
+# Databases & Local Data Files
 *.db
 *.sqlite3
+*.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
 barberia - copia.db
 barberia.db
 
@@ -21,13 +30,15 @@ backups/
 app/static/uploads/*
 !app/static/uploads/.gitkeep
 
-# Environment & Credentials
+# Environment Variables & Secrets
 .env
 .env.local
-.env.*.local
+.env.*
+!.env.example
 
 # Archives & Temporary files
 *.zip
+*.tar.gz
 scratch/
 
 # Logs
@@ -38,4 +49,3 @@ scratch/
 .idea/
 .DS_Store
 Thumbs.db
-
