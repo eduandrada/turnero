@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Control de Inventario & Alertas // Pereyras Barbers</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/admin.css">
+  <style>
+    body {
+      background-color: #0a0a0c;
+      color: #f3f4f6;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+    .inv-header {
+      background: #131318;
+      border-bottom: 1px solid #23232c;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .inv-brand {
+      font-family: 'Space Grotesk', monospace;
+      font-weight: 800;
+      font-size: 1.3rem;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .inv-brand span { color: #d2ff00; }
+    .inv-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .kpi-card {
+      background: #131318;
+      border: 1px solid #23232c;
+      border-radius: 16px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-title {
+      font-size: 0.75rem;
+      font-family: 'Space Grotesk', monospace;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .kpi-value {
+      font-size: 1.8rem;
+      font-family: 'Space Grotesk', monospace;
+      font-weight: 800;
+      color: #ffffff;
+    }
+    .kpi-sub {
+      font-size: 0.75rem;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+    .badge-critical {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+      border: 1px solid #ef4444;
+      animation: pulseCritical 1.5s infinite;
+    }
+    @keyframes pulseCritical {
+      0%, 100% { box-shadow: 0 0 4px rgba(239, 68, 68, 0.4); }
+      50% { box-shadow: 0 0 14px rgba(239, 68, 68, 0.8); }
+    }
+    .stock-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-family: 'Space Grotesk', monospace;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+    .stock-optimal { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .stock-warning { background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3); }
+    .stock-alert { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); }
+
+    .tag-reventa { background: rgba(0, 242, 254, 0.15); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.3); }
+    .tag-insumo { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+
+    .btn-volt {
+      background: #d2ff00;
+      color: #0a0a0c;
+      font-family: 'Space Grotesk', monospace;
+      font-weight: 800;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-volt:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(210, 255, 0, 0.3);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- AUTH OVERLAY -->
+  <div id="authLockOverlay" style="position: fixed; inset: 0; background: rgba(10, 10, 12, 0.95); backdrop-filter: blur(12px); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 20px; width: 100%; max-width: 420px; padding: 36px; box-shadow: 0 20px 40px rgba(0,0,0,0.9); text-align: center;">
+      <div style="margin-bottom: 24px;">
+        <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #d2ff00; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">ADMINISTRACIÓN & LOGÍSTICA</span>
+        <h2 style="font-family: 'Space Grotesk', monospace; color: #ffffff; margin: 8px 0 4px 0; font-size: 1.6rem;">INVENTARIO BARBER</h2>
+        <p style="color: #9ca3af; font-size: 0.85rem; margin: 0;">Ingresá con tu token de administrador para controlar stock y costos.</p>
+      </div>
+
+      <form id="authLoginForm" onsubmit="event.preventDefault(); handleInvLogin();">
+        <div class="form-group" style="text-align: left; margin-bottom: 16px;">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">USUARIO</label>
+          <input type="text" id="invUsername" class="form-control" placeholder="admin" value="admin" required style="margin-top: 4px;">
+        </div>
+        <div class="form-group" style="text-align: left; margin-bottom: 24px;">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">CONTRASEÑA</label>
+          <input type="password" id="invPassword" class="form-control" placeholder="••••••••" required style="margin-top: 4px;">
+        </div>
+
+        <button type="submit" class="btn-volt" style="width: 100%; justify-content: center; padding: 14px; font-size: 0.95rem; margin-bottom: 16px;">
+          🔓 ACCEDER AL INVENTARIO →
+        </button>
+
+        <a href="/" style="display: block; color: #94a3b8; font-size: 0.85rem; text-decoration: none; padding: 8px;">
+          ← Volver al Inicio (Cliente)
+        </a>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- APP CONTENT -->
+  <div id="invApp" style="display: none;">
+    <!-- HEADER -->
+    <header class="inv-header">
+      <div class="inv-brand">
+        <a href="/admin.html" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 8px;">
+          📦 PEREYRAS BARBERS <span>//</span> INVENTARIO
+        </a>
+      </div>
+
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <a href="/admin.html" class="btn-admin btn-admin-secondary btn-admin-sm">
+          ⚙️ Panel Admin
+        </a>
+        <a href="/turnos.html" class="btn-admin btn-admin-secondary btn-admin-sm">
+          📋 Turnos en Vivo
+        </a>
+        <button onclick="invLogout()" class="btn-admin btn-admin-secondary btn-admin-sm" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">
+          🚪 Salir
+        </button>
+      </div>
+    </header>
+
+    <!-- CONTAINER -->
+    <main class="inv-container">
+      
+      <!-- TOP KPIS ANALYTICS -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-title">Valor Total Stock (Costo)</div>
+          <div class="kpi-value" id="kpiTotalCost" style="color: #00f2fe;">$0</div>
+          <div class="kpi-sub">Inversión actual en depósito</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-title">Venta Proyectada Reventa</div>
+          <div class="kpi-value" id="kpiTotalSale" style="color: #d2ff00;">$0</div>
+          <div class="kpi-sub">Facturación potencial bruta</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-title">Ganancia Acumulada Ventas</div>
+          <div class="kpi-value" id="kpiNetProfit" style="color: #10b981;">$0</div>
+          <div class="kpi-sub">Margen neto de pedidos cobrados</div>
+        </div>
+
+        <div class="kpi-card" id="criticalKpiCard">
+          <div class="kpi-title">Alertas Críticas de Stock</div>
+          <div class="kpi-value" id="kpiCriticalCount" style="color: #ef4444;">0</div>
+          <div class="kpi-sub" id="kpiCriticalSub">Productos bajo stock mínimo</div>
+        </div>
+      </div>
+
+
+      <!-- TOOLBAR & FILTERS -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
+        <!-- TABS -->
+        <div style="display: flex; gap: 6px; background: #131318; padding: 6px; border-radius: 12px; border: 1px solid #23232c;">
+          <button class="tab-btn active" id="tabAll" onclick="setInvCategoryFilter('')">📦 Todos</button>
+          <button class="tab-btn" id="tabReventa" onclick="setInvCategoryFilter('reventa')">🛒 Reventa Clientes</button>
+          <button class="tab-btn" id="tabInsumo" onclick="setInvCategoryFilter('insumo')">💈 Insumos Barberos</button>
+          <button class="tab-btn" id="tabAlerts" onclick="setInvAlertFilter(true)">⚠️ Solo Alertas</button>
+        </div>
+
+        <!-- SEARCH AND ACTIONS -->
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <input type="text" id="invSearchInput" class="form-control" placeholder="🔍 Buscar producto o SKU..." onkeyup="loadInventoryProducts()" style="padding: 8px 12px; width: 240px;">
+          
+          <button class="btn-volt" onclick="openProductModal()">
+            + Nuevo Producto
+          </button>
+
+          <button class="btn-admin btn-admin-secondary" onclick="openMovementModal()" style="font-weight: bold;">
+            📥 Cargar Ingreso / Compra
+          </button>
+
+          <button class="btn-admin" onclick="openSupplierWAModal()" style="background: #25D366; color: #000; font-weight: bold;">
+            📲 Pedido a Proveedor
+          </button>
+        </div>
+      </div>
+
+
+      <!-- TABLA DE PRODUCTOS -->
+      <div class="admin-card" style="padding: 0; overflow: hidden;">
+        <div class="admin-table-wrapper">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Categoría / Tipo</th>
+                <th>Precio Costo</th>
+                <th>Precio Venta</th>
+                <th>Margen (%)</th>
+                <th>Stock Actual</th>
+                <th>Mínimo</th>
+                <th>Ajuste Rápido</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="inventoryTableBody">
+              <tr>
+                <td colspan="9" style="text-align: center; padding: 40px; color: #9ca3af;">
+                  Cargando inventario en tiempo real...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+
+  <!-- MODAL PRODUCTO (CREAR / EDITAR) -->
+  <div id="productModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; width: 100%; max-width: 520px; padding: 28px; box-shadow: 0 10px 40px rgba(0,0,0,0.9); max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <h3 id="productModalTitle" style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 0; font-size: 1.2rem;">Nuevo Producto</h3>
+        <button onclick="closeProductModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <form id="productForm" onsubmit="event.preventDefault(); submitProductForm();">
+        <input type="hidden" id="pm_id">
+        
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>NOMBRE DEL PRODUCTO</label>
+            <input type="text" id="pm_name" class="form-control" placeholder="Ej: Cera Modeladora Matte 100g" required>
+          </div>
+
+          <div class="form-group">
+            <label>TIPO / DESTINO</label>
+            <select id="pm_category" class="form-control" required>
+              <option value="reventa">🛒 Reventa (Venta a clientes)</option>
+              <option value="insumo">💈 Insumo Barbería (Uso interno)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>CÓDIGO SKU (Opcional)</label>
+            <input type="text" id="pm_sku" class="form-control" placeholder="CER-MAT-01">
+          </div>
+
+          <div class="form-group">
+            <label>PRECIO DE COSTO ($)</label>
+            <input type="number" step="0.01" id="pm_cost_price" class="form-control" placeholder="4500" required>
+          </div>
+
+          <div class="form-group">
+            <label>PRECIO DE VENTA ($)</label>
+            <input type="number" step="0.01" id="pm_price" class="form-control" placeholder="9500" required>
+            <small style="color: #94a3b8; font-size: 0.65rem;">(Ingresar 0 si es Insumo interno)</small>
+          </div>
+
+          <div class="form-group">
+            <label>STOCK INICIAL / ACTUAL</label>
+            <input type="number" id="pm_stock" class="form-control" value="10" required>
+          </div>
+
+          <div class="form-group">
+            <label>STOCK MÍNIMO (ALERTA)</label>
+            <input type="number" id="pm_min_stock" class="form-control" value="3" required>
+          </div>
+
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>URL IMAGEN PRODUCTO</label>
+            <input type="text" id="pm_image_url" class="form-control" placeholder="/static/products/cera.jpg">
+          </div>
+
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>DESCRIPCIÓN</label>
+            <input type="text" id="pm_description" class="form-control" placeholder="Fijación fuerte efecto mate sin brillo">
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; border-top: 1px solid #23232c; padding-top: 16px;">
+          <button type="button" onclick="closeProductModal()" class="btn-admin btn-admin-secondary">Cancelar</button>
+          <button type="submit" class="btn-volt">Guardar Producto →</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- MODAL CARGAR MOVIMIENTO DE STOCK -->
+  <div id="movementModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; width: 100%; max-width: 480px; padding: 28px; box-shadow: 0 10px 40px rgba(0,0,0,0.9);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <h3 style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 0; font-size: 1.2rem;">📥 Registrar Movimiento de Stock</h3>
+        <button onclick="closeMovementModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <form id="movementForm" onsubmit="event.preventDefault(); submitMovementForm();">
+        <div class="form-grid" style="grid-template-columns: 1fr;">
+          <div class="form-group">
+            <label>PRODUCTO</label>
+            <select id="mov_product_id" class="form-control" required>
+              <option value="">Seleccionar producto...</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>TIPO DE MOVIMIENTO</label>
+            <select id="mov_type" class="form-control" required>
+              <option value="ingreso_compra">📥 Ingreso por Compra a Distribuidor (+)</option>
+              <option value="venta">🛒 Venta Directa en Barbería (-)</option>
+              <option value="uso_interno">💈 Consumo / Uso Interno Barbero (-)</option>
+              <option value="ajuste">⚙️ Ajuste de Inventario / Corrección</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>CANTIDAD UNIDADES</label>
+            <input type="number" id="mov_quantity" class="form-control" value="1" min="1" required>
+          </div>
+
+          <div class="form-group">
+            <label>NOTAS / MOTIVO (Opcional)</label>
+            <input type="text" id="mov_notes" class="form-control" placeholder="Ej: Factura proveedor #4890, Merma, Uso en bacha">
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; border-top: 1px solid #23232c; padding-top: 16px;">
+          <button type="button" onclick="closeMovementModal()" class="btn-admin btn-admin-secondary">Cancelar</button>
+          <button type="submit" class="btn-volt">Registrar Movimiento →</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- MODAL PEDIDO PROVEEDOR WHATSAPP -->
+  <div id="supplierWAModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; width: 100%; max-width: 540px; padding: 28px; box-shadow: 0 10px 40px rgba(0,0,0,0.9);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <div>
+          <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #25D366; letter-spacing: 2px; font-weight: bold;">LOGÍSTICA DE COMPRAS</span>
+          <h3 style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 2px 0 0 0; font-size: 1.2rem;">📲 Pedido de Reposición a Proveedor</h3>
+        </div>
+        <button onclick="closeSupplierWAModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label>WHATSAPP DEL DISTRIBUIDOR / PROVEEDOR</label>
+        <input type="text" id="supplierPhone" class="form-control" placeholder="5493834123456" value="5493834123456">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label>VISTA PREVIA DEL MENSAJE FORMATADO</label>
+        <textarea id="supplierMsgPreview" class="form-control" rows="8" style="font-family: monospace; font-size: 0.85rem;"></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 12px;">
+        <button type="button" onclick="closeSupplierWAModal()" class="btn-admin btn-admin-secondary">Cancelar</button>
+        <button type="button" onclick="sendSupplierWA()" class="btn-admin" style="background: #25D366; color: #000; font-weight: bold; padding: 12px 20px;">
+          💬 Enviar Pedido por WhatsApp →
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    let invToken = localStorage.getItem("bladesync_admin_token") || "";
+    let currentCategoryFilter = "";
+    let currentAlertFilter = false;
+    let cachedProducts = [];
+
+    document.addEventListener("DOMContentLoaded", () => {
+      if (invToken) {
+        verifyInvSession();
+      } else {
+        showAuthOverlay();
+      }
+    });
+
+    function showAuthOverlay() {
+      document.getElementById("authLockOverlay").style.display = "flex";
+      document.getElementById("invApp").style.display = "none";
+    }
+
+    function hideAuthOverlay() {
+      document.getElementById("authLockOverlay").style.display = "none";
+      document.getElementById("invApp").style.display = "block";
+    }
+
+    async function verifyInvSession() {
+      try {
+        const res = await fetch("/api/admin/me", {
+          headers: { "Authorization": `Bearer ${invToken}` }
+        });
+        if (res.ok) {
+          hideAuthOverlay();
+          loadInventoryAnalytics();
+          loadInventoryProducts();
+        } else {
+          invLogout();
+        }
+      } catch (e) {
+        invLogout();
+      }
+    }
+
+    async function handleInvLogin() {
+      const u = document.getElementById("invUsername").value.trim();
+      const p = document.getElementById("invPassword").value.trim();
+
+      try {
+        const res = await fetch("/api/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: u, password: p })
+        });
+        const data = await res.json();
+        if (res.ok && data.token) {
+          invToken = data.token;
+          localStorage.setItem("bladesync_admin_token", invToken);
+          hideAuthOverlay();
+          loadInventoryAnalytics();
+          loadInventoryProducts();
+        } else {
+          alert(data.detail || "Credenciales incorrectas.");
+        }
+      } catch (e) {
+        alert("Error de conexión al servidor.");
+      }
+    }
+
+    function invLogout() {
+      invToken = "";
+      localStorage.removeItem("bladesync_admin_token");
+      showAuthOverlay();
+    }
+
+    function authHeaders() {
+      return {
+        "Authorization": `Bearer ${invToken}`,
+        "Content-Type": "application/json"
+      };
+    }
+
+    async function loadInventoryAnalytics() {
+      try {
+        const res = await fetch("/api/inventory/analytics", { headers: authHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        document.getElementById("kpiTotalCost").textContent = "$" + data.total_inventory_cost.toLocaleString("es-AR");
+        document.getElementById("kpiTotalSale").textContent = "$" + data.total_inventory_sale_value.toLocaleString("es-AR");
+        document.getElementById("kpiNetProfit").textContent = "$" + data.net_profit_total.toLocaleString("es-AR");
+        
+        const critEl = document.getElementById("kpiCriticalCount");
+        const cardEl = document.getElementById("criticalKpiCard");
+        critEl.textContent = data.critical_count;
+
+        if (data.critical_count > 0) {
+          critEl.className = "kpi-value badge-critical";
+          cardEl.style.borderColor = "rgba(239, 68, 68, 0.4)";
+        } else {
+          critEl.className = "kpi-value";
+          critEl.style.color = "#10b981";
+          cardEl.style.borderColor = "#23232c";
+        }
+      } catch (e) { console.error("Error loading analytics:", e); }
+    }
+
+    function setInvCategoryFilter(cat) {
+      currentCategoryFilter = cat;
+      currentAlertFilter = false;
+
+      document.getElementById("tabAll").classList.toggle("active", cat === "");
+      document.getElementById("tabReventa").classList.toggle("active", cat === "reventa");
+      document.getElementById("tabInsumo").classList.toggle("active", cat === "insumo");
+      document.getElementById("tabAlerts").classList.remove("active");
+
+      loadInventoryProducts();
+    }
+
+    function setInvAlertFilter(alertOnly) {
+      currentAlertFilter = alertOnly;
+      currentCategoryFilter = "";
+
+      document.getElementById("tabAll").classList.remove("active");
+      document.getElementById("tabReventa").classList.remove("active");
+      document.getElementById("tabInsumo").classList.remove("active");
+      document.getElementById("tabAlerts").classList.add("active");
+
+      loadInventoryProducts();
+    }
+
+    async function loadInventoryProducts() {
+      try {
+        const search = document.getElementById("invSearchInput").value.trim();
+        let url = "/api/inventory/products?";
+        if (currentCategoryFilter) url += `category=${currentCategoryFilter}&`;
+        if (currentAlertFilter) url += `alert_only=true&`;
+        if (search) url += `search=${encodeURIComponent(search)}&`;
+
+        const res = await fetch(url, { headers: authHeaders() });
+        if (!res.ok) return;
+        cachedProducts = await res.json();
+        renderInventoryTable(cachedProducts);
+      } catch (e) { console.error("Error loading products:", e); }
+    }
+
+    function renderInventoryTable(products) {
+      const tbody = document.getElementById("inventoryTableBody");
+      tbody.innerHTML = "";
+
+      if (products.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="9" style="text-align: center; padding: 40px; color: #9ca3af;">
+              No se encontraron productos en el inventario.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      products.forEach(p => {
+        const tr = document.createElement("tr");
+
+        const cost = p.cost_price || 0;
+        const sale = p.price || p.sale_price || 0;
+        const stock = p.stock !== undefined ? p.stock : (p.current_stock || 0);
+        const minStock = p.min_stock || 2;
+        const cat = p.category || "reventa";
+
+        let marginPct = "-";
+        if (cat === "reventa" && sale > 0 && cost > 0) {
+          marginPct = (((sale - cost) / sale) * 100).toFixed(1) + "%";
+        }
+
+        // Semáforo de stock
+        let stockClass = "stock-optimal";
+        let stockLabel = "🟢 Óptimo";
+        if (stock <= minStock) {
+          stockClass = "stock-alert";
+          stockLabel = "🔴 Crítico";
+        } else if (stock <= minStock + 2) {
+          stockClass = "stock-warning";
+          stockLabel = "🟡 Bajo";
+        }
+
+        tr.innerHTML = `
+          <td>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <img src="${p.image_url || '/static/products/cera.jpg'}" style="width: 38px; height: 38px; object-fit: cover; border-radius: 8px; background: #1a1a22;">
+              <div>
+                <strong style="color: #fff; font-size: 0.9rem;">${escapeHtml(p.name)}</strong>
+                ${p.sku ? `<span style="font-family: monospace; color: #9ca3af; font-size: 0.7rem; display: block;">SKU: ${escapeHtml(p.sku)}</span>` : ''}
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="badge ${cat === 'reventa' ? 'tag-reventa' : 'tag-insumo'}">
+              ${cat === 'reventa' ? '🛒 Reventa' : '💈 Insumo'}
+            </span>
+          </td>
+          <td style="color: #cbd5e1; font-family: monospace;">$${cost.toLocaleString("es-AR")}</td>
+          <td style="color: #d2ff00; font-family: monospace; font-weight: bold;">
+            ${cat === 'reventa' ? '$' + sale.toLocaleString("es-AR") : '<span style="color:#94a3b8; font-size: 0.75rem;">(Insumo)</span>'}
+          </td>
+          <td style="color: #00f2fe; font-family: monospace; font-weight: bold;">${marginPct}</td>
+          <td>
+            <span class="stock-indicator ${stockClass}">
+              ${stockLabel} (${stock} un.)
+            </span>
+          </td>
+          <td style="color: #9ca3af; font-family: monospace;">${minStock} un.</td>
+          <td>
+            <div style="display: flex; gap: 4px; align-items: center;">
+              <button class="btn-admin btn-admin-sm btn-admin-secondary" style="padding: 2px 8px; font-weight: bold;" onclick="quickAdjust(${p.id}, -1)">-1</button>
+              <span style="font-family: monospace; font-size: 0.85rem; font-weight: bold; width: 24px; text-align: center;">${stock}</span>
+              <button class="btn-admin btn-admin-sm btn-admin-secondary" style="padding: 2px 8px; font-weight: bold;" onclick="quickAdjust(${p.id}, 1)">+1</button>
+            </div>
+          </td>
+          <td>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn-admin btn-admin-sm btn-admin-secondary" onclick="editProduct(${p.id})">Editar</button>
+              <button class="btn-admin btn-admin-sm btn-admin-danger" onclick="deleteProduct(${p.id})">Eliminar</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function quickAdjust(productId, delta) {
+      try {
+        const res = await fetch("/api/inventory/movements", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            product_id: productId,
+            movement_type: "ajuste",
+            quantity: delta,
+            notes: "Ajuste rápido desde tabla de inventario"
+          })
+        });
+        if (res.ok) {
+          loadInventoryAnalytics();
+          loadInventoryProducts();
+        } else {
+          const err = await res.json();
+          alert(err.detail || "Error al ajustar stock.");
+        }
+      } catch (e) { alert("Error de conexión."); }
+    }
+
+    function openProductModal() {
+      document.getElementById("productModalTitle").textContent = "+ NUEVO PRODUCTO";
+      document.getElementById("pm_id").value = "";
+      document.getElementById("pm_name").value = "";
+      document.getElementById("pm_category").value = "reventa";
+      document.getElementById("pm_sku").value = "";
+      document.getElementById("pm_cost_price").value = "";
+      document.getElementById("pm_price").value = "";
+      document.getElementById("pm_stock").value = "10";
+      document.getElementById("pm_min_stock").value = "3";
+      document.getElementById("pm_image_url").value = "";
+      document.getElementById("pm_description").value = "";
+      document.getElementById("productModal").style.display = "flex";
+    }
+
+    function closeProductModal() {
+      document.getElementById("productModal").style.display = "none";
+    }
+
+    function editProduct(productId) {
+      const p = cachedProducts.find(item => item.id === productId);
+      if (!p) return;
+      document.getElementById("productModalTitle").textContent = `✏️ EDITAR PRODUCTO #${p.id}`;
+      document.getElementById("pm_id").value = p.id;
+      document.getElementById("pm_name").value = p.name || "";
+      document.getElementById("pm_category").value = p.category || "reventa";
+      document.getElementById("pm_sku").value = p.sku || "";
+      document.getElementById("pm_cost_price").value = p.cost_price || 0;
+      document.getElementById("pm_price").value = p.price || p.sale_price || 0;
+      document.getElementById("pm_stock").value = p.stock !== undefined ? p.stock : (p.current_stock || 0);
+      document.getElementById("pm_min_stock").value = p.min_stock || 2;
+      document.getElementById("pm_image_url").value = p.image_url || "";
+      document.getElementById("pm_description").value = p.description || "";
+      document.getElementById("productModal").style.display = "flex";
+    }
+
+    async function submitProductForm() {
+      const id = document.getElementById("pm_id").value;
+      const isEdit = !!id;
+
+      const payload = {
+        name: document.getElementById("pm_name").value.trim(),
+        category: document.getElementById("pm_category").value,
+        sku: document.getElementById("pm_sku").value.trim(),
+        cost_price: parseFloat(document.getElementById("pm_cost_price").value || "0"),
+        price: parseFloat(document.getElementById("pm_price").value || "0"),
+        stock: parseInt(document.getElementById("pm_stock").value || "0"),
+        min_stock: parseInt(document.getElementById("pm_min_stock").value || "2"),
+        image_url: document.getElementById("pm_image_url").value.trim(),
+        description: document.getElementById("pm_description").value.trim()
+      };
+
+      try {
+        const url = isEdit ? `/api/inventory/products/${id}` : "/api/inventory/products";
+        const method = isEdit ? "PUT" : "POST";
+
+        const res = await fetch(url, {
+          method: method,
+          headers: authHeaders(),
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          closeProductModal();
+          loadInventoryAnalytics();
+          loadInventoryProducts();
+        } else {
+          const err = await res.json();
+          alert(err.detail || "Error al guardar producto.");
+        }
+      } catch (e) { alert("Error de conexión al guardar."); }
+    }
+
+    async function deleteProduct(productId) {
+      if (!confirm("¿Deshabilitar este producto del inventario (borrado lógico)?")) return;
+      try {
+        const res = await fetch(`/api/inventory/products/${productId}`, {
+          method: "DELETE",
+          headers: authHeaders()
+        });
+        if (res.ok) {
+          loadInventoryAnalytics();
+          loadInventoryProducts();
+        } else {
+          alert("Error al eliminar producto.");
+        }
+      } catch (e) { alert("Error de conexión."); }
+    }
+
+    // --- CARGAR MOVIMIENTO ---
+    function openMovementModal() {
+      const sel = document.getElementById("mov_product_id");
+      sel.innerHTML = `<option value="">Seleccionar producto...</option>`;
+      cachedProducts.forEach(p => {
+        sel.innerHTML += `<option value="${p.id}">${escapeHtml(p.name)} (Stock actual: ${p.stock})</option>`;
+      });
+      document.getElementById("movementModal").style.display = "flex";
+    }
+
+    function closeMovementModal() {
+      document.getElementById("movementModal").style.display = "none";
+    }
+
+    async function submitMovementForm() {
+      const prodId = document.getElementById("mov_product_id").value;
+      const type = document.getElementById("mov_type").value;
+      const qty = parseInt(document.getElementById("mov_quantity").value || "1");
+      const notes = document.getElementById("mov_notes").value.trim();
+
+      if (!prodId) {
+        alert("Por favor selecciona un producto.");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/inventory/movements", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            product_id: parseInt(prodId),
+            movement_type: type,
+            quantity: qty,
+            notes: notes
+          })
+        });
+
+        if (res.ok) {
+          closeMovementModal();
+          loadInventoryAnalytics();
+          loadInventoryProducts();
+        } else {
+          const err = await res.json();
+          alert(err.detail || "Error al procesar movimiento.");
+        }
+      } catch (e) { alert("Error de conexión."); }
+    }
+
+    // --- PEDIDO PROVEEDOR WHATSAPP ---
+    async function openSupplierWAModal() {
+      try {
+        const res = await fetch("/api/inventory/alerts", { headers: authHeaders() });
+        const alerts = res.ok ? await res.json() : [];
+
+        let msg = "¡Hola Distribuidor! Te encargo el siguiente pedido de reposición para Pereyras Barbers:\n\n";
+        if (alerts.length === 0) {
+          msg += "📌 No hay productos con stock crítico en este momento. Reposición general de stock a coordinar.";
+        } else {
+          alerts.forEach(item => {
+            const needed = Math.max(5, (item.min_stock || 2) * 3 - (item.stock || 0));
+            msg += `• ${item.name} (${item.category === 'insumo' ? 'Insumo' : 'Reventa'}) — Stock actual: ${item.stock} un. -> Reponer: ${needed} un.\n`;
+          });
+        }
+        msg += "\n¡Gracias!";
+
+        document.getElementById("supplierMsgPreview").value = msg;
+        document.getElementById("supplierWAModal").style.display = "flex";
+      } catch (e) { alert("Error al generar lista de pedido."); }
+    }
+
+    function closeSupplierWAModal() {
+      document.getElementById("supplierWAModal").style.display = "none";
+    }
+
+    function sendSupplierWA() {
+      const phone = document.getElementById("supplierPhone").value.replace(/\D/g, "");
+      const text = encodeURIComponent(document.getElementById("supplierMsgPreview").value);
+      if (!phone) {
+        alert("Ingresá el número de WhatsApp del proveedor.");
+        return;
+      }
+      window.open(`https://wa.me/${phone}?text=${text}`, "_blank");
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>

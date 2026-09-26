@@ -19,7 +19,7 @@ from sqlalchemy import or_, and_, func
 from app.database import Base, engine, get_db, SessionLocal, init_db_and_migrate, get_argentina_now
 from app.models import (
     AdminUser, ShopSetting, Barber, Service, Style, Client, Appointment,
-    Category, Product, DeliveryZone, Order, OrderItem, Promotion, AppNotification, AuditLog, NotificationLog
+    Category, Product, StockMovement, DeliveryZone, Order, OrderItem, Promotion, AppNotification, AuditLog, NotificationLog
 )
 from app.schemas import (
     LoginRequest, LoginResponse, PasswordChangeRequest,
@@ -31,6 +31,7 @@ from app.schemas import (
     AvailableSlotsResponse, AvailableSlotItem,
     CategoryRead, CategoryCreate,
     ProductRead, ProductCreate, ProductUpdate,
+    StockMovementCreate, StockMovementRead, InventoryAnalyticsResponse,
     OrderRead, OrderCreate, OrderStatusUpdate,
     DeliveryZoneRead, DeliveryZoneCreate,
     PromotionRead, PromotionCreate,
@@ -1808,6 +1809,278 @@ def delete_admin_product(
     return {"message": f"Producto '{name}' eliminado."}
 
 
+# ==============================================================================
+# MÓDULO DE INVENTARIO EN TIEMPO REAL & ALERTAS DE STOCK (/api/inventory/*)
+# ==============================================================================
+@app.get("/api/inventory/products", response_model=List[ProductRead])
+def get_inventory_products(
+    category: Optional[str] = Query(None, description="reventa o insumo"),
+    alert_only: bool = Query(False, description="Solo productos con stock <= min_stock"),
+    search: Optional[str] = Query(None, description="Búsqueda por nombre"),
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    query = db.query(Product).filter(Product.is_active == True)
+    if category:
+        query = query.filter(Product.category == category)
+    if alert_only:
+        query = query.filter(Product.stock <= Product.min_stock)
+    if search:
+        query = query.filter(Product.name.ilike(f"%{search}%"))
+
+    products = query.order_by(Product.display_order.asc(), Product.name.asc()).all()
+    res = []
+    for p in products:
+        p_read = ProductRead.model_validate(p)
+        p_read.cost_price = p.cost_price or 0.0
+        p_read.sale_price = p.price or 0.0
+        p_read.current_stock = p.stock or 0
+        p_read.category = p.category or "reventa"
+        if p.category_rel:
+            p_read.category_name = p.category_rel.name
+        res.append(p_read)
+    return res
+
+@app.post("/api/inventory/products", response_model=ProductRead)
+def create_inventory_product(
+    prod_in: ProductCreate,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    data = prod_in.model_dump()
+    if data.get("sale_price") is not None:
+        data["price"] = data["sale_price"]
+    if data.get("current_stock") is not None:
+        data["stock"] = data["current_stock"]
+    data.pop("sale_price", None)
+    data.pop("current_stock", None)
+
+    p = Product(**data)
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Inventario",
+        action="Crear Producto",
+        record_id=str(p.id),
+        new_value=f"{p.name} ({p.category}, Costo: ${p.cost_price}, Venta: ${p.price}, Stock: {p.stock})"
+    ))
+    db.commit()
+
+    p_read = ProductRead.model_validate(p)
+    p_read.cost_price = p.cost_price or 0.0
+    p_read.sale_price = p.price or 0.0
+    p_read.current_stock = p.stock or 0
+    p_read.category = p.category or "reventa"
+    return p_read
+
+@app.put("/api/inventory/products/{product_id}", response_model=ProductRead)
+def update_inventory_product(
+    product_id: int,
+    prod_in: ProductUpdate,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    p = db.query(Product).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Producto no encontrado.")
+
+    data = prod_in.model_dump(exclude_unset=True)
+    if "sale_price" in data and data["sale_price"] is not None:
+        data["price"] = data["sale_price"]
+    if "current_stock" in data and data["current_stock"] is not None:
+        data["stock"] = data["current_stock"]
+    data.pop("sale_price", None)
+    data.pop("current_stock", None)
+
+    old_info = f"{p.name} (Stock: {p.stock}, Costo: ${p.cost_price}, Venta: ${p.price})"
+    for k, v in data.items():
+        setattr(p, k, v)
+    db.commit()
+    db.refresh(p)
+
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Inventario",
+        action="Editar Producto",
+        record_id=str(p.id),
+        old_value=old_info,
+        new_value=f"{p.name} (Stock: {p.stock}, Costo: ${p.cost_price}, Venta: ${p.price})"
+    ))
+    db.commit()
+
+    p_read = ProductRead.model_validate(p)
+    p_read.cost_price = p.cost_price or 0.0
+    p_read.sale_price = p.price or 0.0
+    p_read.current_stock = p.stock or 0
+    p_read.category = p.category or "reventa"
+    return p_read
+
+@app.delete("/api/inventory/products/{product_id}")
+def delete_inventory_product(
+    product_id: int,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    p = db.query(Product).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Producto no encontrado.")
+
+    p.is_active = False # Borrado lógico
+    db.commit()
+
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Inventario",
+        action="Borrado Lógico Producto",
+        record_id=str(product_id),
+        old_value=p.name
+    ))
+    db.commit()
+    return {"message": f"Producto '{p.name}' deshabilitado del inventario (borrado lógico)."}
+
+@app.post("/api/inventory/movements", response_model=StockMovementRead)
+def create_stock_movement(
+    mov_in: StockMovementCreate,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    p = db.query(Product).filter(Product.id == mov_in.product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Producto no encontrado.")
+
+    qty = mov_in.quantity
+    m_type = mov_in.movement_type.lower()
+
+    if m_type in ["ingreso_compra"]:
+        qty = abs(qty)
+        p.stock += qty
+    elif m_type in ["venta", "uso_interno"]:
+        qty = -abs(qty)
+        if p.stock + qty < 0:
+            raise HTTPException(status_code=400, detail=f"Stock insuficiente para el producto '{p.name}'. Stock actual: {p.stock}.")
+        p.stock += qty
+    elif m_type == "ajuste":
+        p.stock += qty
+        if p.stock < 0:
+            p.stock = 0
+
+    mov = StockMovement(
+        product_id=p.id,
+        movement_type=m_type,
+        quantity=qty,
+        notes=mov_in.notes,
+        registered_by=mov_in.registered_by or admin.username
+    )
+    db.add(mov)
+    db.commit()
+    db.refresh(mov)
+
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Inventario",
+        action=f"Movimiento {m_type.upper()}",
+        record_id=str(p.id),
+        new_value=f"Variación: {qty} un. Nuevo stock: {p.stock}"
+    ))
+    db.commit()
+
+    res = StockMovementRead.model_validate(mov)
+    res.product_name = p.name
+    return res
+
+@app.get("/api/inventory/alerts", response_model=List[ProductRead])
+def get_inventory_alerts(
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    products = db.query(Product).filter(Product.is_active == True, Product.stock <= Product.min_stock).all()
+    res = []
+    for p in products:
+        p_read = ProductRead.model_validate(p)
+        p_read.cost_price = p.cost_price or 0.0
+        p_read.sale_price = p.price or 0.0
+        p_read.current_stock = p.stock or 0
+        p_read.category = p.category or "reventa"
+        res.append(p_read)
+    return res
+
+@app.get("/api/inventory/analytics", response_model=InventoryAnalyticsResponse)
+def get_inventory_analytics(
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    active_prods = db.query(Product).filter(Product.is_active == True).all()
+
+    total_cost = sum((p.stock or 0) * (p.cost_price or 0.0) for p in active_prods)
+    total_sale = sum((p.stock or 0) * (p.price or 0.0) for p in active_prods if (p.category or 'reventa') == 'reventa')
+
+    # Net profit total from completed orders
+    completed_items = db.query(OrderItem).join(Order).filter(Order.status != "CANCELADO").all()
+    net_profit = 0.0
+    for item in completed_items:
+        prod = item.product
+        c_price = prod.cost_price if prod and prod.cost_price else 0.0
+        net_profit += (item.unit_price - c_price) * item.quantity
+
+    # Top rotating products in past 30 days
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    top_items = (
+        db.query(OrderItem.product_id, OrderItem.product_name, func.sum(OrderItem.quantity).label("total_sold"))
+        .join(Order)
+        .filter(Order.status != "CANCELADO", Order.created_at >= thirty_days_ago)
+        .group_by(OrderItem.product_id, OrderItem.product_name)
+        .order_by(func.sum(OrderItem.quantity).desc())
+        .limit(5)
+        .all()
+    )
+    top_rotating = [
+        {"product_id": t[0], "name": t[1], "quantity_sold": t[2]} for t in top_items
+    ]
+
+    # Critical products
+    critical_list = [
+        {
+            "id": p.id,
+            "name": p.name,
+            "category": p.category or "reventa",
+            "current_stock": p.stock,
+            "min_stock": p.min_stock,
+            "cost_price": p.cost_price or 0.0,
+            "sale_price": p.price or 0.0
+        } for p in active_prods if (p.stock or 0) <= (p.min_stock or 0)
+    ]
+
+    # Dead stock products (> 60 days without movements/sales)
+    sixty_days_ago = datetime.utcnow() - timedelta(days=60)
+    recent_mov_prod_ids = [m.product_id for m in db.query(StockMovement.product_id).filter(StockMovement.date >= sixty_days_ago).distinct().all()]
+    recent_order_prod_ids = [it.product_id for it in db.query(OrderItem.product_id).join(Order).filter(Order.created_at >= sixty_days_ago).distinct().all() if it.product_id]
+    active_prod_ids = set(recent_mov_prod_ids + recent_order_prod_ids)
+
+    dead_stock = [
+        {
+            "id": p.id,
+            "name": p.name,
+            "category": p.category or "reventa",
+            "current_stock": p.stock,
+            "cost_price": p.cost_price or 0.0
+        } for p in active_prods if p.id not in active_prod_ids and (p.stock or 0) > 0
+    ]
+
+    return InventoryAnalyticsResponse(
+        total_inventory_cost=round(total_cost, 2),
+        total_inventory_sale_value=round(total_sale, 2),
+        net_profit_total=round(net_profit, 2),
+        critical_count=len(critical_list),
+        top_rotating_products=top_rotating,
+        critical_products=critical_list,
+        dead_stock_products=dead_stock
+    )
+
+
+
 # 11. GESTIÓN DE PEDIDOS Y ESTADOS CON CONTROL DE STOCK
 @app.get("/api/admin/orders", response_model=List[OrderRead])
 def get_admin_orders(
@@ -2038,6 +2311,14 @@ def serve_turnos():
     if os.path.exists(t_path):
         return FileResponse(t_path)
     raise HTTPException(status_code=404, detail="Página turnos.html no encontrada.")
+
+@app.get("/inventario.html", include_in_schema=False)
+@app.get("/inventario", include_in_schema=False)
+def serve_inventario():
+    inv_path = os.path.join(STATIC_DIR, "inventario.html")
+    if os.path.exists(inv_path):
+        return FileResponse(inv_path)
+    raise HTTPException(status_code=404, detail="Página inventario.html no encontrada.")
 
 @app.get("/manifest.json", include_in_schema=False)
 def serve_manifest(db: Session = Depends(get_db)):

@@ -360,6 +360,55 @@ class TestBarberApp(unittest.TestCase):
         self.assertEqual(res_past.status_code, 400)
         self.assertIn("transcurridos", res_past.json()["detail"].lower())
 
+    def test_16_inventory_module_and_stock_movements(self):
+        login_res = client.post("/api/admin/login", json={"username": "admin", "password": "admin123"})
+        token = login_res.json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # 1. Create inventory product
+        prod_payload = {
+            "name": "Pomada Insumo Test",
+            "category": "insumo",
+            "cost_price": 3000.0,
+            "sale_price": 0.0,
+            "current_stock": 5,
+            "min_stock": 2,
+            "sku": "INS-TEST-01"
+        }
+        create_res = client.post("/api/inventory/products", json=prod_payload, headers=headers)
+        self.assertEqual(create_res.status_code, 200)
+        prod_data = create_res.json()
+        prod_id = prod_data["id"]
+        self.assertEqual(prod_data["category"], "insumo")
+        self.assertEqual(prod_data["cost_price"], 3000.0)
+
+        # 2. Get inventory products list
+        list_res = client.get("/api/inventory/products?category=insumo", headers=headers)
+        self.assertEqual(list_res.status_code, 200)
+        self.assertTrue(any(p["id"] == prod_id for p in list_res.json()))
+
+        # 3. Post stock movement (ingreso_compra +10)
+        mov_payload = {
+            "product_id": prod_id,
+            "movement_type": "ingreso_compra",
+            "quantity": 10,
+            "notes": "Compra Distribuidor Test"
+        }
+        mov_res = client.post("/api/inventory/movements", json=mov_payload, headers=headers)
+        self.assertEqual(mov_res.status_code, 200)
+        self.assertEqual(mov_res.json()["quantity"], 10)
+
+        # 4. Analytics endpoint
+        analytics_res = client.get("/api/inventory/analytics", headers=headers)
+        self.assertEqual(analytics_res.status_code, 200)
+        data = analytics_res.json()
+        self.assertIn("total_inventory_cost", data)
+        self.assertIn("critical_products", data)
+
+        # 5. Delete product (logical delete)
+        del_res = client.delete(f"/api/inventory/products/{prod_id}", headers=headers)
+        self.assertEqual(del_res.status_code, 200)
+
 if __name__ == "__main__":
     unittest.main()
 

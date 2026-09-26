@@ -235,10 +235,12 @@ class CategoryRead(CategoryBase):
 class ProductBase(BaseModel):
     name: str
     description: Optional[str] = None
-    price: float
+    price: float = 0.0 # Precio de venta al público (sale_price)
     previous_price: Optional[float] = None
+    cost_price: float = 0.0 # Precio de costo
+    category: str = "reventa" # "reventa" o "insumo"
     sku: Optional[str] = None
-    stock: int = 0
+    stock: int = 0 # Stock actual (current_stock)
     min_stock: int = 2
     image_url: Optional[str] = None
     gallery_json: Optional[str] = None
@@ -248,15 +250,21 @@ class ProductBase(BaseModel):
     display_order: int = 0
 
 class ProductCreate(ProductBase):
-    pass
+    cost_price: Optional[float] = 0.0
+    sale_price: Optional[float] = None # alias para price
+    current_stock: Optional[int] = None # alias para stock
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     price: Optional[float] = None
+    sale_price: Optional[float] = None
     previous_price: Optional[float] = None
+    cost_price: Optional[float] = None
+    category: Optional[str] = None
     sku: Optional[str] = None
     stock: Optional[int] = None
+    current_stock: Optional[int] = None
     min_stock: Optional[int] = None
     image_url: Optional[str] = None
     category_id: Optional[int] = None
@@ -266,8 +274,39 @@ class ProductUpdate(BaseModel):
 
 class ProductRead(ProductBase):
     id: int
+    cost_price: float = 0.0
+    category: str = "reventa"
+    current_stock: int = 0
+    sale_price: float = 0.0
     category_name: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+
+class StockMovementCreate(BaseModel):
+    product_id: int
+    movement_type: str # "venta", "ingreso_compra", "uso_interno", "ajuste"
+    quantity: int
+    notes: Optional[str] = None
+    registered_by: Optional[str] = "Admin"
+
+class StockMovementRead(BaseModel):
+    id: int
+    product_id: int
+    product_name: Optional[str] = None
+    movement_type: str
+    quantity: int
+    date: datetime
+    notes: Optional[str] = None
+    registered_by: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class InventoryAnalyticsResponse(BaseModel):
+    total_inventory_cost: float
+    total_inventory_sale_value: float
+    net_profit_total: float
+    critical_count: int
+    top_rotating_products: List[Dict[str, Any]]
+    critical_products: List[Dict[str, Any]]
+    dead_stock_products: List[Dict[str, Any]]
 
 # ==========================================
 # ORDER SCHEMAS

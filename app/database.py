@@ -109,6 +109,16 @@ def init_db_and_migrate():
                 conn.execute(text("ALTER TABLE services ADD COLUMN display_order INTEGER DEFAULT 0"))
                 conn.commit()
 
+        # 4. Migration for products
+        if "products" in tables:
+            columns = [c["name"] for c in inspector.get_columns("products")]
+            if "cost_price" not in columns:
+                conn.execute(text("ALTER TABLE products ADD COLUMN cost_price FLOAT DEFAULT 0.0"))
+                conn.commit()
+            if "category" not in columns:
+                conn.execute(text("ALTER TABLE products ADD COLUMN category VARCHAR(50) DEFAULT 'reventa'"))
+                conn.commit()
+
 def get_db():
     """Dependency for obtaining a database session per request."""
     db = SessionLocal()

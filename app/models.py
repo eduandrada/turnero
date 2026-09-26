@@ -136,10 +136,12 @@ class Product(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(150), nullable=False)
     description = Column(Text, nullable=True)
-    price = Column(Float, nullable=False)
+    price = Column(Float, nullable=False) # Precio de venta al público (sale_price)
     previous_price = Column(Float, nullable=True)
+    cost_price = Column(Float, default=0.0) # Precio de costo (cuánto pagó la barbería)
+    category = Column(String(50), default="reventa") # "reventa" o "insumo"
     sku = Column(String(50), nullable=True)
-    stock = Column(Integer, default=0)
+    stock = Column(Integer, default=0) # Stock actual (current_stock)
     min_stock = Column(Integer, default=2)
     image_url = Column(String(500), nullable=True)
     gallery_json = Column(Text, nullable=True) # JSON list of URLs
@@ -150,6 +152,21 @@ class Product(Base):
 
     category_rel = relationship("Category", back_populates="products")
     order_items = relationship("OrderItem", back_populates="product")
+    movements = relationship("StockMovement", back_populates="product", cascade="all, delete-orphan")
+
+
+class StockMovement(Base):
+    __tablename__ = "stock_movements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    movement_type = Column(String(50), nullable=False) # "venta", "ingreso_compra", "uso_interno", "ajuste"
+    quantity = Column(Integer, nullable=False) # Cantidad (+ o -)
+    date = Column(DateTime, default=datetime.utcnow)
+    notes = Column(Text, nullable=True)
+    registered_by = Column(String(80), default="Admin")
+
+    product = relationship("Product", back_populates="movements")
 
 
 class DeliveryZone(Base):
