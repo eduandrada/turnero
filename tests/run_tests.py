@@ -409,6 +409,51 @@ class TestBarberApp(unittest.TestCase):
         del_res = client.delete(f"/api/inventory/products/{prod_id}", headers=headers)
         self.assertEqual(del_res.status_code, 200)
 
+    def test_17_product_creation_photo_stock_and_audit_logs(self):
+        file_content = b"fake image bytes content"
+        files = {
+            "file": ("test_pomada.png", file_content, "image/png")
+        }
+        data = {
+            "name": "Pomada Matte Fiber Test",
+            "description": "Fijación extrema con acabado mate natural",
+            "price": "8500.0",
+            "stock": "15",
+            "category": "reventa",
+            "actor": "Encargado / Recepción"
+        }
+        create_res = client.post("/api/products", data=data, files=files)
+        self.assertEqual(create_res.status_code, 200)
+        prod_data = create_res.json()
+        prod_id = prod_data["id"]
+        self.assertEqual(prod_data["name"], "Pomada Matte Fiber Test")
+        self.assertEqual(prod_data["stock"], 15)
+        self.assertIsNotNone(prod_data["image_url"])
+        self.assertTrue(prod_data["image_url"].startswith("/static/uploads/products/"))
+
+        patch_res = client.patch(
+            f"/api/products/{prod_id}/stock",
+            json={
+                "quantity": -2,
+                "action_type": "VENTA_PRODUCTO",
+                "notes": "Venta directa de mostrador en turno #10",
+                "actor": "Encargado / Recepción"
+            }
+        )
+        self.assertEqual(patch_res.status_code, 200)
+        updated_prod = patch_res.json()
+        self.assertEqual(updated_prod["stock"], 13)
+
+        audit_res = client.get("/api/audit-logs?search=Pomada")
+        self.assertEqual(audit_res.status_code, 200)
+        audit_logs = audit_res.json()
+        self.assertTrue(len(audit_logs) >= 2)
+        
+        actions = [log["action"] for log in audit_logs]
+        self.assertIn("CREAR_PRODUCTO", actions)
+        self.assertIn("VENTA_PRODUCTO", actions)
+        self.assertEqual(audit_logs[0]["actor"], "Encargado / Recepción")
+
 if __name__ == "__main__":
     unittest.main()
 

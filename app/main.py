@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, time
 from typing import List, Optional, Dict, Any
 
-from fastapi import FastAPI, HTTPException, Depends, Request, Response, Query, UploadFile, File, status
+from fastapi import FastAPI, HTTPException, Depends, Request, Response, Query, Form, UploadFile, File, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
@@ -30,13 +30,13 @@ from app.schemas import (
     AppointmentRead, AppointmentCreate, AppointmentUpdate,
     AvailableSlotsResponse, AvailableSlotItem,
     CategoryRead, CategoryCreate,
-    ProductRead, ProductCreate, ProductUpdate,
+    ProductRead, ProductCreate, ProductUpdate, ProductResponse, StockAdjustment,
     StockMovementCreate, StockMovementRead, InventoryAnalyticsResponse,
     OrderRead, OrderCreate, OrderStatusUpdate,
     DeliveryZoneRead, DeliveryZoneCreate,
     PromotionRead, PromotionCreate,
     AppNotificationRead, AppNotificationCreate,
-    AuditLogRead, NotificationLogRead, DashboardStatsResponse,
+    AuditLogRead, AuditLogResponse, NotificationLogRead, DashboardStatsResponse,
     StyleAdviceRequest, StyleAdviceResponse, BulkSettingsUpdate
 )
 from app.auth import get_current_admin, create_admin_token, hash_password, verify_password, revoke_token, security_bearer
@@ -2248,6 +2248,216 @@ def get_admin_notification_logs(
     db: Session = Depends(get_db)
 ):
     return db.query(NotificationLog).order_by(NotificationLog.created_at.desc()).limit(limit).all()
+
+
+# ==========================================
+# GESTIÓN DE PRODUCTOS, FOTOS Y AUDITORÍA DE STOCK
+# ==========================================
+STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+UPLOAD_PRODUCTS_DIR = os.path.join(STATIC_DIR, "uploads", "products")
+os.makedirs(UPLOAD_PRODUCTS_DIR, exist_ok=True)
+
+@app.get("/api/products", response_model=List[ProductRead])
+def get_products(
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    query = db.query(Product).filter(Product.is_active == True)
+    if category:
+        query = query.filter(Product.category == category)
+    if search:
+        s_term = f"%{search}%"
+        query = query.filter(or_(Product.name.ilike(s_term), Product.description.ilike(s_term)))
+    
+    products = query.order_by(Product.display_order.asc(), Product.id.desc()).all()
+    res = []
+    for p in products:
+        p_read = ProductRead.model_validate(p)
+        p_read.cost_price = p.cost_price or 0.0
+        p_read.sale_price = p.price or 0.0
+        p_read.current_stock = p.stock or 0
+        p_read.category = p.category or "reventa"
+        res.append(p_read)
+    return res
+
+@app.post("/api/products", response_model=ProductRead)
+async def create_product_with_photo(
+    request: Request,
+    name: str = Form(...),
+    description: Optional[str] = Form(None),
+    price: float = Form(...),
+    stock: int = Form(0),
+    category: Optional[str] = Form("reventa"),
+    cost_price: Optional[float] = Form(0.0),
+    min_stock: Optional[int] = Form(2),
+    file: Optional[UploadFile] = File(None),
+    actor: Optional[str] = Form("Encargado / Recepción"),
+    db: Session = Depends(get_db)
+):
+    image_url = None
+    if file and file.filename:
+        file_ext = os.path.splitext(file.filename)[1].lower()
+        if not file_ext or file_ext not in [".jpg", ".jpeg", ".png", ".webp", ".gif"]:
+            file_ext = ".jpg"
+        
+        safe_filename = f"prod_{int(datetime.utcnow().timestamp())}_{secrets.token_hex(4)}{file_ext}"
+        file_path = os.path.join(UPLOAD_PRODUCTS_DIR, safe_filename)
+        
+        content = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(content)
+        
+        image_url = f"/static/uploads/products/{safe_filename}"
+
+    new_prod = Product(
+        name=name.strip(),
+        description=description.strip() if description else None,
+        price=price,
+        stock=stock,
+        cost_price=cost_price or 0.0,
+        category=category or "reventa",
+        min_stock=min_stock or 2,
+        image_url=image_url,
+        is_active=True,
+        created_at=datetime.utcnow()
+    )
+    db.add(new_prod)
+    db.commit()
+    db.refresh(new_prod)
+
+    client_ip = request.client.host if (request and request.client) else None
+    actor_name = actor or "Encargado / Recepción"
+    
+    db.add(AuditLog(
+        user_name=actor_name,
+        actor=actor_name,
+        module="Productos",
+        action="CREAR_PRODUCTO",
+        description=f"Nuevo producto creado: '{name}' (${price:.2f}) - Stock Inicial: {stock}",
+        record_id=str(new_prod.id),
+        new_value=f"Precio: ${price:.2f}, Stock: {stock}",
+        ip_address=client_ip
+    ))
+    
+    if stock > 0:
+        db.add(StockMovement(
+            product_id=new_prod.id,
+            movement_type="ingreso_compra",
+            quantity=stock,
+            notes="Carga inicial al crear producto",
+            registered_by=actor_name
+        ))
+
+    db.commit()
+
+    p_read = ProductRead.model_validate(new_prod)
+    p_read.cost_price = new_prod.cost_price or 0.0
+    p_read.sale_price = new_prod.price or 0.0
+    p_read.current_stock = new_prod.stock or 0
+    p_read.category = new_prod.category or "reventa"
+    return p_read
+
+@app.patch("/api/products/{product_id}/stock", response_model=ProductRead)
+def adjust_product_stock(
+    product_id: int,
+    request: Request,
+    adj: StockAdjustment,
+    db: Session = Depends(get_db)
+):
+    product = db.query(Product).filter(Product.id == product_id, Product.is_active == True).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Producto no encontrado.")
+
+    old_stock = product.stock or 0
+    
+    if adj.stock is not None:
+        new_stock = max(0, adj.stock)
+        delta = new_stock - old_stock
+    elif adj.quantity is not None:
+        delta = adj.quantity
+        new_stock = max(0, old_stock + delta)
+    else:
+        raise HTTPException(status_code=400, detail="Debe proporcionar 'quantity' (variación) o 'stock' (valor absoluto).")
+
+    product.stock = new_stock
+    
+    actor_name = adj.actor or "Encargado / Recepción"
+    action_type = adj.action_type or ("VENTA_PRODUCTO" if delta < 0 else "MODIFICAR_STOCK")
+    
+    client_ip = request.client.host if (request and request.client) else None
+    
+    sign = f"+{delta}" if delta > 0 else str(delta)
+    desc = f"Ajuste de stock en '{product.name}': {old_stock} -> {new_stock} ({sign})"
+    if adj.notes:
+        desc += f" - Notas: {adj.notes}"
+
+    db.add(AuditLog(
+        user_name=actor_name,
+        actor=actor_name,
+        module="Productos",
+        action=action_type,
+        description=desc,
+        record_id=str(product.id),
+        old_value=str(old_stock),
+        new_value=str(new_stock),
+        ip_address=client_ip
+    ))
+
+    m_type = "venta" if action_type == "VENTA_PRODUCTO" else ("ingreso_compra" if delta > 0 else "ajuste")
+    db.add(StockMovement(
+        product_id=product.id,
+        movement_type=m_type,
+        quantity=delta,
+        notes=adj.notes or f"Ajuste rápido ({sign})",
+        registered_by=actor_name
+    ))
+
+    db.commit()
+    db.refresh(product)
+
+    p_read = ProductRead.model_validate(product)
+    p_read.cost_price = product.cost_price or 0.0
+    p_read.sale_price = product.price or 0.0
+    p_read.current_stock = product.stock or 0
+    p_read.category = product.category or "reventa"
+    return p_read
+
+@app.get("/api/admin/audit-logs", response_model=List[AuditLogRead])
+@app.get("/api/audit-logs", response_model=List[AuditLogRead])
+def get_audit_logs(
+    search: Optional[str] = Query(None),
+    action: Optional[str] = Query(None),
+    actor: Optional[str] = Query(None),
+    limit: int = Query(200, ge=1, le=1000),
+    db: Session = Depends(get_db)
+):
+    query = db.query(AuditLog)
+    
+    if action:
+        query = query.filter(AuditLog.action == action)
+    if actor:
+        query = query.filter(or_(AuditLog.actor.ilike(f"%{actor}%"), AuditLog.user_name.ilike(f"%{actor}%")))
+    if search:
+        s_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                AuditLog.description.ilike(s_term),
+                AuditLog.action.ilike(s_term),
+                AuditLog.actor.ilike(s_term),
+                AuditLog.user_name.ilike(s_term),
+                AuditLog.module.ilike(s_term)
+            )
+        )
+    
+    logs = query.order_by(AuditLog.timestamp.desc()).limit(limit).all()
+    res = []
+    for l in logs:
+        item = AuditLogRead.model_validate(l)
+        item.actor = l.actor or l.user_name or "Encargado / Recepción"
+        item.description = l.description or f"{l.action} en módulo {l.module}"
+        res.append(item)
+    return res
 
 
 # ==========================================

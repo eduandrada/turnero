@@ -118,6 +118,22 @@ def init_db_and_migrate():
             if "category" not in columns:
                 conn.execute(text("ALTER TABLE products ADD COLUMN category VARCHAR(50) DEFAULT 'reventa'"))
                 conn.commit()
+            if "created_at" not in columns:
+                conn.execute(text("ALTER TABLE products ADD COLUMN created_at DATETIME"))
+                conn.commit()
+
+        # 5. Migration for audit_logs
+        if "audit_logs" in tables:
+            columns = [c["name"] for c in inspector.get_columns("audit_logs")]
+            if "actor" not in columns:
+                conn.execute(text("ALTER TABLE audit_logs ADD COLUMN actor VARCHAR(80) DEFAULT 'Encargado / Recepción'"))
+                conn.commit()
+            if "description" not in columns:
+                conn.execute(text("ALTER TABLE audit_logs ADD COLUMN description TEXT"))
+                conn.commit()
+            if "ip_address" not in columns:
+                conn.execute(text("ALTER TABLE audit_logs ADD COLUMN ip_address VARCHAR(50)"))
+                conn.commit()
 
 def get_db():
     """Dependency for obtaining a database session per request."""

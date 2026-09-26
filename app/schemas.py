@@ -279,7 +279,17 @@ class ProductRead(ProductBase):
     current_stock: int = 0
     sale_price: float = 0.0
     category_name: Optional[str] = None
+    created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
+
+ProductResponse = ProductRead
+
+class StockAdjustment(BaseModel):
+    quantity: Optional[int] = None
+    stock: Optional[int] = None
+    action_type: Optional[str] = "MODIFICAR_STOCK"
+    notes: Optional[str] = None
+    actor: Optional[str] = "Encargado / Recepción"
 
 class StockMovementCreate(BaseModel):
     product_id: int
@@ -418,14 +428,19 @@ class AppNotificationRead(AppNotificationBase):
 # ==========================================
 class AuditLogRead(BaseModel):
     id: int
-    user_name: str
-    module: str
+    timestamp: datetime
+    actor: str = "Encargado / Recepción"
     action: str
+    description: Optional[str] = None
+    ip_address: Optional[str] = None
+    user_name: Optional[str] = "Administrador"
+    module: Optional[str] = "Productos"
     record_id: Optional[str] = None
     old_value: Optional[str] = None
     new_value: Optional[str] = None
-    timestamp: datetime
     model_config = ConfigDict(from_attributes=True)
+
+AuditLogResponse = AuditLogRead
 
 class NotificationLogRead(BaseModel):
     id: int

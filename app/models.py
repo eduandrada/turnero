@@ -149,6 +149,7 @@ class Product(Base):
     is_featured = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
     display_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     category_rel = relationship("Category", back_populates="products")
     order_items = relationship("OrderItem", back_populates="product")
@@ -254,11 +255,14 @@ class AuditLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_name = Column(String(80), default="Administrador")
-    module = Column(String(80), nullable=False)
-    action = Column(String(120), nullable=False)
+    actor = Column(String(80), default="Encargado / Recepción")
+    module = Column(String(80), default="Productos")
+    action = Column(String(120), nullable=False) # "CREAR_PRODUCTO", "MODIFICAR_STOCK", "EDITAR_PRODUCTO", "VENTA_PRODUCTO"
+    description = Column(Text, nullable=True)
     record_id = Column(String(50), nullable=True)
     old_value = Column(Text, nullable=True)
     new_value = Column(Text, nullable=True)
+    ip_address = Column(String(50), nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
 
 

@@ -179,7 +179,8 @@ function switchSection(secId) {
     content: "Contenido & Textos",
     pwa: "Configuración PWA",
     security: "Seguridad",
-    backups: "Copias de Seguridad"
+    backups: "Copias de Seguridad",
+    audit: "🛡️ Auditoría de Cambios"
   };
 
   document.getElementById("currentSectionTitle").textContent = titles[secId] || "Panel";
@@ -191,13 +192,14 @@ function switchSection(secId) {
   else if (secId === "services") loadAdminServices();
   else if (secId === "styles") loadAdminStyles();
   else if (secId === "schedules") loadAdminSchedules();
-  else if (secId === "stats") loadAdminAuditLogs();
+  else if (secId === "stats") loadAuditLogsData();
   else if (secId === "products") loadAdminProducts();
   else if (secId === "orders") loadAdminOrders();
   else if (secId === "delivery") loadAdminDelivery();
   else if (secId === "notifications") loadAdminNotificationLogs();
   else if (secId === "identity" || secId === "appearance" || secId === "content" || secId === "pwa" || secId === "whatsapp") loadSettingsToForm();
   else if (secId === "backups") loadAdminBackups();
+  else if (secId === "audit") loadAuditLogsData();
 }
 
 // 1. DASHBOARD
@@ -1630,6 +1632,104 @@ async function loadAdminNotificationLogs() {
       tbody.appendChild(tr);
     });
   } catch (e) { console.error("Error loading notification logs:", e); }
+}
+
+// 14. AUDITORÍA DE CAMBIOS
+let allAuditLogsList = [];
+
+async function loadAuditLogsData() {
+  try {
+    const res = await fetch("/api/admin/audit-logs?limit=300", { headers: authHeaders() });
+    if (!res.ok) {
+      const fallbackRes = await fetch("/api/audit-logs?limit=300");
+      if (fallbackRes.ok) {
+        allAuditLogsList = await fallbackRes.json();
+      }
+    } else {
+      allAuditLogsList = await res.json();
+    }
+    renderAuditLogsTable();
+  } catch (e) {
+    console.error("Error loading audit logs:", e);
+    const tbody = document.getElementById("auditLogsTableBody");
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #ef4444; padding: 30px;">Error al cargar registros de auditoría.</td></tr>`;
+    }
+  }
+}
+
+function renderAuditLogsTable() {
+  const tbody = document.getElementById("auditLogsTableBody");
+  if (!tbody) return;
+
+  const searchVal = (document.getElementById("auditSearchInput")?.value || "").toLowerCase().trim();
+
+  let filtered = allAuditLogsList.filter(l => {
+    if (!searchVal) return true;
+    const actorMatch = (l.actor || l.user_name || "").toLowerCase().includes(searchVal);
+    const actionMatch = (l.action || "").toLowerCase().includes(searchVal);
+    const descMatch = (l.description || "").toLowerCase().includes(searchVal);
+    const ipMatch = (l.ip_address || "").toLowerCase().includes(searchVal);
+    return actorMatch || actionMatch || descMatch || ipMatch;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #9ca3af; padding: 40px;">No se encontraron registros de auditoría.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = "";
+  filtered.forEach(l => {
+    const tr = document.createElement("tr");
+    
+    let dateStr = l.timestamp ? new Date(l.timestamp).toLocaleString("es-AR") : "-";
+
+    const actorStr = l.actor || l.user_name || "Encargado / Recepción";
+    const isAdmin = actorStr.toLowerCase().includes("admin");
+    const actorBadgeStyle = isAdmin 
+      ? "background: rgba(210, 255, 0, 0.15); color: #d2ff00; border: 1px solid rgba(210, 255, 0, 0.3);"
+      : "background: rgba(0, 242, 254, 0.15); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.3);";
+
+    const act = (l.action || "").toUpperCase();
+    let actBadgeStyle = "background: rgba(255, 255, 255, 0.1); color: #ffffff; border: 1px solid rgba(255,255,255,0.2);";
+    if (act.includes("CREAR")) {
+      actBadgeStyle = "background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);";
+    } else if (act.includes("VENTA")) {
+      actBadgeStyle = "background: rgba(210, 255, 0, 0.15); color: #d2ff00; border: 1px solid rgba(210, 255, 0, 0.3);";
+    } else if (act.includes("MODIFICAR") || act.includes("EDITAR") || act.includes("STOCK")) {
+      actBadgeStyle = "background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3);";
+    } else if (act.includes("ELIMINAR") || act.includes("BORRADO") || act.includes("CANCELAR")) {
+      actBadgeStyle = "background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);";
+    }
+
+    const descText = l.description || `${l.action} en módulo ${l.module || 'Productos'}`;
+
+    tr.innerHTML = `
+      <td><span style="font-family: monospace; font-size: 0.85rem; color: #94a3b8;">${escapeHtml(dateStr)}</span></td>
+      <td>
+        <span style="${actorBadgeStyle} padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-family: monospace; font-weight: bold;">
+          ${escapeHtml(actorStr)}
+        </span>
+      </td>
+      <td>
+        <span style="${actBadgeStyle} padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-family: monospace; font-weight: bold;">
+          ${escapeHtml(l.action)}
+        </span>
+      </td>
+      <td>
+        <strong style="color: #ffffff; font-size: 0.9rem;">${escapeHtml(descText)}</strong>
+        ${l.new_value ? `<span style="display: block; font-size: 0.78rem; color: #64748b; margin-top: 2px;">Detalle: ${escapeHtml(l.new_value)}</span>` : ''}
+      </td>
+      <td>
+        <span style="font-family: monospace; font-size: 0.8rem; color: #64748b;">${escapeHtml(l.ip_address || '127.0.0.1')}</span>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function filterAuditLogsTable() {
+  renderAuditLogsTable();
 }
 
 
