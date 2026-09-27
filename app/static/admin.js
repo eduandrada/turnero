@@ -74,6 +74,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
+      toggleSidebar(false);
       document.querySelectorAll(".modal-overlay, .modal, [id$='Modal'], [id$='Overlay']").forEach(el => {
         if (el.id !== "loginOverlay" && el.style.display && el.style.display !== "none") {
           el.style.display = "none";
@@ -93,9 +94,75 @@ function hideLoginOverlay() {
   document.getElementById("adminApp").style.display = "flex";
 }
 
-function toggleSidebar() {
+let currentActiveSection = "dashboard";
+
+function updateBottomNavActiveState() {
+  document.querySelectorAll(".bottom-nav-item").forEach(b => b.classList.remove("active"));
+  const directBtn = document.querySelector(`.bottom-nav-item[data-bottom-sec="${currentActiveSection}"]`);
+  if (directBtn) {
+    directBtn.classList.add("active");
+  } else {
+    const menuBtn = document.getElementById("bottomNavMenuBtn");
+    if (menuBtn) menuBtn.classList.add("active");
+  }
+}
+
+function toggleSidebar(forceState) {
   const sidebar = document.getElementById("adminSidebar");
-  if (sidebar) sidebar.classList.toggle("open");
+  const backdrop = document.getElementById("adminSidebarBackdrop");
+  const hamburger = document.getElementById("adminHamburgerBtn");
+  const menuBottom = document.getElementById("bottomNavMenuBtn");
+  if (!sidebar) return;
+
+  const isOpen = sidebar.classList.contains("open");
+  const shouldOpen = typeof forceState === "boolean" ? forceState : !isOpen;
+
+  if (shouldOpen) {
+    sidebar.classList.add("open");
+    if (backdrop) backdrop.classList.add("open");
+    if (hamburger) hamburger.classList.add("active");
+    if (menuBottom) menuBottom.classList.add("active");
+    document.body.style.overflow = "hidden";
+  } else {
+    sidebar.classList.remove("open");
+    if (backdrop) backdrop.classList.remove("open");
+    if (hamburger) hamburger.classList.remove("active");
+    document.body.style.overflow = "";
+    updateBottomNavActiveState();
+  }
+}
+
+function filterAdminMenu(query) {
+  const q = (query || "").toLowerCase().trim();
+  const items = document.querySelectorAll(".admin-sidebar .admin-nav-item");
+  const categories = document.querySelectorAll(".admin-sidebar .admin-menu-category");
+
+  items.forEach(item => {
+    if (item.classList.contains("logout-nav-item")) return;
+    const text = item.textContent.toLowerCase();
+    if (!q || text.includes(q)) {
+      item.style.display = "flex";
+    } else {
+      item.style.display = "none";
+    }
+  });
+
+  categories.forEach(cat => {
+    if (!q) {
+      cat.style.display = "";
+      return;
+    }
+    let next = cat.nextElementSibling;
+    let hasVisibleChild = false;
+    while (next && !next.classList.contains("admin-menu-category") && !next.classList.contains("admin-sidebar-footer")) {
+      if (next.classList.contains("admin-nav-item") && next.style.display !== "none") {
+        hasVisibleChild = true;
+        break;
+      }
+      next = next.nextElementSibling;
+    }
+    cat.style.display = hasVisibleChild ? "" : "none";
+  });
 }
 
 async function handleAdminLogin() {
@@ -142,7 +209,11 @@ async function verifyAdminSession() {
         return;
       }
       const badge = document.getElementById("adminUserBadge");
-      if (badge) badge.textContent = userData.username + (userData.role ? ` (${userData.role})` : '');
+      if (badge) {
+        badge.textContent = userData.username;
+        const container = badge.closest(".admin-user-badge-wrap");
+        if (container) container.title = `${userData.username} (${userData.role || 'admin'})`;
+      }
       hideLoginOverlay();
       loadAdminDashboard();
       loadSettingsToForm();
@@ -172,15 +243,32 @@ function authHeaders() {
 
 // Navigation
 function switchSection(secId) {
+  currentActiveSection = secId;
   document.querySelectorAll(".admin-section").forEach(s => s.style.display = "none");
   document.querySelectorAll(".admin-nav-item").forEach(i => i.classList.remove("active"));
 
+  // Highlight active item in sidebar
+  const activeNavItem = document.querySelector(`.admin-nav-item[data-section="${secId}"]`);
+  if (activeNavItem) activeNavItem.classList.add("active");
+
+  // Highlight active item in bottom nav
+  updateBottomNavActiveState();
+
   const target = document.getElementById(`section-${secId}`);
-  if (target) target.style.display = "block";
+  if (target) {
+    target.style.display = "block";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // Clear menu filter if active
+  const searchInput = document.getElementById("adminMenuSearch");
+  if (searchInput && searchInput.value) {
+    searchInput.value = "";
+    filterAdminMenu("");
+  }
 
   // Close mobile sidebar after click
-  const sidebar = document.getElementById("adminSidebar");
-  if (sidebar) sidebar.classList.remove("open");
+  toggleSidebar(false);
 
   const titles = {
     dashboard: "Dashboard",

@@ -11,7 +11,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./barberia.db")
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-TIMEZONE_NAME = os.getenv("TIMEZONE", "America/Argentina/Buenos_Aires")
+TIMEZONE_NAME = os.getenv("TIMEZONE", "America/Argentina/Catamarca")
 
 ARGENTINA_OFFSET = timezone(timedelta(hours=-3))
 
@@ -21,11 +21,15 @@ except Exception:
     APP_TIMEZONE = ARGENTINA_OFFSET
 
 def get_argentina_now() -> datetime:
-    """Retorna la fecha y hora actual en la zona horaria oficial del negocio (Argentina UTC-3)."""
+    """Retorna la fecha y hora actual en la zona horaria oficial del negocio (Catamarca UTC-3)."""
     try:
         return datetime.now(APP_TIMEZONE)
     except Exception:
         return datetime.now(ARGENTINA_OFFSET)
+
+def get_catamarca_now() -> datetime:
+    """Alias explícito para la zona horaria de Catamarca (UTC-3)."""
+    return get_argentina_now()
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
@@ -64,6 +68,9 @@ def init_db_and_migrate():
             if "notes" not in columns:
                 conn.execute(text("ALTER TABLE appointments ADD COLUMN notes TEXT"))
                 conn.commit()
+            if "idempotency_key" not in columns:
+                conn.execute(text("ALTER TABLE appointments ADD COLUMN idempotency_key VARCHAR(100)"))
+                conn.commit()
 
         # 2. Migration for barbers
         if "barbers" in tables:
@@ -99,6 +106,12 @@ def init_db_and_migrate():
             if "previous_price" not in columns:
                 conn.execute(text("ALTER TABLE services ADD COLUMN previous_price FLOAT"))
                 conn.commit()
+            if "prep_buffer_min" not in columns:
+                conn.execute(text("ALTER TABLE services ADD COLUMN prep_buffer_min INTEGER DEFAULT 0"))
+                conn.commit()
+            if "clean_buffer_min" not in columns:
+                conn.execute(text("ALTER TABLE services ADD COLUMN clean_buffer_min INTEGER DEFAULT 5"))
+                conn.commit()
             if "category" not in columns:
                 conn.execute(text("ALTER TABLE services ADD COLUMN category VARCHAR(50) DEFAULT 'Cortes'"))
                 conn.commit()
@@ -107,6 +120,13 @@ def init_db_and_migrate():
                 conn.commit()
             if "display_order" not in columns:
                 conn.execute(text("ALTER TABLE services ADD COLUMN display_order INTEGER DEFAULT 0"))
+                conn.commit()
+
+        # 3.1 Migration for orders
+        if "orders" in tables:
+            columns = [c["name"] for c in inspector.get_columns("orders")]
+            if "idempotency_key" not in columns:
+                conn.execute(text("ALTER TABLE orders ADD COLUMN idempotency_key VARCHAR(100)"))
                 conn.commit()
 
         # 4. Migration for products
@@ -152,6 +172,19 @@ def init_db_and_migrate():
                 conn.commit()
             if "can_manage_shop" not in columns:
                 conn.execute(text("ALTER TABLE admin_users ADD COLUMN can_manage_shop BOOLEAN DEFAULT 1"))
+                conn.commit()
+
+        # 7. Migration for notification_logs
+        if "notification_logs" in tables:
+            columns = [c["name"] for c in inspector.get_columns("notification_logs")]
+            if "whatsapp_message_id" not in columns:
+                conn.execute(text("ALTER TABLE notification_logs ADD COLUMN whatsapp_message_id VARCHAR(100)"))
+                conn.commit()
+            if "retry_count" not in columns:
+                conn.execute(text("ALTER TABLE notification_logs ADD COLUMN retry_count INTEGER DEFAULT 0"))
+                conn.commit()
+            if "response_payload" not in columns:
+                conn.execute(text("ALTER TABLE notification_logs ADD COLUMN response_payload TEXT"))
                 conn.commit()
 
 def get_db():

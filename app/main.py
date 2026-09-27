@@ -9,17 +9,20 @@ from datetime import datetime, timedelta, time
 from typing import List, Optional, Dict, Any
 
 from fastapi import FastAPI, HTTPException, Depends, Request, Response, Query, Form, UploadFile, File, status
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_, func
+from sqlalchemy import or_, and_, func, update, text
 
 from app.database import Base, engine, get_db, SessionLocal, init_db_and_migrate, get_argentina_now
 from app.models import (
     AdminUser, ShopSetting, Barber, Service, Style, Client, Appointment,
-    Category, Product, StockMovement, DeliveryZone, Order, OrderItem, Promotion, AppNotification, AuditLog, NotificationLog, ShiftClosure
+    Category, Product, StockMovement, DeliveryZone, Order, OrderItem, Promotion, AppNotification, AuditLog, NotificationLog, ShiftClosure,
+    IdempotencyRecord, RevokedToken, AppointmentHistory, BarberSchedule, ScheduleException, WaitlistEntry, Voucher, VoucherRedemption, SalesRecord
 )
 from app.schemas import (
     LoginRequest, LoginResponse, PasswordChangeRequest,
@@ -39,12 +42,45 @@ from app.schemas import (
     AuditLogRead, AuditLogResponse, NotificationLogRead, DashboardStatsResponse,
     StyleAdviceRequest, StyleAdviceResponse, BulkSettingsUpdate,
     StaffUserRead, StaffUserCreate, StaffUserUpdate, StaffPasswordUpdate,
-    ShiftClosureCreate, ShiftClosureRead, ShiftCalculationResponse
+    ShiftClosureCreate, ShiftClosureRead, ShiftCalculationResponse,
+    BarberScheduleItem, BarberScheduleBulkUpdate,
+    ScheduleExceptionCreate, ScheduleExceptionRead,
+    WaitlistEntryCreate, WaitlistEntryRead,
+    VoucherCreate, VoucherUpdate, VoucherRead, VoucherPreviewRequest, VoucherApplyRequest,
+    ClientNotesUpdate, SalesRecordCreate, SalesRecordRead
 )
-from app.auth import get_current_admin, require_admin_role, create_admin_token, hash_password, verify_password, revoke_token, security_bearer
-from app.settings_helper import get_all_settings, get_setting, bulk_set_settings, DEFAULT_SETTINGS
-from app.backup_helper import create_database_backup, list_backups, restore_database_backup, BACKUP_DIR
+from app.auth import (
+    get_current_admin,
+    require_admin_role,
+    require_encargado_or_admin,
+    require_any_staff_role,
+    create_admin_token,
+    hash_password,
+    verify_password,
+    revoke_token,
+    security_bearer,
+)
+from app.settings_helper import (
+    get_all_settings,
+    get_setting,
+    set_setting,
+    bulk_set_settings,
+    DEFAULT_SETTINGS,
+    get_public_settings_dict,
+)
+from app.whatsapp_service import (
+    send_appointment_whatsapp_notifications,
+    verify_whatsapp_signature,
+    process_whatsapp_status_update,
+    clean_phone_number,
+    retry_failed_whatsapp_notifications,
+)
+from app.backup_helper import create_database_backup, list_backups, restore_database_backup, BACKUP_DIR, verify_backup_integrity, cleanup_old_backups
 from app.scheduler import start_scheduler, shutdown_scheduler
+from app.utils import normalize_phone, format_turn_for_speech, build_speech_announcement
+from app.availability_engine import calculate_available_slots
+from app.voucher_engine import validate_and_calculate_discount, record_voucher_redemption
+from app.rate_limiter import check_rate_limit
 
 logger = logging.getLogger("bladesync.main")
 logging.basicConfig(level=logging.INFO)
@@ -63,23 +99,30 @@ def seed_initial_data():
     """Siembra usuario administrador, barberos, servicios, productos y configuraciones iniciales."""
     db: Session = SessionLocal()
     try:
-        # 1. Admin User & Default Encargado Operator
+        # 1. Admin User
         admin_user = db.query(AdminUser).filter(AdminUser.username == "admin").first()
         if not admin_user:
-            initial_password = os.getenv("ADMIN_INITIAL_PASSWORD", "admin123")
-            default_admin = AdminUser(
-                username="admin",
-                password_hash=hash_password(initial_password),
-                role="admin",
-                is_active=True,
-                can_edit_stock=True,
-                can_view_finances=True,
-                can_cancel_appointments=True,
-                can_manage_shop=True
-            )
-            db.add(default_admin)
-            db.commit()
-            logger.info("Usuario administrador inicial creado ('admin').")
+            initial_password = os.getenv("ADMIN_INITIAL_PASSWORD")
+            if initial_password:
+                default_admin = AdminUser(
+                    username="admin",
+                    password_hash=hash_password(initial_password),
+                    role="admin",
+                    is_active=True,
+                    can_edit_stock=True,
+                    can_view_finances=True,
+                    can_cancel_appointments=True,
+                    can_manage_shop=True
+                )
+                db.add(default_admin)
+                db.commit()
+                logger.info("[ADMIN] Usuario administrador inicial creado con ADMIN_INITIAL_PASSWORD.")
+            else:
+                logger.warning(
+                    "[SECURITY] No existe usuario administrador y ADMIN_INITIAL_PASSWORD no está definida. "
+                    "El sistema no creará credenciales por defecto inseguras ('admin123'). "
+                    "Configure ADMIN_INITIAL_PASSWORD en su entorno o complete la inicialización mediante el endpoint seguro."
+                )
         else:
             if not admin_user.role:
                 admin_user.role = "admin"
@@ -88,23 +131,6 @@ def seed_initial_data():
                 admin_user.can_cancel_appointments = True
                 admin_user.can_manage_shop = True
                 db.commit()
-
-        # Operador / Encargado por defecto (Usuario: Encargado, Pass: barber, Rol: encargado)
-        encargado_user = db.query(AdminUser).filter(AdminUser.username == "Encargado").first()
-        if not encargado_user:
-            default_encargado = AdminUser(
-                username="Encargado",
-                password_hash=hash_password("barber"),
-                role="encargado",
-                is_active=True,
-                can_edit_stock=True,
-                can_view_finances=False,
-                can_cancel_appointments=True,
-                can_manage_shop=False
-            )
-            db.add(default_encargado)
-            db.commit()
-            logger.info("Usuario encargado por defecto creado ('Encargado' / 'barber').")
 
         # 2. Settings iniciales
         for k, v in DEFAULT_SETTINGS.items():
@@ -308,6 +334,114 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Middleware de Request ID, Security Headers y Modo Mantenimiento
+@app.middleware("http")
+async def security_and_maintenance_middleware(request: Request, call_next):
+    # Generar o respetar X-Request-ID
+    req_id = request.headers.get("X-Request-ID")
+    if not req_id:
+        req_id = f"REQ-2026-{secrets.token_hex(4).upper()}"
+    request.state.request_id = req_id
+
+    # Comprobar modo mantenimiento para endpoints de reserva y compra pública
+    path = request.url.path
+    if request.method in ["POST", "PUT", "PATCH"] and (path.startswith("/api/appointments") or path.startswith("/api/shop/orders")):
+        db = SessionLocal()
+        try:
+            m_mode = get_setting(db, "maintenance_mode", "0")
+            if str(m_mode).lower() in ["1", "true"]:
+                m_msg = get_setting(db, "maintenance_message", "Sistema en mantenimiento programado. Por favor intente más tarde.")
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "status": "maintenance",
+                        "detail": m_msg,
+                        "success": False,
+                        "error": {
+                            "code": "MAINTENANCE_MODE",
+                            "message": m_msg
+                        }
+                    },
+                    headers={"X-Request-ID": req_id}
+                )
+        finally:
+            db.close()
+
+    response = await call_next(request)
+
+    # Inyectar headers de seguridad estándar
+    response.headers["X-Request-ID"] = req_id
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
+
+    return response
+
+# Manejo global de excepciones para respuestas consistentes, seguras y sanitizadas
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    detail = exc.detail
+    code = f"HTTP_{exc.status_code}"
+    if exc.status_code == 401:
+        code = "UNAUTHORIZED"
+    elif exc.status_code == 403:
+        code = "FORBIDDEN"
+    elif exc.status_code == 404:
+        code = "NOT_FOUND"
+    elif exc.status_code == 409:
+        code = "APPOINTMENT_CONFLICT"
+    elif exc.status_code == 400:
+        code = "BAD_REQUEST"
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": detail,
+            "success": False,
+            "error": {
+                "code": code,
+                "message": detail
+            }
+        },
+        headers=getattr(exc, "headers", None)
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    error_msgs = []
+    for err in exc.errors():
+        loc = " -> ".join([str(l) for l in err.get("loc", []) if l != "body"])
+        msg = err.get("msg", "Dato inválido")
+        error_msgs.append(f"{loc}: {msg}" if loc else msg)
+    message = "; ".join(error_msgs) or "Datos de solicitud inválidos."
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": message,
+            "success": False,
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": message
+            }
+        }
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception(f"[CRITICAL_ERROR] Excepción no controlada procesando {request.method} {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Ha ocurrido un error interno en el servidor. Por favor, intente más tarde.",
+            "success": False,
+            "error": {
+                "code": "INTERNAL_SERVER_ERROR",
+                "message": "Ha ocurrido un error interno en el servidor. Por favor, intente más tarde."
+            }
+        }
+    )
+
 # Archivos estáticos
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 uploads_dir = os.path.join(static_dir, "uploads")
@@ -315,12 +449,46 @@ os.makedirs(uploads_dir, exist_ok=True)
 
 
 # ==========================================
+# HEALTH & READINESS PROBES (FASE 21.11)
+# ==========================================
+@app.get("/health")
+def health_check():
+    """Endpoint de comprobación de salud de la aplicación (Liveness Probe)."""
+    return {
+        "status": "ok",
+        "app": "bladesync",
+        "timezone": "America/Argentina/Catamarca",
+        "timestamp": get_argentina_now().isoformat()
+    }
+
+@app.get("/ready")
+def readiness_check(db: Session = Depends(get_db)):
+    """Endpoint de comprobación de preparación (Readiness Probe)."""
+    try:
+        db.execute(text("SELECT 1"))
+        return {
+            "status": "ok",
+            "database": "connected",
+            "timestamp": get_argentina_now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"[READINESS_PROBE_ERROR] Falla al conectar a la base de datos: {e}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "database": "disconnected",
+                "detail": "Base de datos no disponible o sobrecargada."
+            }
+        )
+
+# ==========================================
 # APIS PÚBLICAS (CONFIGURACIÓN, BARBEROS, SERVICIOS, SLOTS, RESERVA)
 # ==========================================
 @app.get("/api/public/settings")
 def get_public_settings(db: Session = Depends(get_db)):
-    """Retorna la configuración central pública de la barbería."""
-    return get_all_settings(db)
+    """Retorna la configuración central pública de la barbería (sin credenciales ni secretos)."""
+    return get_public_settings_dict(db)
 
 @app.get("/api/barbers", response_model=List[BarberRead])
 def list_public_barbers(db: Session = Depends(get_db)):
@@ -354,15 +522,16 @@ def get_available_slots(
     db: Session = Depends(get_db)
 ):
     """
-    Calcula slots dinámicos evaluando duración real del servicio,
-    horarios de atención del día y solapamientos exactos (start < existing_end AND end > existing_start).
+    Calcula slots dinámicos mediante el motor de disponibilidad (calculate_available_slots)
+    evaluando ventanas laborales por barbero, pausas, feriados, excepciones,
+    duración real del servicio y buffers de preparación y limpieza.
     """
     try:
         target_date = datetime.strptime(date, "%Y-%m-%d").date()
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Utilice YYYY-MM-DD.")
 
-    # Barber
+    # Resolver barbero
     query_barber = None
     if barber_id:
         query_barber = db.query(Barber).filter(Barber.id == barber_id).first()
@@ -372,14 +541,23 @@ def get_available_slots(
     resolved_name = query_barber.name if query_barber else (barber_name or "General")
     resolved_id = query_barber.id if query_barber else barber_id
 
-    # Service Duration
+    # Si no se pasó barbero, usar el primer barbero activo
+    if not resolved_id:
+        first_b = db.query(Barber).filter(Barber.is_active == True).order_by(Barber.display_order.asc()).first()
+        if first_b:
+            resolved_id = first_b.id
+            resolved_name = first_b.name
+        else:
+            resolved_id = 1
+
+    # Duración de servicio
     duration_min = 45
     if service_id:
         srv = db.query(Service).filter(Service.id == service_id).first()
-        if srv:
+        if srv and srv.duration_min:
             duration_min = srv.duration_min
 
-    # Obtener configuración de Horarios de Atención
+    # Configuración de horarios comerciales
     bh_json = get_setting(db, "business_hours", "{}")
     try:
         bh_config = json.loads(bh_json)
@@ -390,84 +568,31 @@ def get_available_slots(
     day_name = days_es[target_date.weekday()]
     day_setting = bh_config.get(day_name, {"active": True, "open": "09:00", "close": "20:00"})
 
-    slots: List[AvailableSlotItem] = []
-
-    # Si el día está cerrado, retornar grilla vacía
-    if not day_setting.get("active", True):
+    # Si el día está marcado inactivo en business_hours o domingo por defecto cerrado
+    if not day_setting.get("active", True) or (target_date.weekday() == 6 and not bh_config.get("Domingo", {}).get("active", False)):
         return AvailableSlotsResponse(
             barber_id=resolved_id,
             barber_name=resolved_name,
             date=date,
-            slots=slots
+            slots=[]
         )
 
-    open_t = parse_time_str(day_setting.get("open", "09:00"))
-    close_t = parse_time_str(day_setting.get("close", "20:00"))
-    pause_start_str = day_setting.get("pause_start", "")
-    pause_end_str = day_setting.get("pause_end", "")
-    has_pause = bool(pause_start_str and pause_end_str)
-    
-    pause_start_t = parse_time_str(pause_start_str) if has_pause else None
-    pause_end_t = parse_time_str(pause_end_str) if has_pause else None
+    # Invocar el motor de disponibilidad configurable
+    calc_res = calculate_available_slots(db, date, resolved_id, service_id)
+    avail_set = set(calc_res.get("slots", []))
 
-    # Consultar citas existentes del barbero para el día objetivo (no canceladas)
-    start_day = datetime.combine(target_date, datetime.min.time())
-    end_day = datetime.combine(target_date, datetime.max.time())
+    open_t = parse_time_str(day_setting.get("open", "09:00")) or time(9, 0)
+    close_t = parse_time_str(day_setting.get("close", "20:00")) or time(20, 0)
 
-    appt_filter = [
-        Appointment.canceled == False,
-        Appointment.appointment_time >= start_day,
-        Appointment.appointment_time <= end_day
-    ]
-    if query_barber:
-        appt_filter.append(
-            or_(
-                Appointment.barber_id == query_barber.id,
-                Appointment.barber_name == query_barber.name
-            )
-        )
-
-    existing_appts = db.query(Appointment).filter(*appt_filter).all()
-
-    # Generar intervalos de 15 minutos desde apertura hasta cierre
+    slots: List[AvailableSlotItem] = []
     current_dt = datetime.combine(target_date, open_t)
     limit_dt = datetime.combine(target_date, close_t)
-    now_arg = get_argentina_now().replace(tzinfo=None)
-    is_today = (target_date == now_arg.date())
-
     step_minutes = 15
+
     while current_dt + timedelta(minutes=duration_min) <= limit_dt:
-        slot_start = current_dt
-        slot_end = current_dt + timedelta(minutes=duration_min)
-        time_str = slot_start.strftime("%H:%M")
-
-        # 1. Past check
-        if is_today and slot_start < now_arg:
-            slots.append(AvailableSlotItem(time=time_str, available=False))
-            current_dt += timedelta(minutes=step_minutes)
-            continue
-
-        # 2. Pause check
-        if has_pause:
-            slot_s_t = slot_start.time()
-            slot_e_t = slot_end.time()
-            if not (slot_e_t <= pause_start_t or slot_s_t >= pause_end_t):
-                slots.append(AvailableSlotItem(time=time_str, available=False))
-                current_dt += timedelta(minutes=step_minutes)
-                continue
-
-        # 3. Overlap check: new_start < existing_end AND new_end > existing_start
-        has_overlap = False
-        for ex in existing_appts:
-            ex_start = ex.appointment_time
-            ex_dur = ex.duration_min or 45
-            ex_end = ex.end_time or (ex_start + timedelta(minutes=ex_dur))
-
-            if slot_start < ex_end and slot_end > ex_start:
-                has_overlap = True
-                break
-
-        slots.append(AvailableSlotItem(time=time_str, available=not has_overlap))
+        time_str = current_dt.strftime("%H:%M")
+        is_avail = (time_str in avail_set)
+        slots.append(AvailableSlotItem(time=time_str, available=is_avail))
         current_dt += timedelta(minutes=step_minutes)
 
     return AvailableSlotsResponse(
@@ -482,8 +607,25 @@ def get_available_slots(
 # CREACIÓN PÚBLICA DE TURNOS
 # ==========================================
 @app.post("/api/appointments", response_model=dict)
-def create_public_appointment(data: AppointmentCreate, db: Session = Depends(get_db)):
-    """Crea un nuevo turno verificando disponibilidad en tiempo real."""
+def create_public_appointment(request: Request, data: AppointmentCreate, db: Session = Depends(get_db)):
+    """Crea un nuevo turno verificando disponibilidad en tiempo real, idempotencia y rate limiting."""
+    # 1. Rate Limiting de reservas (Fase 21.5)
+    check_rate_limit(request, "appointments", max_requests=20, window_seconds=60)
+
+    # 2. Idempotencia: Verificar si esta solicitud ya fue procesada (Fase 21.1)
+    idem_key = request.headers.get("X-Idempotency-Key") or data.idempotency_key
+    if idem_key:
+        cached = db.query(IdempotencyRecord).filter(
+            IdempotencyRecord.idempotency_key == idem_key,
+            IdempotencyRecord.expires_at > get_argentina_now()
+        ).first()
+        if cached:
+            logger.info(f"[IDEMPOTENCY] Turno repetido con clave '{idem_key}'. Retornando respuesta en caché.")
+            return json.loads(cached.response_json)
+
+    # 3. Normalizar teléfono (Fase 21.4)
+    normalized_phone = normalize_phone(data.client_phone)
+
     now_arg = get_argentina_now().replace(tzinfo=None)
     appt_time_naive = data.appointment_time.replace(tzinfo=None)
     if appt_time_naive < now_arg:
@@ -513,10 +655,17 @@ def create_public_appointment(data: AppointmentCreate, db: Session = Depends(get
     slot_start = appt_time_naive
     slot_end = slot_start + timedelta(minutes=duration_min)
 
-    # Validar colisión de horario y crear turno de forma atómica (thread-safe)
+    # Validar colisión de horario y crear turno de forma atómica y transaccional
     with APPOINTMENT_LOCK:
+        try:
+            if str(engine.url).startswith("sqlite"):
+                db.execute(text("BEGIN IMMEDIATE"))
+        except Exception:
+            pass
+
         existing = db.query(Appointment).filter(
             Appointment.canceled == False,
+            Appointment.status != "CANCELADO",
             or_(
                 Appointment.barber_id == resolved_b_id,
                 Appointment.barber_name == resolved_b_name
@@ -529,17 +678,18 @@ def create_public_appointment(data: AppointmentCreate, db: Session = Depends(get
             ex_end = ex.end_time or (ex_start + timedelta(minutes=ex_dur))
 
             if slot_start < ex_end and slot_end > ex_start:
+                db.rollback()
                 raise HTTPException(
                     status_code=400,
                     detail="El horario seleccionado ya se encuentra ocupado. Por favor elige otro horario."
                 )
 
         # Buscar o crear cliente
-        client_obj = db.query(Client).filter(Client.phone == data.client_phone).first()
+        client_obj = db.query(Client).filter(Client.phone == normalized_phone).first()
         if not client_obj:
             client_obj = Client(
                 name=data.client_name,
-                phone=data.client_phone,
+                phone=normalized_phone,
                 is_active=True
             )
             db.add(client_obj)
@@ -549,7 +699,7 @@ def create_public_appointment(data: AppointmentCreate, db: Session = Depends(get
         new_appt = Appointment(
             client_id=client_obj.id if client_obj else None,
             client_name=data.client_name,
-            client_phone=data.client_phone,
+            client_phone=normalized_phone,
             barber_id=resolved_b_id,
             barber_name=resolved_b_name,
             service_id=resolved_s_id,
@@ -561,18 +711,29 @@ def create_public_appointment(data: AppointmentCreate, db: Session = Depends(get
             confirmed=False,
             canceled=False,
             reminder_sent=False,
+            idempotency_key=idem_key,
             notes=data.notes
         )
         db.add(new_appt)
         db.commit()
         db.refresh(new_appt)
 
-        # Disparar notificaciones WhatsApp automáticas (cliente + barbero)
+        # 4. Registrar historial inmutable del turno (Fase 21.16)
+        db.add(AppointmentHistory(
+            appointment_id=new_appt.id,
+            old_status=None,
+            new_status="PENDIENTE",
+            changed_by="CLIENTE",
+            change_reason="Reserva web pública inicial"
+        ))
+        db.commit()
+
+        # Disparar notificaciones WhatsApp reales (cliente + barbero)
         send_appointment_whatsapp_notifications(db, new_appt)
 
     logger.info(f"Nuevo turno creado #{new_appt.id} para {new_appt.client_name} a las {slot_start}")
 
-    return {
+    response_payload = {
         "status": "success",
         "message": get_setting(db, "msg_success", "Turno reservado exitosamente."),
         "appointment": {
@@ -586,69 +747,17 @@ def create_public_appointment(data: AppointmentCreate, db: Session = Depends(get
         }
     }
 
-
-def send_appointment_whatsapp_notifications(db: Session, appointment: Appointment):
-    """
-    Registra y envía notificaciones de WhatsApp para Cliente y Barbero al confirmar turno.
-    No interrumpe el flujo ni rompe la transacción si falla.
-    """
-    try:
-        notify_client = get_setting(db, "wa_notify_client", "true") == "true"
-        notify_barber = get_setting(db, "wa_notify_barber", "true") == "true"
-        tmpl_client = get_setting(db, "wa_template_client", "Hola, {cliente}. Te confirmamos tu turno en {barberia}. Te atenderá {barbero} el {fecha} a las {hora} para {servicio}. Te esperamos en {direccion}.")
-        tmpl_barber = get_setting(db, "wa_template_barber", "Hola, {barbero}. Tenés un nuevo turno confirmado: {cliente} — {servicio} — {fecha} — {hora}. Lugar: {direccion}.")
-        
-        shop_name = get_setting(db, "barber_name", "Turnero")
-        shop_address = get_setting(db, "address", "Av. Principal 123")
-        
-        date_str = appointment.appointment_time.strftime("%d/%m/%Y")
-        time_str = appointment.appointment_time.strftime("%H:%M")
-        
-        vars_map = {
-            "cliente": appointment.client_name,
-            "barbero": appointment.barber_name or "Profesional de Autor",
-            "servicio": appointment.service or "Servicio de Barbería",
-            "fecha": date_str,
-            "hora": time_str,
-            "direccion": shop_address,
-            "barberia": shop_name
-        }
-
-        # 1. Notificación al Cliente
-        if notify_client and appointment.client_phone:
-            body_c = tmpl_client
-            for k, v in vars_map.items():
-                body_c = body_c.replace(f"{{{k}}}", str(v))
-            
-            db.add(NotificationLog(
-                appointment_id=appointment.id,
-                recipient=appointment.client_phone,
-                recipient_role="CLIENTE",
-                message_type="WHATSAPP_CONFIRMACION",
-                message_body=body_c,
-                status="ENVIADO"
-            ))
-
-        # 2. Notificación al Barbero (Usando teléfono privado del barbero)
-        if notify_barber and appointment.barber_id:
-            barber = db.query(Barber).filter(Barber.id == appointment.barber_id).first()
-            if barber and barber.phone:
-                body_b = tmpl_barber
-                for k, v in vars_map.items():
-                    body_b = body_b.replace(f"{{{k}}}", str(v))
-
-                db.add(NotificationLog(
-                    appointment_id=appointment.id,
-                    recipient=barber.phone,
-                    recipient_role="BARBERO",
-                    message_type="WHATSAPP_CONFIRMACION",
-                    message_body=body_b,
-                    status="ENVIADO"
-                ))
-        
+    # 5. Guardar registro de idempotencia si se proveyó clave
+    if idem_key:
+        db.add(IdempotencyRecord(
+            idempotency_key=idem_key,
+            request_path="/api/appointments",
+            response_json=json.dumps(response_payload),
+            expires_at=get_argentina_now() + timedelta(hours=24)
+        ))
         db.commit()
-    except Exception as e:
-        logger.error(f"Error procesando notificaciones WhatsApp para turno #{appointment.id}: {e}")
+
+    return response_payload
 
 
 # ==========================================
@@ -788,12 +897,24 @@ def get_live_agenda(
     if current_called_id_str and current_called_id_str.isdigit():
         c_appt = db.query(Appointment).filter(Appointment.id == int(current_called_id_str)).first()
         if c_appt:
+            turn_code = f"T-{c_appt.id:03d}" if c_appt.id < 1000 else f"T-{c_appt.id}"
+            speech_text = build_speech_announcement(
+                style=get_setting(db, "voice_communication_style", "moderno"),
+                turn_code=turn_code,
+                client_name=c_appt.client_name,
+                barber_name=c_appt.barber_name or "General",
+                station_name=f"Sillón {c_appt.barber_id or 1}",
+                service_name=c_appt.service or "Corte",
+                custom_template=get_setting(db, "voice_custom_template", "")
+            )
             called_appointment = {
                 "id": c_appt.id,
+                "turn_code": turn_code,
                 "client_name": c_appt.client_name,
                 "barber_name": c_appt.barber_name or "General",
                 "service": c_appt.service or "Corte",
-                "time_str": c_appt.appointment_time.strftime("%H:%M")
+                "time_str": c_appt.appointment_time.strftime("%H:%M"),
+                "speech_text": speech_text
             }
 
     return {
@@ -815,28 +936,60 @@ def get_live_agenda(
         "barbers": barbers_data
     }
 
-@app.post("/api/live-agenda/{appointment_id}/call")
-def call_live_appointment(appointment_id: int, db: Session = Depends(get_db)):
-    """Llama al cliente a pantalla TV y emite timbre/chime sincronizado."""
-    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
-    if not appt:
-        raise HTTPException(status_code=404, detail="Turno no encontrado.")
-    appt.status = "LLAMANDO"
-    set_setting(db, "live_current_called_id", str(appt.id))
+# Helper centralizado
+def save_live_settings_service(db: Session, data: Dict[str, Any], actor_name: str = "Encargado / Admin") -> Dict[str, str]:
+    """Servicio centralizado para guardar configuraciones de pantalla TV y Live Agenda."""
+    allowed = [
+        "live_tv_title", "live_tv_subtitle", "live_tv_marquee", "live_voice_enabled", "live_chime_enabled", "live_auto_refresh_sec",
+        "voice_communication_style", "voice_pitch", "voice_rate", "voice_volume", "voice_chime_volume", "voice_double_call", "voice_custom_template"
+    ]
+    saved_items = {}
+    for k in allowed:
+        if k in data:
+            set_setting(db, k, str(data[k]))
+            saved_items[k] = str(data[k])
     db.commit()
+    
+    if saved_items:
+        db.add(AuditLog(
+            user_name=actor_name,
+            actor=actor_name,
+            module="Live Agenda",
+            action="Actualizar Configuración Live TV",
+            description="Ajustes de pantalla TV actualizados",
+            new_value=json.dumps(saved_items)
+        ))
+    return {"status": "success", "message": "Configuraciones de pantalla TV guardadas exitosamente."}
+
+# 1. Rutas estáticas específicas PRIMERO
+@app.get("/api/live-agenda/settings")
+def get_live_settings(db: Session = Depends(get_db)):
+    """Retorna las configuraciones actuales de la pantalla TV y agenda en vivo (público)."""
     return {
-        "message": f"Turno #{appt.id} de {appt.client_name} llamado a pantalla.",
-        "appointment": {
-            "id": appt.id,
-            "client_name": appt.client_name,
-            "barber_name": appt.barber_name or "General",
-            "service": appt.service or "Corte",
-            "time_str": appt.appointment_time.strftime("%H:%M")
-        }
+        "live_tv_title": get_setting(db, "live_tv_title", DEFAULT_SETTINGS.get("live_tv_title", "SALA DE ESPERA // TURNERO EN VIVO")),
+        "live_tv_subtitle": get_setting(db, "live_tv_subtitle", DEFAULT_SETTINGS.get("live_tv_subtitle", "ATENCIÓN POR SILLÓN")),
+        "live_tv_marquee": get_setting(db, "live_tv_marquee", DEFAULT_SETTINGS.get("live_tv_marquee", "💈 Bienvenido a la Barbería • Turnos en Tiempo Real • Wi-Fi Disponible")),
+        "live_voice_enabled": str(get_setting(db, "live_voice_enabled", DEFAULT_SETTINGS.get("live_voice_enabled", "true"))).lower() in ["true", "1", "yes"],
+        "live_chime_enabled": str(get_setting(db, "live_chime_enabled", DEFAULT_SETTINGS.get("live_chime_enabled", "true"))).lower() in ["true", "1", "yes"],
+        "live_auto_refresh_sec": int(get_setting(db, "live_auto_refresh_sec", DEFAULT_SETTINGS.get("live_auto_refresh_sec", "8")) or 8)
     }
 
+@app.post("/api/live-agenda/settings")
+@app.put("/api/live-agenda/settings")
+def save_live_settings(
+    data: Dict[str, Any],
+    current_user: AdminUser = Depends(require_encargado_or_admin),
+    db: Session = Depends(get_db)
+):
+    """Guarda las configuraciones de la pantalla TV y cartelera directamente desde live.html o admin."""
+    return save_live_settings_service(db, data, current_user.username)
+
 @app.post("/api/live-agenda/walk-in")
-def create_live_walk_in(data: Dict[str, Any], db: Session = Depends(get_db)):
+def create_live_walk_in(
+    data: Dict[str, Any],
+    current_user: AdminUser = Depends(require_encargado_or_admin),
+    db: Session = Depends(get_db)
+):
     """Agrega un cliente espontáneo / en espera directamente a la cola de hoy."""
     name = str(data.get("client_name", "")).strip()
     if not name:
@@ -868,10 +1021,27 @@ def create_live_walk_in(data: Dict[str, Any], db: Session = Depends(get_db)):
     db.add(new_appt)
     db.commit()
     db.refresh(new_appt)
+
+    db.add(AuditLog(
+        user_name=current_user.username,
+        actor=current_user.username,
+        module="Live Agenda",
+        action="Walk-in Agregado",
+        description=f"Cliente espontáneo: {name} ({service_name}) - Barbero: {barber_name}",
+        record_id=str(new_appt.id)
+    ))
+    db.commit()
+
     return {"message": "Cliente agregado a la cola en vivo exitosamente.", "appointment_id": new_appt.id}
 
+# 2. Rutas dinámicas con {appointment_id} DESPUÉS de las estáticas
 @app.put("/api/live-agenda/{appointment_id}")
-def update_live_appointment(appointment_id: int, data: Dict[str, Any], db: Session = Depends(get_db)):
+def update_live_appointment(
+    appointment_id: int,
+    data: Dict[str, Any],
+    current_user: AdminUser = Depends(require_encargado_or_admin),
+    db: Session = Depends(get_db)
+):
     """Permite editar cliente, barbero o servicio directamente desde la pantalla de moderación."""
     appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appt:
@@ -897,12 +1067,81 @@ def update_live_appointment(appointment_id: int, data: Dict[str, Any], db: Sessi
         except Exception:
             pass
     db.commit()
+
+    db.add(AuditLog(
+        user_name=current_user.username,
+        actor=current_user.username,
+        module="Live Agenda",
+        action="Editar Turno en Vivo",
+        description=f"Turno #{appt.id} modificado en pantalla de moderación",
+        record_id=str(appt.id)
+    ))
+    db.commit()
+
     return {"message": "Turno actualizado correctamente.", "id": appt.id}
+
+@app.post("/api/live-agenda/{appointment_id}/call")
+def call_live_appointment(
+    appointment_id: int,
+    current_user: AdminUser = Depends(require_encargado_or_admin),
+    db: Session = Depends(get_db)
+):
+    """Llama al cliente a pantalla TV y emite timbre/chime sincronizado."""
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Turno no encontrado.")
+    appt.status = "LLAMANDO"
+    set_setting(db, "live_current_called_id", str(appt.id))
+    db.commit()
+
+    db.add(AppointmentHistory(
+        appointment_id=appt.id,
+        old_status="CONFIRMADO",
+        new_status="LLAMANDO",
+        changed_by=current_user.username,
+        change_reason="Llamado a pantalla TV desde Live Agenda"
+    ))
+    db.add(AuditLog(
+        user_name=current_user.username,
+        actor=current_user.username,
+        module="Live Agenda",
+        action="Llamar Turno a Pantalla TV",
+        description=f"Llamado a pantalla: Turno #{appt.id} ({appt.client_name})",
+        record_id=str(appt.id)
+    ))
+    db.commit()
+
+    turn_code = f"T-{appt.id:03d}" if appt.id < 1000 else f"T-{appt.id}"
+    speech_text = build_speech_announcement(
+        style=get_setting(db, "voice_communication_style", "moderno"),
+        turn_code=turn_code,
+        client_name=appt.client_name,
+        barber_name=appt.barber_name or "General",
+        station_name=f"Sillón {appt.barber_id or 1}",
+        service_name=appt.service or "Corte",
+        custom_template=get_setting(db, "voice_custom_template", "")
+    )
+    call_info = {
+        "id": appt.id,
+        "turn_code": turn_code,
+        "client_name": appt.client_name,
+        "barber_name": appt.barber_name or "General",
+        "service": appt.service or "Corte",
+        "time_str": appt.appointment_time.strftime("%H:%M"),
+        "speech_text": speech_text
+    }
+    return {
+        "status": "success",
+        "message": f"Turno #{appt.id} de {appt.client_name} llamado a pantalla.",
+        "appointment": call_info,
+        "current_call": call_info
+    }
 
 @app.post("/api/live-agenda/{appointment_id}/status")
 def update_live_status(
     appointment_id: int,
     status_data: Dict[str, str],
+    current_user: AdminUser = Depends(require_encargado_or_admin),
     db: Session = Depends(get_db)
 ):
     new_status = status_data.get("status")
@@ -911,36 +1150,25 @@ def update_live_status(
     appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appt:
         raise HTTPException(status_code=404, detail="Turno no encontrado.")
+    old_status = appt.status
     appt.status = new_status
     if new_status == "COMPLETADO":
         appt.confirmed = True
     elif new_status == "CANCELADO":
         appt.canceled = True
     db.commit()
-    return {"message": "Estado actualizado exitosamente.", "id": appt.id, "status": appt.status}
 
-@app.get("/api/live-agenda/settings")
-def get_live_settings(db: Session = Depends(get_db)):
-    """Retorna las configuraciones actuales de la pantalla TV y agenda en vivo."""
-    return {
-        "live_tv_title": get_setting(db, "live_tv_title", DEFAULT_SETTINGS.get("live_tv_title", "SALA DE ESPERA // TURNERO EN VIVO")),
-        "live_tv_subtitle": get_setting(db, "live_tv_subtitle", DEFAULT_SETTINGS.get("live_tv_subtitle", "ATENCIÓN POR SILLÓN")),
-        "live_tv_marquee": get_setting(db, "live_tv_marquee", DEFAULT_SETTINGS.get("live_tv_marquee", "💈 Bienvenido a la Barbería • Turnos en Tiempo Real • Wi-Fi Disponible")),
-        "live_voice_enabled": str(get_setting(db, "live_voice_enabled", DEFAULT_SETTINGS.get("live_voice_enabled", "true"))).lower() in ["true", "1", "yes"],
-        "live_chime_enabled": str(get_setting(db, "live_chime_enabled", DEFAULT_SETTINGS.get("live_chime_enabled", "true"))).lower() in ["true", "1", "yes"],
-        "live_auto_refresh_sec": int(get_setting(db, "live_auto_refresh_sec", DEFAULT_SETTINGS.get("live_auto_refresh_sec", "8")) or 8)
-    }
-
-@app.post("/api/live-agenda/settings")
-@app.put("/api/live-agenda/settings")
-def save_live_settings(data: Dict[str, Any], db: Session = Depends(get_db)):
-    """Guarda las configuraciones de la pantalla TV y cartelera directamente desde live.html o admin."""
-    allowed = ["live_tv_title", "live_tv_subtitle", "live_tv_marquee", "live_voice_enabled", "live_chime_enabled", "live_auto_refresh_sec"]
-    for k in allowed:
-        if k in data:
-            set_setting(db, k, str(data[k]))
+    db.add(AuditLog(
+        user_name=current_user.username,
+        actor=current_user.username,
+        module="Live Agenda",
+        action="Cambiar Estado Turno",
+        description=f"Turno #{appt.id} cambió de {old_status} a {new_status}",
+        record_id=str(appt.id)
+    ))
     db.commit()
-    return {"message": "Configuraciones de pantalla TV guardadas exitosamente."}
+
+    return {"message": "Estado actualizado exitosamente.", "id": appt.id, "status": appt.status}
 
 
 
@@ -967,6 +1195,7 @@ def list_shop_products(
     result = []
     for p in products:
         p_read = ProductRead.model_validate(p)
+        p_read.cost_price = 0.0  # Protección: ocultar costo mayorista a clientes públicos
         if p.category_rel:
             p_read.category_name = p.category_rel.name
         result.append(p_read)
@@ -977,11 +1206,29 @@ def list_delivery_zones(db: Session = Depends(get_db)):
     return db.query(DeliveryZone).filter(DeliveryZone.is_active == True).all()
 
 @app.post("/api/shop/orders", response_model=OrderRead)
-def create_shop_order(order_in: OrderCreate, db: Session = Depends(get_db)):
+def create_shop_order(request: Request, order_in: OrderCreate, db: Session = Depends(get_db)):
     """
     Crea un pedido en el shop recalculando los precios en backend y
-    descontando el stock de los productos.
+    descontando el stock de los productos. Protegido contra pedidos duplicados con Idempotency Key.
     """
+    # 1. Rate Limiting de compras
+    check_rate_limit(request, "shop_orders", max_requests=25, window_seconds=60)
+
+    # 2. Idempotencia: Verificar si este pedido ya fue procesado
+    idem_key = request.headers.get("X-Idempotency-Key") or getattr(order_in, "idempotency_key", None)
+    if idem_key:
+        cached = db.query(IdempotencyRecord).filter(
+            IdempotencyRecord.idempotency_key == idem_key,
+            IdempotencyRecord.expires_at > get_argentina_now()
+        ).first()
+        if cached:
+            cached_data = json.loads(cached.response_json)
+            logger.info(f"[IDEMPOTENCY] Pedido repetido con clave '{idem_key}'. Retornando pedido en caché.")
+            return OrderRead(**cached_data)
+
+    # 3. Normalizar teléfono
+    order_in.client_phone = normalize_phone(order_in.client_phone)
+
     if not order_in.items:
         raise HTTPException(status_code=400, detail="El carrito de compras no contiene productos.")
 
@@ -991,9 +1238,22 @@ def create_shop_order(order_in: OrderCreate, db: Session = Depends(get_db)):
     for item in order_in.items:
         prod = db.query(Product).filter(Product.id == item.product_id, Product.is_active == True).first()
         if not prod:
+            db.rollback()
             raise HTTPException(status_code=400, detail=f"Producto ID #{item.product_id} no disponible.")
-        
-        if prod.stock < item.quantity:
+
+        # Descuento atómico de stock condicional en base de datos
+        stmt = (
+            update(Product)
+            .where(
+                Product.id == item.product_id,
+                Product.is_active == True,
+                Product.stock >= item.quantity
+            )
+            .values(stock=Product.stock - item.quantity)
+        )
+        res = db.execute(stmt)
+        if res.rowcount == 0:
+            db.rollback()
             raise HTTPException(
                 status_code=400,
                 detail=f"Stock insuficiente para '{prod.name}'. Stock disponible: {prod.stock} un."
@@ -1001,9 +1261,6 @@ def create_shop_order(order_in: OrderCreate, db: Session = Depends(get_db)):
 
         item_subtotal = prod.price * item.quantity
         subtotal += item_subtotal
-
-        # Descontar stock
-        prod.stock -= item.quantity
 
         items_to_create.append({
             "product_id": prod.id,
@@ -1070,6 +1327,7 @@ def create_shop_order(order_in: OrderCreate, db: Session = Depends(get_db)):
         total=total,
         delivery_type=order_in.delivery_type,
         payment_method=order_in.payment_method,
+        idempotency_key=idem_key,
         status="NUEVO"
     )
     db.add(new_order)
@@ -1086,9 +1344,26 @@ def create_shop_order(order_in: OrderCreate, db: Session = Depends(get_db)):
             subtotal=it["subtotal"]
         )
         db.add(order_item)
+        db.add(StockMovement(
+            product_id=it["product_id"],
+            movement_type="venta",
+            quantity=-it["quantity"],
+            notes=f"Venta Online Pedido #{new_order.order_number}",
+            registered_by="Shop Online"
+        ))
 
     db.commit()
     db.refresh(new_order)
+
+    if idem_key:
+        order_read_dict = OrderRead.model_validate(new_order).model_dump(mode="json")
+        db.add(IdempotencyRecord(
+            idempotency_key=idem_key,
+            request_path="/api/shop/orders",
+            response_json=json.dumps(order_read_dict),
+            expires_at=get_argentina_now() + timedelta(hours=24)
+        ))
+        db.commit()
 
     logger.info(f"Nuevo pedido creado {new_order.order_number} por ${total}")
     return new_order
@@ -1098,6 +1373,7 @@ def create_shop_order(order_in: OrderCreate, db: Session = Depends(get_db)):
 # WHATSAPP WEBHOOK
 # ==========================================
 @app.get("/api/whatsapp-webhook")
+@app.get("/api/whatsapp/webhook")
 def verify_whatsapp_webhook(
     hub_mode: Optional[str] = Query(None, alias="hub.mode"),
     hub_challenge: Optional[str] = Query(None, alias="hub.challenge"),
@@ -1108,28 +1384,114 @@ def verify_whatsapp_webhook(
     raise HTTPException(status_code=403, detail="Verification token mismatch")
 
 @app.post("/api/whatsapp-webhook")
+@app.post("/api/whatsapp/webhook")
 async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
+    body_bytes = await request.body()
+    sig_header = request.headers.get("X-Hub-Signature-256")
+
+    # 1. Verificación estricta de firma criptográfica HMAC-SHA256
+    if not verify_whatsapp_signature(body_bytes, sig_header):
+        logger.warning("[SECURITY] Firma de WhatsApp Webhook inválida o ausente.")
+        raise HTTPException(status_code=403, detail="Firma de WhatsApp Webhook inválida.")
+
     try:
-        body = await request.json()
+        body = json.loads(body_bytes.decode("utf-8")) if body_bytes else {}
+    except Exception as e:
+        logger.error(f"Error decodificando payload de WhatsApp: {e}")
+        return {"status": "invalid_json"}
+
+    try:
         entries = body.get("entry", [])
         for entry in entries:
             for change in entry.get("changes", []):
-                for msg in change.get("value", {}).get("messages", []):
+                val = change.get("value", {})
+
+                # A. Actualizaciones de estado de entrega (SENT, DELIVERED, READ, FAILED) con deduplicación
+                for status_obj in val.get("statuses", []):
+                    s_id = status_obj.get("id")
+                    s_val = status_obj.get("status")
+                    if s_id and s_val:
+                        s_key = f"wa_stat_{s_id}_{s_val}"
+                        if db.query(IdempotencyRecord).filter(IdempotencyRecord.idempotency_key == s_key).first():
+                            logger.info(f"[WHATSAPP] Webhook de estado duplicado ignorado: {s_key}")
+                            continue
+                        db.add(IdempotencyRecord(
+                            idempotency_key=s_key,
+                            request_path="/api/whatsapp-webhook",
+                            response_json="{}",
+                            expires_at=get_argentina_now() + timedelta(days=7)
+                        ))
+                        db.commit()
+                    process_whatsapp_status_update(db, status_obj)
+
+                # B. Mensajes entrantes / Respuestas interactivas con deduplicación
+                for msg in val.get("messages", []):
+                    m_id = msg.get("id")
+                    if m_id:
+                        m_key = f"wa_msg_{m_id}"
+                        if db.query(IdempotencyRecord).filter(IdempotencyRecord.idempotency_key == m_key).first():
+                            logger.info(f"[WHATSAPP] Webhook de mensaje duplicado ignorado: {m_key}")
+                            continue
+                        db.add(IdempotencyRecord(
+                            idempotency_key=m_key,
+                            request_path="/api/whatsapp-webhook",
+                            response_json="{}",
+                            expires_at=get_argentina_now() + timedelta(days=7)
+                        ))
+                        db.commit()
+
+                    sender_phone = clean_phone_number(msg.get("from", ""))
+                    action_payload = ""
                     if msg.get("type") == "interactive":
-                        button_id = msg["interactive"].get("button_reply", {}).get("id", "")
-                        if "_" in button_id:
-                            action, appt_id_str = button_id.split("_", 1)
-                            if appt_id_str.isdigit():
-                                appt = db.query(Appointment).filter(Appointment.id == int(appt_id_str)).first()
-                                if appt:
+                        action_payload = msg.get("interactive", {}).get("button_reply", {}).get("id", "")
+                    elif msg.get("type") == "text" or "text" in msg:
+                        action_payload = msg.get("text", {}).get("body", "").strip()
+
+                    if "_" in action_payload:
+                        action, appt_id_str = action_payload.split("_", 1)
+                        if action in ("CONFIRM", "CANCEL") and appt_id_str.isdigit():
+                            appt = db.query(Appointment).filter(Appointment.id == int(appt_id_str)).first()
+                            if appt:
+                                client_p = clean_phone_number(appt.client_phone)
+                                barber_p = clean_phone_number(appt.barber.phone) if appt.barber else ""
+                                phone_matches = False
+                                if sender_phone:
+                                    if client_p and (sender_phone.endswith(client_p[-8:]) or client_p.endswith(sender_phone[-8:])):
+                                        phone_matches = True
+                                    elif barber_p and (sender_phone.endswith(barber_p[-8:]) or barber_p.endswith(sender_phone[-8:])):
+                                        phone_matches = True
+
+                                if phone_matches:
+                                    old_s = appt.status
                                     if action == "CONFIRM":
                                         appt.status = "CONFIRMADO"
                                         appt.confirmed = True
                                         appt.canceled = False
+                                        db.add(AppointmentHistory(
+                                            appointment_id=appt.id,
+                                            old_status=old_s,
+                                            new_status="CONFIRMADO",
+                                            changed_by="WHATSAPP_BOT",
+                                            change_reason=f"Confirmado vía WhatsApp ({sender_phone})"
+                                        ))
+                                        logger.info(f"[WHATSAPP] Turno #{appt.id} confirmado por WhatsApp ({sender_phone})")
                                     elif action == "CANCEL":
                                         appt.status = "CANCELADO"
                                         appt.canceled = True
+                                        db.add(AppointmentHistory(
+                                            appointment_id=appt.id,
+                                            old_status=old_s,
+                                            new_status="CANCELADO",
+                                            changed_by="WHATSAPP_BOT",
+                                            change_reason=f"Cancelado vía WhatsApp ({sender_phone})"
+                                        ))
+                                        logger.info(f"[WHATSAPP] Turno #{appt.id} cancelado por WhatsApp ({sender_phone})")
                                     db.commit()
+                                else:
+                                    logger.warning(
+                                        f"[SECURITY] Intento no autorizado de acción {action} sobre turno #{appt.id} "
+                                        f"desde remitente no verificado ({sender_phone}). Ignorado."
+                                    )
     except Exception as e:
         logger.exception(f"Error procesando WhatsApp Webhook: {e}")
     return {"status": "received"}
@@ -1139,12 +1501,50 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
 # RUTAS DE ADMINISTRACIÓN PROTEGIDAS (/api/admin/*)
 # ==============================================================================
 
-# 1. AUTH ADMIN
+# 1. AUTH ADMIN & SETUP SEGURO
+@app.post("/api/admin/setup-initial-admin")
+def setup_initial_admin(data: StaffUserCreate, db: Session = Depends(get_db)):
+    """Permite configurar el primer usuario administrador únicamente si la base de datos no tiene administradores."""
+    admin_count = db.query(AdminUser).count()
+    if admin_count > 0:
+        raise HTTPException(
+            status_code=403,
+            detail="La instalación inicial ya fue completada. Endpoint deshabilitado permanentemente."
+        )
+    if len(data.password) < 6:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres.")
+    new_admin = AdminUser(
+        username=data.username.strip(),
+        password_hash=hash_password(data.password),
+        role="admin",
+        is_active=True,
+        can_edit_stock=True,
+        can_view_finances=True,
+        can_cancel_appointments=True,
+        can_manage_shop=True
+    )
+    db.add(new_admin)
+    db.commit()
+    db.refresh(new_admin)
+    logger.info(f"[ADMIN] Primer administrador inicial '{new_admin.username}' configurado exitosamente.")
+    return {"message": "Administrador inicial creado exitosamente.", "username": new_admin.username}
+
 @app.post("/api/auth/login", response_model=LoginResponse)
 @app.post("/api/admin/login", response_model=LoginResponse)
-def admin_login(creds: LoginRequest, db: Session = Depends(get_db)):
+def admin_login(creds: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = db.query(AdminUser).filter(AdminUser.username == creds.username, AdminUser.is_active == True).first()
+    client_ip = request.client.host if (request and request.client) else None
+
     if not user or not verify_password(creds.password, user.password_hash):
+        db.add(AuditLog(
+            user_name=creds.username or "desconocido",
+            actor=creds.username or "desconocido",
+            module="Seguridad",
+            action="LOGIN_FALLIDO",
+            description=f"Intento fallido de autenticación para el usuario '{creds.username}'",
+            ip_address=client_ip
+        ))
+        db.commit()
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
 
     # Auto-actualizar hash si el usuario aún tenía la versión legada
@@ -1154,6 +1554,17 @@ def admin_login(creds: LoginRequest, db: Session = Depends(get_db)):
 
     user_role = user.role or "admin"
     token = create_admin_token(user.username, role=user_role)
+
+    db.add(AuditLog(
+        user_name=user.username,
+        actor=user.username,
+        module="Seguridad",
+        action="LOGIN_EXITOSO",
+        description=f"Inicio de sesión exitoso en el sistema. Rol asignado: {user_role}",
+        ip_address=client_ip
+    ))
+    db.commit()
+
     return LoginResponse(
         token=token,
         username=user.username,
@@ -1162,12 +1573,26 @@ def admin_login(creds: LoginRequest, db: Session = Depends(get_db)):
     )
 
 @app.post("/api/admin/logout")
+@app.post("/api/auth/logout")
 def admin_logout(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
-    admin: AdminUser = Depends(get_current_admin)
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
 ):
     if credentials and credentials.credentials:
-        revoke_token(credentials.credentials)
+        revoke_token(credentials.credentials, db=db)
+
+    client_ip = request.client.host if (request and request.client) else None
+    db.add(AuditLog(
+        user_name=admin.username,
+        actor=admin.username,
+        module="Seguridad",
+        action="LOGOUT",
+        description=f"Cierre de sesión para el usuario '{admin.username}'",
+        ip_address=client_ip
+    ))
+    db.commit()
     return {"message": "Sesión cerrada correctamente."}
 
 @app.get("/api/admin/me")
@@ -1509,13 +1934,13 @@ def get_dashboard_stats(admin: AdminUser = Depends(get_current_admin), db: Sessi
 
 # 3. SETTINGS & CONFIGURACIÓN CENTRAL
 @app.get("/api/admin/settings")
-def get_admin_settings(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+def get_admin_settings(admin: AdminUser = Depends(require_admin_role), db: Session = Depends(get_db)):
     return get_all_settings(db)
 
 @app.put("/api/admin/settings")
 def update_admin_settings(
     data: BulkSettingsUpdate,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     old_sets = get_all_settings(db)
@@ -1541,7 +1966,7 @@ os.makedirs(uploads_dir, exist_ok=True)
 @app.post("/api/admin/upload")
 async def upload_asset(
     file: UploadFile = File(...),
-    admin: AdminUser = Depends(get_current_admin)
+    admin: AdminUser = Depends(require_admin_role)
 ):
     if not file.filename:
         raise HTTPException(status_code=400, detail="Archivo no válido.")
@@ -1567,7 +1992,7 @@ async def upload_asset(
 @app.post("/api/admin/logo/upload")
 async def upload_logo(
     file: UploadFile = File(...),
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     if not file.filename:
@@ -1603,7 +2028,7 @@ async def upload_logo(
 
 @app.delete("/api/admin/logo/delete")
 def delete_logo(
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     bulk_set_settings(db, {"logo_url": ""})
@@ -1619,13 +2044,13 @@ def delete_logo(
 
 # 5. GESTIÓN DE BARBEROS
 @app.get("/api/admin/barbers", response_model=List[BarberAdminRead])
-def get_admin_barbers(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+def get_admin_barbers(admin: AdminUser = Depends(require_any_staff_role), db: Session = Depends(get_db)):
     return db.query(Barber).order_by(Barber.display_order.asc()).all()
 
 @app.post("/api/admin/barbers", response_model=BarberAdminRead)
 def create_admin_barber(
     barber_in: BarberCreate,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     b = Barber(**barber_in.model_dump())
@@ -1641,7 +2066,7 @@ def create_admin_barber(
 def update_admin_barber(
     barber_id: int,
     barber_in: BarberUpdate,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     b = db.query(Barber).filter(Barber.id == barber_id).first()
@@ -1661,7 +2086,7 @@ def update_admin_barber(
 @app.delete("/api/admin/barbers/{barber_id}")
 def delete_admin_barber(
     barber_id: int,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     b = db.query(Barber).filter(Barber.id == barber_id).first()
@@ -1681,7 +2106,7 @@ def reassign_absent_barber_turnos(
     barber_id: int,
     date_str: str = Query(..., description="Fecha YYYY-MM-DD"),
     target_barber_id: Optional[int] = Query(None),
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_encargado_or_admin),
     db: Session = Depends(get_db)
 ):
     """
@@ -1748,13 +2173,13 @@ def reassign_absent_barber_turnos(
 
 # 6. GESTIÓN DE SERVICIOS Y PRECIOS
 @app.get("/api/admin/services", response_model=List[ServiceRead])
-def get_admin_services(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+def get_admin_services(admin: AdminUser = Depends(require_any_staff_role), db: Session = Depends(get_db)):
     return db.query(Service).order_by(Service.display_order.asc()).all()
 
 @app.post("/api/admin/services", response_model=ServiceRead)
 def create_admin_service(
     service_in: ServiceCreate,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     s = Service(**service_in.model_dump())
@@ -1770,7 +2195,7 @@ def create_admin_service(
 def update_admin_service(
     service_id: int,
     service_in: ServiceUpdate,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     s = db.query(Service).filter(Service.id == service_id).first()
@@ -1792,7 +2217,7 @@ def update_admin_service(
 @app.delete("/api/admin/services/{service_id}")
 def delete_admin_service(
     service_id: int,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     s = db.query(Service).filter(Service.id == service_id).first()
@@ -1810,13 +2235,13 @@ def delete_admin_service(
 
 # 7. GESTIÓN DE ESTILOS DE CORTE
 @app.get("/api/admin/styles", response_model=List[StyleRead])
-def get_admin_styles(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+def get_admin_styles(admin: AdminUser = Depends(require_any_staff_role), db: Session = Depends(get_db)):
     return db.query(Style).order_by(Style.display_order.asc()).all()
 
 @app.post("/api/admin/styles", response_model=StyleRead)
 def create_admin_style(
     style_in: StyleCreate,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     st = Style(**style_in.model_dump())
@@ -1832,7 +2257,7 @@ def create_admin_style(
 def update_admin_style(
     style_id: int,
     style_in: StyleUpdate,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     st = db.query(Style).filter(Style.id == style_id).first()
@@ -1852,7 +2277,7 @@ def update_admin_style(
 @app.delete("/api/admin/styles/{style_id}")
 def delete_admin_style(
     style_id: int,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     st = db.query(Style).filter(Style.id == style_id).first()
@@ -1875,7 +2300,7 @@ def get_admin_appointments(
     barber_id: Optional[int] = None,
     status: Optional[str] = None,
     limit: int = 200,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_any_staff_role),
     db: Session = Depends(get_db)
 ):
     query = db.query(Appointment).order_by(Appointment.appointment_time.desc())
@@ -1888,8 +2313,15 @@ def get_admin_appointments(
         except ValueError:
             pass
 
-    if barber_id:
+    user_role = (admin.role or "").strip().lower()
+    if user_role == "barbero":
+        # El barbero únicamente puede consultar sus propios turnos
+        matched_b = db.query(Barber).filter(Barber.name.ilike(f"%{admin.username}%")).first()
+        target_b_id = matched_b.id if matched_b else -1
+        query = query.filter(Appointment.barber_id == target_b_id)
+    elif barber_id:
         query = query.filter(Appointment.barber_id == barber_id)
+
     if status:
         query = query.filter(Appointment.status == status)
 
@@ -1899,7 +2331,7 @@ def get_admin_appointments(
 def update_admin_appointment(
     appointment_id: int,
     appt_in: AppointmentUpdate,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_encargado_or_admin),
     db: Session = Depends(get_db)
 ):
     appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
@@ -1935,7 +2367,7 @@ def update_admin_appointment(
 @app.delete("/api/admin/appointments/{appointment_id}")
 def delete_admin_appointment(
     appointment_id: int,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
@@ -1952,13 +2384,13 @@ def delete_admin_appointment(
 
 # 9. DIRECTORIO DE CLIENTES
 @app.get("/api/admin/clients", response_model=List[ClientRead])
-def get_admin_clients(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+def get_admin_clients(admin: AdminUser = Depends(require_any_staff_role), db: Session = Depends(get_db)):
     return db.query(Client).order_by(Client.id.desc()).all()
 
 @app.post("/api/admin/clients", response_model=ClientRead)
 def create_admin_client(
     client_in: ClientCreate,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_encargado_or_admin),
     db: Session = Depends(get_db)
 ):
     c = Client(**client_in.model_dump())
@@ -1971,7 +2403,7 @@ def create_admin_client(
 @app.delete("/api/clients/{client_id}")
 def delete_admin_client(
     client_id: int,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     c = db.query(Client).filter(Client.id == client_id).first()
@@ -2437,22 +2869,14 @@ def delete_admin_delivery_zone(
 
 
 
-# 13. AUDITORÍA Y COPIAS DE SEGURIDAD
-@app.get("/api/admin/audit-logs", response_model=List[AuditLogRead])
-def get_admin_audit_logs(
-    limit: int = 100,
-    admin: AdminUser = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    return db.query(AuditLog).order_by(AuditLog.timestamp.desc()).limit(limit).all()
-
+# 13. COPIAS DE SEGURIDAD
 @app.get("/api/admin/backups")
-def get_admin_backups(admin: AdminUser = Depends(get_current_admin)):
+def get_admin_backups(admin: AdminUser = Depends(require_admin_role)):
     return list_backups()
 
 @app.post("/api/admin/backups/create")
 def create_admin_backup(
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     fname = create_database_backup(db, user_name=admin.username)
@@ -2461,7 +2885,7 @@ def create_admin_backup(
 @app.post("/api/admin/backups/restore")
 def restore_admin_backup(
     filename: str = Query(...),
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     ok = restore_database_backup(db, filename, user_name=admin.username)
@@ -2472,53 +2896,39 @@ def restore_admin_backup(
 @app.get("/api/admin/backups/download/{filename}")
 def download_admin_backup(
     filename: str,
-    admin: AdminUser = Depends(get_current_admin)
+    admin: AdminUser = Depends(require_admin_role)
 ):
     fpath = os.path.join(BACKUP_DIR, filename)
     if not os.path.exists(fpath):
         raise HTTPException(status_code=404, detail="Archivo no encontrado.")
     return FileResponse(fpath, media_type="application/json", filename=filename)
 
-
-# 14. GESTIÓN DE CLIENTES Y NOTIFICACIONES
-@app.get("/api/admin/clients", response_model=List[ClientRead])
-def get_admin_clients(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
-    return db.query(Client).order_by(Client.created_at.desc()).all()
-
-@app.delete("/api/admin/clients/{client_id}")
-def delete_admin_client(
-    client_id: int,
-    admin: AdminUser = Depends(get_current_admin),
-    db: Session = Depends(get_db)
+@app.get("/api/admin/backups/verify/{filename}")
+def verify_admin_backup(
+    filename: str,
+    admin: AdminUser = Depends(require_admin_role)
 ):
-    client = db.query(Client).filter(Client.id == client_id).first()
-    if not client:
-        raise HTTPException(status_code=404, detail="Cliente no encontrado.")
+    """Verifica la integridad física y lógica de un archivo de backup JSON."""
+    result = verify_backup_integrity(filename)
+    if not result.get("valid"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Backup corrupto o inválido."))
+    return result
 
-    client_name = client.name
-    
-    # Desvincular turnos y pedidos para preservar integridad referencial sin romper SQLite
-    db.query(Appointment).filter(Appointment.client_id == client_id).update({"client_id": None})
-    db.query(Order).filter(Order.client_id == client_id).update({"client_id": None})
-    
-    db.delete(client)
-    db.commit()
+@app.post("/api/admin/backups/cleanup")
+def cleanup_admin_backups(
+    retention_days: int = Query(30, ge=1, le=365),
+    min_to_keep: int = Query(5, ge=1, le=50),
+    admin: AdminUser = Depends(require_admin_role)
+):
+    """Aplica la política de retención de backups eliminando copias antiguas."""
+    return cleanup_old_backups(retention_days=retention_days, min_to_keep=min_to_keep)
 
-    db.add(AuditLog(
-        user_name=admin.username,
-        module="Clientes",
-        action="Eliminar Cliente",
-        record_id=str(client_id),
-        old_value=client_name
-    ))
-    db.commit()
 
-    return {"message": f"Cliente '{client_name}' eliminado correctamente."}
-
+# 14. GESTIÓN DE NOTIFICACIONES Y LOGS WHATSAPP
 @app.get("/api/admin/notifications/logs", response_model=List[NotificationLogRead])
 def get_admin_notification_logs(
     limit: int = 100,
-    admin: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     return db.query(NotificationLog).order_by(NotificationLog.created_at.desc()).limit(limit).all()
@@ -2535,6 +2945,7 @@ os.makedirs(UPLOAD_PRODUCTS_DIR, exist_ok=True)
 def get_products(
     category: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    current_user: AdminUser = Depends(require_encargado_or_admin),
     db: Session = Depends(get_db)
 ):
     query = db.query(Product).filter(Product.is_active == True)
@@ -2566,7 +2977,8 @@ async def create_product_with_photo(
     cost_price: Optional[float] = Form(0.0),
     min_stock: Optional[int] = Form(2),
     file: Optional[UploadFile] = File(None),
-    actor: Optional[str] = Form("Encargado / Recepción"),
+    actor: Optional[str] = Form(None),
+    current_user: AdminUser = Depends(require_encargado_or_admin),
     db: Session = Depends(get_db)
 ):
     image_url = None
@@ -2601,7 +3013,7 @@ async def create_product_with_photo(
     db.refresh(new_prod)
 
     client_ip = request.client.host if (request and request.client) else None
-    actor_name = actor or "Encargado / Recepción"
+    actor_name = current_user.username
     
     db.add(AuditLog(
         user_name=actor_name,
@@ -2637,6 +3049,7 @@ def adjust_product_stock(
     product_id: int,
     request: Request,
     adj: StockAdjustment,
+    current_user: AdminUser = Depends(require_encargado_or_admin),
     db: Session = Depends(get_db)
 ):
     product = db.query(Product).filter(Product.id == product_id, Product.is_active == True).first()
@@ -2656,7 +3069,7 @@ def adjust_product_stock(
 
     product.stock = new_stock
     
-    actor_name = adj.actor or "Encargado / Recepción"
+    actor_name = current_user.username
     action_type = adj.action_type or ("VENTA_PRODUCTO" if delta < 0 else "MODIFICAR_STOCK")
     
     client_ip = request.client.host if (request and request.client) else None
@@ -2704,6 +3117,7 @@ def get_audit_logs(
     action: Optional[str] = Query(None),
     actor: Optional[str] = Query(None),
     limit: int = Query(200, ge=1, le=1000),
+    admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
     query = db.query(AuditLog)
@@ -2846,4 +3260,554 @@ def serve_sw():
     if os.path.exists(sw_path):
         return FileResponse(sw_path, media_type="application/javascript")
     raise HTTPException(status_code=404, detail="service-worker.js no encontrado.")
+
+
+# ==============================================================================
+# FASE 21 & 22 — GESTIÓN INTEGRAL: HORARIOS, EXCEPCIONES, WAITLIST, VOUCHERS,
+# PERFILES DE CLIENTE, CAJA Y CONTROL DE CONFIGURACIÓN
+# ==============================================================================
+
+# 1. LISTA DE ESPERA (WAITLIST - FASE 22.5)
+@app.post("/api/waitlist", response_model=dict)
+def add_to_waitlist(data: WaitlistEntryCreate, db: Session = Depends(get_db)):
+    """Registra a un cliente en la lista de espera cuando un horario no está disponible."""
+    norm_phone = normalize_phone(data.client_phone)
+    entry = WaitlistEntry(
+        client_name=data.client_name.strip(),
+        client_phone=norm_phone,
+        service_id=data.service_id,
+        barber_id=data.barber_id,
+        preferred_date=data.preferred_date,
+        preferred_time_range=data.preferred_time_range,
+        status="ACTIVA",
+        notes=data.notes
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return {"status": "success", "message": "Te hemos registrado en la lista de espera. Te avisaremos si se libera un turno.", "id": entry.id}
+
+@app.get("/api/admin/waitlist", response_model=List[WaitlistEntryRead])
+def list_admin_waitlist(
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    query = db.query(WaitlistEntry)
+    if status:
+        query = query.filter(WaitlistEntry.status == status)
+    return query.order_by(WaitlistEntry.created_at.desc()).all()
+
+@app.delete("/api/admin/waitlist/{entry_id}")
+def delete_waitlist_entry(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    entry = db.query(WaitlistEntry).filter(WaitlistEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entrada no encontrada en lista de espera.")
+    db.delete(entry)
+    db.commit()
+    return {"status": "success", "message": "Entrada eliminada de la lista de espera."}
+
+
+# 2. HORARIOS BASE POR BARBERO Y EXCEPCIONES (FASE 22.1)
+@app.get("/api/admin/schedules/barbers/{barber_id}", response_model=List[BarberScheduleItem])
+def get_barber_schedules(
+    barber_id: int,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    """Obtiene la configuración semanal de horarios del barbero (0=Lunes, 6=Domingo)."""
+    schedules = db.query(BarberSchedule).filter(BarberSchedule.barber_id == barber_id).all()
+    sched_map = {s.day_of_week: s for s in schedules}
+    result = []
+    for d in range(7):
+        if d in sched_map:
+            s = sched_map[d]
+            result.append(BarberScheduleItem(
+                day_of_week=d,
+                is_working=s.is_working,
+                start_time_1=s.start_time_1,
+                end_time_1=s.end_time_1,
+                start_time_2=s.start_time_2,
+                end_time_2=s.end_time_2
+            ))
+        else:
+            result.append(BarberScheduleItem(
+                day_of_week=d,
+                is_working=True if d < 6 else False,
+                start_time_1="09:00",
+                end_time_1="13:00",
+                start_time_2="16:00",
+                end_time_2="21:00"
+            ))
+    return result
+
+@app.post("/api/admin/schedules/barbers/{barber_id}", response_model=dict)
+def update_barber_schedules(
+    barber_id: int,
+    data: BarberScheduleBulkUpdate,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    """Actualiza o crea la grilla de disponibilidad semanal para un barbero."""
+    b = db.query(Barber).filter(Barber.id == barber_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Barbero no encontrado.")
+
+    for item in data.schedules:
+        s = db.query(BarberSchedule).filter(
+            BarberSchedule.barber_id == barber_id,
+            BarberSchedule.day_of_week == item.day_of_week
+        ).first()
+        if not s:
+            s = BarberSchedule(barber_id=barber_id, day_of_week=item.day_of_week)
+            db.add(s)
+        s.is_working = item.is_working
+        s.start_time_1 = item.start_time_1
+        s.end_time_1 = item.end_time_1
+        s.start_time_2 = item.start_time_2
+        s.end_time_2 = item.end_time_2
+
+    db.commit()
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Disponibilidad",
+        action="Actualizar Horarios Barbero",
+        record_id=str(barber_id),
+        new_value=f"Horarios actualizados para {b.name}"
+    ))
+    db.commit()
+    return {"status": "success", "message": f"Horarios de {b.name} actualizados exitosamente."}
+
+@app.get("/api/admin/schedules/exceptions", response_model=List[ScheduleExceptionRead])
+def list_schedule_exceptions(
+    barber_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    query = db.query(ScheduleException)
+    if barber_id:
+        query = query.filter(or_(ScheduleException.barber_id == barber_id, ScheduleException.barber_id.is_(None)))
+    return query.order_by(ScheduleException.date.asc()).all()
+
+@app.post("/api/admin/schedules/exceptions", response_model=ScheduleExceptionRead)
+def create_schedule_exception(
+    data: ScheduleExceptionCreate,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    exc = ScheduleException(
+        barber_id=data.barber_id,
+        date=data.date,
+        start_time=data.start_time,
+        end_time=data.end_time,
+        reason=data.reason,
+        exception_type=data.exception_type
+    )
+    db.add(exc)
+    db.commit()
+    db.refresh(exc)
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Disponibilidad",
+        action="Crear Bloqueo/Feriado",
+        record_id=str(exc.id),
+        new_value=f"{exc.exception_type} el {exc.date}: {exc.reason}"
+    ))
+    db.commit()
+    return exc
+
+@app.delete("/api/admin/schedules/exceptions/{exception_id}")
+def delete_schedule_exception(
+    exception_id: int,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    exc = db.query(ScheduleException).filter(ScheduleException.id == exception_id).first()
+    if not exc:
+        raise HTTPException(status_code=404, detail="Excepción o bloqueo no encontrado.")
+    db.delete(exc)
+    db.commit()
+    return {"status": "success", "message": "Bloqueo eliminado correctamente."}
+
+
+# 3. MOTOR DE VOUCHERS, CUPONES Y DESCUENTOS (FASE 22.12 & 22.13)
+@app.post("/api/vouchers/preview")
+def preview_voucher(
+    req: VoucherPreviewRequest,
+    db: Session = Depends(get_db)
+):
+    """Simula la aplicación de un cupón calculando el descuento y validando restricciones."""
+    cart_context = {
+        "subtotal": req.subtotal,
+        "service_id": req.service_id,
+        "service_price": req.service_price or req.subtotal,
+        "product_ids": req.product_ids or [],
+        "target_datetime": req.target_datetime
+    }
+    result = validate_and_calculate_discount(
+        db=db,
+        voucher_code=req.voucher_code,
+        cart_context=cart_context,
+        client_phone=req.client_phone,
+        operator_role="ANY"
+    )
+    return result
+
+@app.post("/api/vouchers/apply")
+def apply_voucher_at_checkout(
+    req: VoucherApplyRequest,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    """Aplica y consume atómicamente un cupón en el checkout con registro inmutable."""
+    cart_context = {
+        "subtotal": req.subtotal,
+        "service_id": req.service_id,
+        "service_price": req.service_price or req.subtotal,
+        "product_ids": req.product_ids or []
+    }
+    result = validate_and_calculate_discount(
+        db=db,
+        voucher_code=req.voucher_code,
+        cart_context=cart_context,
+        client_phone=req.client_phone,
+        operator_role=admin.role
+    )
+    if not result.get("valid"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Cupón inválido o no aplicable."))
+
+    voucher = db.query(Voucher).filter(Voucher.code == req.voucher_code.strip().upper()).first()
+    redemption = record_voucher_redemption(
+        db=db,
+        voucher=voucher,
+        appointment_id=req.appointment_id,
+        order_id=req.order_id,
+        client_id=req.client_id,
+        client_phone=req.client_phone,
+        staff_username=admin.username,
+        validation_result=result
+    )
+    return {
+        "status": "success",
+        "message": f"Cupón '{voucher.code}' aplicado exitosamente.",
+        "discount_applied": result["discount_applied"],
+        "final_total": result["final_total"],
+        "commission_impact": result["commission_impact"],
+        "barber_commission_base": result["barber_commission_base"],
+        "redemption_id": redemption.id
+    }
+
+@app.get("/api/admin/vouchers", response_model=List[VoucherRead])
+def list_admin_vouchers(
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    return db.query(Voucher).order_by(Voucher.created_at.desc()).all()
+
+@app.post("/api/admin/vouchers", response_model=VoucherRead)
+def create_admin_voucher(
+    data: VoucherCreate,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    code_clean = data.code.strip().upper()
+    existing = db.query(Voucher).filter(Voucher.code == code_clean).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Ya existe un cupón con el código '{code_clean}'.")
+
+    voucher = Voucher(
+        code=code_clean,
+        discount_type=data.discount_type,
+        discount_value=data.discount_value,
+        max_discount_amount=data.max_discount_amount,
+        scope=data.scope,
+        commission_impact=data.commission_impact,
+        min_ticket_amount=data.min_ticket_amount,
+        start_date=data.start_date,
+        end_date=data.end_date,
+        allowed_days=data.allowed_days,
+        allowed_start_time=data.allowed_start_time,
+        allowed_end_time=data.allowed_end_time,
+        max_total_uses=data.max_total_uses,
+        max_uses_per_client=data.max_uses_per_client,
+        required_role=data.required_role,
+        is_active=data.is_active,
+        description=data.description
+    )
+    db.add(voucher)
+    db.commit()
+    db.refresh(voucher)
+
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Vouchers",
+        action="Crear Cupón",
+        record_id=str(voucher.id),
+        new_value=f"Cupón {voucher.code}: {voucher.discount_type} {voucher.discount_value}"
+    ))
+    db.commit()
+    return voucher
+
+@app.delete("/api/admin/vouchers/{voucher_id}")
+def delete_admin_voucher(
+    voucher_id: int,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    v = db.query(Voucher).filter(Voucher.id == voucher_id).first()
+    if not v:
+        raise HTTPException(status_code=404, detail="Cupón no encontrado.")
+    v.is_active = False
+    db.commit()
+    return {"status": "success", "message": f"Cupón '{v.code}' desactivado."}
+
+@app.get("/api/admin/vouchers/redemptions")
+def list_voucher_redemptions(
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    redemptions = db.query(VoucherRedemption).order_by(VoucherRedemption.created_at.desc()).limit(100).all()
+    return [
+        {
+            "id": r.id,
+            "voucher_code": r.voucher_code,
+            "appointment_id": r.appointment_id,
+            "order_id": r.order_id,
+            "client_phone": r.client_phone,
+            "staff_username": r.staff_username,
+            "original_amount": r.original_amount,
+            "discount_applied": r.discount_applied,
+            "final_amount": r.final_amount,
+            "commission_impact": r.commission_impact,
+            "created_at": r.created_at.isoformat() if r.created_at else None
+        }
+        for r in redemptions
+    ]
+
+
+# 4. FICHA DEL CLIENTE Y NOTAS INTERNAS (FASE 22.8 & 22.17)
+@app.get("/api/admin/clients/{client_id}/profile")
+def get_client_profile(
+    client_id: int,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado.")
+
+    appts = db.query(Appointment).filter(
+        or_(Appointment.client_id == client.id, Appointment.client_phone == client.phone)
+    ).order_by(Appointment.appointment_time.desc()).all()
+
+    total_turns = len(appts)
+    completed_turns = len([a for a in appts if a.status == "COMPLETADO"])
+    cancelled_turns = len([a for a in appts if a.status == "CANCELADO" or a.canceled])
+    noshow_turns = len([a for a in appts if a.status == "NO_SHOW"])
+
+    barber_counts = {}
+    for a in appts:
+        if a.barber_name:
+            barber_counts[a.barber_name] = barber_counts.get(a.barber_name, 0) + 1
+    favorite_barber = max(barber_counts, key=barber_counts.get) if barber_counts else "Sin asignar"
+
+    orders = db.query(Order).filter(
+        or_(Order.client_id == client.id, Order.client_phone == client.phone)
+    ).order_by(Order.created_at.desc()).all()
+
+    return {
+        "id": client.id,
+        "name": client.name,
+        "phone": client.phone,
+        "email": client.email,
+        "notes": getattr(client, "notes", None),
+        "total_turnos": total_turns,
+        "cumplidos": completed_turns,
+        "cancelados": cancelled_turns,
+        "no_show": noshow_turns,
+        "barbero_habitual": favorite_barber,
+        "turnos_recientes": [
+            {
+                "id": a.id,
+                "service": a.service,
+                "barber_name": a.barber_name,
+                "date": a.appointment_time.strftime("%Y-%m-%d %H:%M"),
+                "status": a.status
+            }
+            for a in appts[:10]
+        ],
+        "pedidos_shop": [
+            {
+                "id": o.id,
+                "order_number": o.order_number,
+                "total": o.total,
+                "status": o.status,
+                "date": o.created_at.strftime("%Y-%m-%d") if o.created_at else ""
+            }
+            for o in orders[:5]
+        ]
+    }
+
+@app.put("/api/admin/clients/{client_id}/notes")
+def update_client_notes(
+    client_id: int,
+    data: ClientNotesUpdate,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado.")
+    client.notes = data.notes
+    db.commit()
+    return {"status": "success", "message": "Notas internas del cliente actualizadas."}
+
+
+# 5. REGISTRO DE VENTAS EN CAJA (FASE 22.16)
+@app.post("/api/admin/sales", response_model=SalesRecordRead)
+def create_sales_record(
+    data: SalesRecordCreate,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    record = SalesRecord(
+        sale_type=data.sale_type,
+        appointment_id=data.appointment_id,
+        order_id=data.order_id,
+        client_id=data.client_id,
+        client_name=data.client_name,
+        barber_id=data.barber_id,
+        barber_name=data.barber_name,
+        payment_method=data.payment_method,
+        original_amount=data.original_amount,
+        discount_amount=data.discount_amount,
+        final_amount=data.final_amount,
+        voucher_code=data.voucher_code,
+        items_detail=data.items_detail,
+        cashier_name=admin.username,
+        notes=data.notes
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Caja",
+        action="Venta Registrada",
+        record_id=str(record.id),
+        new_value=f"${record.final_amount} ({record.payment_method}) - {record.sale_type}"
+    ))
+    db.commit()
+    return record
+
+@app.get("/api/admin/sales/summary")
+def get_daily_sales_summary(
+    date_str: Optional[str] = None,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_encargado_or_admin)
+):
+    target_date = datetime.strptime(date_str, "%Y-%m-%d").date() if date_str else get_argentina_now().date()
+    start_dt = datetime.combine(target_date, time.min)
+    end_dt = datetime.combine(target_date, time.max)
+
+    sales = db.query(SalesRecord).filter(
+        SalesRecord.created_at >= start_dt,
+        SalesRecord.created_at <= end_dt
+    ).all()
+
+    total_sales = sum(s.final_amount for s in sales)
+    total_discounts = sum(s.discount_amount for s in sales)
+    by_method = {}
+    for s in sales:
+        by_method[s.payment_method] = by_method.get(s.payment_method, 0.0) + s.final_amount
+
+    return {
+        "date": target_date.strftime("%Y-%m-%d"),
+        "total_operations": len(sales),
+        "total_income": total_sales,
+        "total_discounts": total_discounts,
+        "by_payment_method": by_method
+    }
+
+
+# 6. EXPORTAR / IMPORTAR CONFIGURACIÓN CENTRALIZADA (FASE 21.21 & 22.30)
+@app.get("/api/admin/config/export")
+def export_application_config(
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_admin_role)
+):
+    """Exporta las configuraciones de la barbería excluyendo secretos, claves de API y contraseñas."""
+    settings = get_all_settings(db)
+    safe_settings = {}
+    sensitive_keys = {"token", "secret", "password", "key", "access_token"}
+    for k, v in settings.items():
+        if any(sk in k.lower() for sk in sensitive_keys):
+            continue
+        safe_settings[k] = v
+
+    return {
+        "export_date": get_argentina_now().isoformat(),
+        "exported_by": admin.username,
+        "settings_count": len(safe_settings),
+        "settings": safe_settings
+    }
+
+@app.post("/api/admin/config/import")
+def import_application_config(
+    data: Dict[str, Any],
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(require_admin_role)
+):
+    """Importa configuraciones visuales y operativas validadas."""
+    settings_to_import = data.get("settings", data)
+    sensitive_keys = {"token", "secret", "password", "key", "access_token"}
+    imported_count = 0
+
+    for k, v in settings_to_import.items():
+        if any(sk in k.lower() for sk in sensitive_keys):
+            continue
+        set_setting(db, k, str(v))
+        imported_count += 1
+
+    db.commit()
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Configuración",
+        action="Importar Configuración",
+        description=f"Importadas {imported_count} configuraciones"
+    ))
+    db.commit()
+    return {"status": "success", "message": f"{imported_count} configuraciones importadas exitosamente."}
+
+
+# 7. FORMATO FONÉTICO DE PRUEBA PARA LOCUCIÓN (FASE 24 / SIGNAGE)
+@app.get("/api/live/speech-format")
+def get_live_speech_format(
+    turn_code: str = Query("A-125"),
+    barber_name: str = Query("Martín"),
+    service_name: str = Query("Corte Clásico"),
+    station_name: str = Query("Sillón 1"),
+    style: str = Query("moderno")
+):
+    """Endpoint de utilidad para probar en vivo la locución y formateo fonético."""
+    speech = build_speech_announcement(
+        style=style,
+        turn_code=turn_code,
+        barber_name=barber_name,
+        station_name=station_name,
+        service_name=service_name
+    )
+    phonetic_turn = format_turn_for_speech(turn_code)
+    return {
+        "turn_code": turn_code,
+        "phonetic_turn": phonetic_turn,
+        "style": style,
+        "speech_text": speech
+    }
+
 

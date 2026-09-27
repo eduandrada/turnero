@@ -44,14 +44,16 @@ def test_admin_endpoints_protection():
     assert res_b.status_code == 401
 
 def test_admin_login():
-    res = client.post("/api/admin/login", json={"username": "admin", "password": "admin123"})
+    test_pass = os.getenv("TEST_ADMIN_PASSWORD", "AdminTest2026!#")
+    res = client.post("/api/admin/login", json={"username": "admin", "password": test_pass})
     assert res.status_code == 200
     data = res.json()
     assert "token" in data
 
 def test_appointment_creation_and_overlap_protection():
     # Admin login for verification
-    login_res = client.post("/api/admin/login", json={"username": "admin", "password": "admin123"})
+    test_pass = os.getenv("TEST_ADMIN_PASSWORD", "AdminTest2026!#")
+    login_res = client.post("/api/admin/login", json={"username": "admin", "password": test_pass})
     token = login_res.json()["token"]
 
     target_dt = (get_argentina_now() + timedelta(days=2)).replace(hour=15, minute=0, second=0, microsecond=0)

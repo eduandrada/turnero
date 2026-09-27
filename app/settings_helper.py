@@ -112,6 +112,22 @@ DEFAULT_SETTINGS = {
     "live_chime_enabled": "true",
     "live_auto_refresh_sec": "10",
     "live_current_called_id": "",
+    "voice_communication_style": "moderno",
+    "voice_pitch": "1.0",
+    "voice_rate": "1.0",
+    "voice_volume": "1.0",
+    "voice_chime_volume": "0.8",
+    "voice_double_call": "false",
+    "voice_custom_template": "",
+
+    # Modo Mantenimiento y Operaciones
+    "maintenance_mode": "false",
+    "maintenance_message": "Estamos realizando mejoras en el sistema. Volvemos en unos minutos.",
+    "maintenance_contact": "5493834123456",
+    "max_overbooking_per_slot": "1",
+    "min_advance_minutes": "60",
+    "max_future_booking_days": "30",
+    "slot_interval_minutes": "15",
 
     # Horarios de Atención (JSON)
     "business_hours": json.dumps({
@@ -170,3 +186,69 @@ def bulk_set_settings(db: Session, settings_dict: Dict[str, Any]) -> None:
         else:
             db.add(ShopSetting(key=k, value=val_str))
     db.commit()
+
+PUBLIC_SETTINGS_KEYS = {
+    # Identidad Central
+    "barber_name", "app_name", "short_name", "browser_title", "description",
+    "phone", "whatsapp", "email", "address", "city", "province",
+    "instagram", "facebook", "tiktok", "website", "google_maps",
+
+    # Textos Principales
+    "welcome_title", "welcome_sub", "text_welcome", "text_services",
+    "text_barbers", "text_appointments", "text_contact", "text_shop",
+    "text_cart", "text_confirm", "text_footer",
+
+    # Mensajes al público
+    "msg_success", "msg_cancel", "msg_confirm", "msg_error", "msg_maintenance",
+
+    # Logo & Assets
+    "logo_url", "logo_dark_url", "favicon_url", "app_icon_url",
+    "cover_image_url", "splash_image_url", "splash_title", "splash_subtitle",
+    "splash_welcome", "splash_duration", "show_splash",
+
+    # Apariencia & Tema Visual
+    "color_primary", "color_secondary", "color_accent", "color_background",
+    "color_surface", "color_surface_elevated", "color_text", "color_muted",
+    "color_button", "color_button_text", "color_button_secondary", "color_border",
+    "color_success", "color_warning", "color_error", "border_radius", "box_shadow",
+    "font_family", "theme_mode",
+
+    # Créditos
+    "developed_by", "designed_by", "version", "year", "copyright",
+    "dev_website", "dev_contact", "show_credits",
+
+    # PWA
+    "pwa_name", "pwa_short_name", "pwa_description", "pwa_theme_color",
+    "pwa_bg_color", "pwa_start_url", "pwa_display",
+
+    # Música de Fondo
+    "bg_music_url", "bg_music_enabled",
+
+    # Horarios de Atención
+    "business_hours",
+
+    # Pantalla TV (públicos)
+    "live_tv_title", "live_tv_subtitle", "live_tv_marquee",
+    "voice_communication_style", "voice_pitch", "voice_rate",
+    "voice_volume", "voice_chime_volume", "voice_double_call", "voice_custom_template",
+
+    # Modo Mantenimiento
+    "maintenance_mode", "maintenance_message", "maintenance_contact",
+}
+
+SENSITIVE_KEY_SUBSTRINGS = (
+    "token", "secret", "password", "key", "cred", "auth",
+    "admin_", "wa_template", "private", "salt"
+)
+
+def get_public_settings_dict(db: Session) -> Dict[str, Any]:
+    """Retorna únicamente las configuraciones catalogadas como estrictamente públicas."""
+    all_settings = get_all_settings(db)
+    public_dict = {}
+    for k, v in all_settings.items():
+        k_lower = k.lower()
+        if k in PUBLIC_SETTINGS_KEYS:
+            if not any(sub in k_lower for sub in SENSITIVE_KEY_SUBSTRINGS):
+                public_dict[k] = v
+    return public_dict
+

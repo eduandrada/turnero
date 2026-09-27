@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Float, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 from app.database import Base
 
 class AdminUser(Base):
@@ -54,6 +54,8 @@ class Service(Base):
     name = Column(String(120), nullable=False)
     description = Column(Text, nullable=True)
     duration_min = Column(Integer, default=45)
+    prep_buffer_min = Column(Integer, default=0)
+    clean_buffer_min = Column(Integer, default=5)
     price = Column(Float, nullable=False)
     previous_price = Column(Float, nullable=True)
     category = Column(String(50), default="Cortes")
@@ -115,6 +117,7 @@ class Appointment(Base):
     canceled = Column(Boolean, default=False)
     reminder_sent = Column(Boolean, default=False)
     notes = Column(Text, nullable=True)
+    idempotency_key = Column(String(100), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     barber = relationship("Barber", back_populates="appointments")
@@ -206,6 +209,7 @@ class Order(Base):
     delivery_type = Column(String(30), default="pickup") # pickup, delivery
     payment_method = Column(String(50), default="Efectivo") # Efectivo, Transferencia, Mercado Pago, Pago al retirar
     status = Column(String(30), default="NUEVO") # NUEVO, CONFIRMADO, PREPARANDO, LISTO, EN_CAMINO, ENTREGADO, CANCELADO
+    idempotency_key = Column(String(100), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     client_rel = relationship("Client", back_populates="orders")
@@ -280,7 +284,10 @@ class NotificationLog(Base):
     recipient_role = Column(String(20), default="CLIENTE") # CLIENTE, BARBERO
     message_type = Column(String(50), default="WHATSAPP_CONFIRMACION")
     message_body = Column(Text, nullable=False)
-    status = Column(String(20), default="ENVIADO") # ENVIADO, PENDIENTE, ERROR
+    status = Column(String(20), default="ENVIADO") # ENVIADO, PENDIENTE, DELIVERED, READ, ERROR
+    whatsapp_message_id = Column(String(100), nullable=True, index=True)
+    retry_count = Column(Integer, default=0)
+    response_payload = Column(Text, nullable=True)
     error_details = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -303,3 +310,216 @@ class ShiftClosure(Base):
     diferencia = Column(Float, default=0.0)
     total_turnos_atendidos = Column(Integer, default=0)
     notas = Column(Text, nullable=True)
+
+
+class IdempotencyRecord(Base):
+    __tablename__ = "idempotency_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(100), unique=True, nullable=False, index=True)
+    scope = Column(String(50), nullable=False) # "appointment", "order", "whatsapp_webhook"
+    response_code = Column(Integer, default=200)
+    response_body = Column(Text, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    idempotency_key = synonym("key")
+    request_path = synonym("scope")
+    response_json = synonym("response_body")
+
+    def __init__(self, *args, **kwargs):
+        if "idempotency_key" in kwargs and "key" not in kwargs:
+            kwargs["key"] = kwargs.pop("idempotency_key")
+        if "request_path" in kwargs and "scope" not in kwargs:
+            kwargs["scope"] = kwargs.pop("request_path")
+        if "response_json" in kwargs and "response_body" not in kwargs:
+            kwargs["response_body"] = kwargs.pop("response_json")
+        super().__init__(*args, **kwargs)
+
+
+class RevokedToken(Base):
+    __tablename__ = "revoked_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    token_str = Column(String(255), unique=True, nullable=False, index=True)
+    revoked_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=True)
+
+
+class AppointmentHistory(Base):
+    __tablename__ = "appointment_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=False, index=True)
+    previous_status = Column(String(30), nullable=True)
+    new_status = Column(String(30), nullable=False)
+    changed_by = Column(String(80), default="Sistema")
+    change_reason = Column(Text, nullable=True)
+    previous_time = Column(DateTime, nullable=True)
+    new_time = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def __init__(self, *args, **kwargs):
+        if "old_status" in kwargs and "previous_status" not in kwargs:
+            kwargs["previous_status"] = kwargs.pop("old_status")
+        super().__init__(*args, **kwargs)
+
+    @property
+    def old_status(self):
+        return self.previous_status
+
+    @old_status.setter
+    def old_status(self, val):
+        self.previous_status = val
+
+
+class BarberSchedule(Base):
+    __tablename__ = "barber_schedules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    barber_id = Column(Integer, ForeignKey("barbers.id"), nullable=False, index=True)
+    day_of_week = Column(Integer, nullable=False) # 0=Lunes, 1=Martes ... 6=Domingo
+    start_time_1 = Column(String(10), default="09:00")
+    end_time_1 = Column(String(10), default="13:00")
+    start_time_2 = Column(String(10), nullable=True, default="16:00")
+    end_time_2 = Column(String(10), nullable=True, default="21:00")
+    is_working = Column(Boolean, default=True)
+
+
+class ScheduleException(Base):
+    __tablename__ = "schedule_exceptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    barber_id = Column(Integer, ForeignKey("barbers.id"), nullable=True, index=True) # NULL = toda la barbería
+    date = Column(String(10), nullable=False, index=True) # YYYY-MM-DD
+    start_time = Column(String(10), nullable=True) # NULL = todo el día
+    end_time = Column(String(10), nullable=True)
+    exception_type = Column(String(50), default="bloqueo_manual") # feriado, vacaciones, licencia, bloqueo_manual, horario_especial
+    reason = Column(String(250), nullable=True)
+    created_by = Column(String(80), default="Admin")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class WaitlistEntry(Base):
+    __tablename__ = "waitlist_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    client_name = Column(String(120), nullable=False)
+    client_phone = Column(String(40), nullable=False, index=True)
+    barber_id = Column(Integer, ForeignKey("barbers.id"), nullable=True)
+    service_id = Column(Integer, ForeignKey("services.id"), nullable=True)
+    date = Column(String(10), nullable=False, index=True) # YYYY-MM-DD
+    time_range_start = Column(String(10), default="09:00")
+    time_range_end = Column(String(10), default="21:00")
+    status = Column(String(30), default="WAITING") # WAITING, NOTIFIED, BOOKED, EXPIRED, CANCELLED
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    preferred_date = synonym("date")
+    preferred_time_range = synonym("time_range_start")
+
+    def __init__(self, *args, **kwargs):
+        if "preferred_date" in kwargs and "date" not in kwargs:
+            kwargs["date"] = kwargs.pop("preferred_date")
+        if "preferred_time_range" in kwargs and "time_range_start" not in kwargs:
+            kwargs["time_range_start"] = kwargs.pop("preferred_time_range")
+        super().__init__(*args, **kwargs)
+
+
+class Voucher(Base):
+    __tablename__ = "vouchers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(50), unique=True, nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    discount_type = Column(String(30), default="PERCENTAGE") # PERCENTAGE, FIXED_AMOUNT, FIXED_PRICE, FREE_ITEM
+    discount_value = Column(Float, nullable=False)
+    max_discount_amount = Column(Float, nullable=True)
+    min_ticket_amount = Column(Float, default=0.0)
+    discount_absorption = Column(String(30), default="BUSINESS_ABSORBED") # BUSINESS_ABSORBED o PROPORTIONAL
+    scope = Column(String(30), default="TOTAL_TICKET") # TOTAL_TICKET, SERVICES_ONLY, PRODUCTS_ONLY
+    applicable_service_ids = Column(String(200), nullable=True) # CSV de IDs o NULL
+    applicable_product_ids = Column(String(200), nullable=True)
+    allowed_days = Column(String(50), nullable=True) # CSV de días "0,1" (Lunes y Martes) o NULL
+    allowed_start_time = Column(String(10), nullable=True)
+    allowed_end_time = Column(String(10), nullable=True)
+    valid_from = Column(DateTime, nullable=True)
+    valid_to = Column(DateTime, nullable=True)
+    max_total_uses = Column(Integer, default=100)
+    current_uses = Column(Integer, default=0)
+    max_uses_per_client = Column(Integer, default=1)
+    min_role = Column(String(20), default="admin") # "admin", "encargado", "public"
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    commission_impact = synonym("discount_absorption")
+    start_date = synonym("valid_from")
+    end_date = synonym("valid_to")
+    required_role = synonym("min_role")
+
+    redemptions = relationship("VoucherRedemption", back_populates="voucher", cascade="all, delete-orphan")
+
+    def __init__(self, *args, **kwargs):
+        if "commission_impact" in kwargs and "discount_absorption" not in kwargs:
+            kwargs["discount_absorption"] = kwargs.pop("commission_impact")
+        if "start_date" in kwargs and "valid_from" not in kwargs:
+            kwargs["valid_from"] = kwargs.pop("start_date")
+        if "end_date" in kwargs and "valid_to" not in kwargs:
+            kwargs["valid_to"] = kwargs.pop("end_date")
+        if "required_role" in kwargs and "min_role" not in kwargs:
+            kwargs["min_role"] = kwargs.pop("required_role")
+        super().__init__(*args, **kwargs)
+
+
+class VoucherRedemption(Base):
+    __tablename__ = "voucher_redemptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    voucher_id = Column(Integer, ForeignKey("vouchers.id"), nullable=False, index=True)
+    voucher_code = Column(String(50), nullable=False)
+    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=True)
+    client_phone = Column(String(40), nullable=False, index=True)
+    staff_user_id = Column(Integer, ForeignKey("admin_users.id"), nullable=True)
+    staff_username = Column(String(80), nullable=True)
+    original_amount = Column(Float, nullable=False)
+    discount_amount = Column(Float, nullable=False)
+    final_amount = Column(Float, nullable=False)
+    barber_commission_impact = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    voucher = relationship("Voucher", back_populates="redemptions")
+
+
+class SalesRecord(Base):
+    __tablename__ = "sales_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    shift_id = Column(Integer, ForeignKey("shift_closures.id"), nullable=True)
+    sale_type = Column(String(30), default="TURNO") # TURNO, PRODUCTO, MIXTO
+    appointment_id = Column(Integer, nullable=True)
+    order_id = Column(Integer, nullable=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=True)
+    barber_id = Column(Integer, nullable=True)
+    barber_name = Column(String(100), nullable=True)
+    client_name = Column(String(120), nullable=True)
+    original_amount = Column(Float, default=0.0)
+    total_amount = Column(Float, nullable=False)
+    discount_amount = Column(Float, default=0.0)
+    payment_method = Column(String(50), default="Efectivo") # Efectivo, Transferencia, Tarjeta, Mercado Pago
+    voucher_code = Column(String(50), nullable=True)
+    items_detail = Column(Text, nullable=True)
+    registered_by = Column(String(80), default="Encargado")
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    final_amount = synonym("total_amount")
+    cashier_name = synonym("registered_by")
+
+    def __init__(self, *args, **kwargs):
+        if "final_amount" in kwargs and "total_amount" not in kwargs:
+            kwargs["total_amount"] = kwargs.pop("final_amount")
+        if "cashier_name" in kwargs and "registered_by" not in kwargs:
+            kwargs["registered_by"] = kwargs.pop("cashier_name")
+        super().__init__(*args, **kwargs)
+

@@ -172,6 +172,7 @@ class AppointmentCreate(BaseModel):
     service: Optional[str] = None
     appointment_time: datetime
     notes: Optional[str] = None
+    idempotency_key: Optional[str] = None
 
 class AppointmentUpdate(BaseModel):
     client_name: Optional[str] = None
@@ -346,6 +347,7 @@ class OrderCreate(BaseModel):
     delivery_type: str = "pickup" # pickup, delivery
     delivery_zone_id: Optional[int] = None
     payment_method: str = "Efectivo"
+    idempotency_key: Optional[str] = None
     items: List[OrderItemCreate]
 
 class OrderRead(BaseModel):
@@ -569,3 +571,175 @@ class ShiftCalculationResponse(BaseModel):
     total_transferencia: float = 0.0
     total_calculado: float = 0.0
     total_turnos_atendidos: int = 0
+
+
+# ==========================================
+# SCHEDULE & EXCEPTION SCHEMAS
+# ==========================================
+class BarberScheduleItem(BaseModel):
+    day_of_week: int
+    is_working: bool = True
+    start_time_1: Optional[str] = "09:00"
+    end_time_1: Optional[str] = "13:00"
+    start_time_2: Optional[str] = "16:00"
+    end_time_2: Optional[str] = "21:00"
+
+class BarberScheduleBulkUpdate(BaseModel):
+    schedules: List[BarberScheduleItem]
+
+class ScheduleExceptionCreate(BaseModel):
+    barber_id: Optional[int] = None
+    date: str
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    reason: str
+    exception_type: str = "BLOQUEO"
+
+class ScheduleExceptionRead(BaseModel):
+    id: int
+    barber_id: Optional[int] = None
+    date: str
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    reason: str
+    exception_type: str
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+# ==========================================
+# WAITLIST SCHEMAS
+# ==========================================
+class WaitlistEntryCreate(BaseModel):
+    client_name: str
+    client_phone: str
+    service_id: Optional[int] = None
+    barber_id: Optional[int] = None
+    preferred_date: str
+    preferred_time_range: Optional[str] = None
+    notes: Optional[str] = None
+
+class WaitlistEntryRead(BaseModel):
+    id: int
+    client_name: str
+    client_phone: str
+    service_id: Optional[int] = None
+    barber_id: Optional[int] = None
+    preferred_date: str
+    preferred_time_range: Optional[str] = None
+    status: str
+    notes: Optional[str] = None
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+# ==========================================
+# VOUCHER & DISCOUNT SCHEMAS
+# ==========================================
+class VoucherCreate(BaseModel):
+    code: str
+    discount_type: str
+    discount_value: float
+    max_discount_amount: Optional[float] = None
+    scope: str = "TOTAL_TICKET"
+    commission_impact: str = "BUSINESS_ABSORBED"
+    min_ticket_amount: float = 0.0
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    allowed_days: Optional[str] = None
+    allowed_start_time: Optional[str] = None
+    allowed_end_time: Optional[str] = None
+    max_total_uses: Optional[int] = None
+    max_uses_per_client: int = 1
+    required_role: str = "ANY"
+    is_active: bool = True
+    description: Optional[str] = None
+
+class VoucherUpdate(BaseModel):
+    discount_value: Optional[float] = None
+    max_discount_amount: Optional[float] = None
+    is_active: Optional[bool] = None
+    max_total_uses: Optional[int] = None
+    description: Optional[str] = None
+
+class VoucherRead(BaseModel):
+    id: int
+    code: str
+    discount_type: str
+    discount_value: float
+    max_discount_amount: Optional[float] = None
+    scope: str
+    commission_impact: str
+    min_ticket_amount: float
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    allowed_days: Optional[str] = None
+    allowed_start_time: Optional[str] = None
+    allowed_end_time: Optional[str] = None
+    current_uses: int
+    max_total_uses: Optional[int] = None
+    max_uses_per_client: int
+    required_role: str
+    is_active: bool
+    description: Optional[str] = None
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class VoucherPreviewRequest(BaseModel):
+    voucher_code: str
+    subtotal: float
+    client_phone: Optional[str] = None
+    service_id: Optional[int] = None
+    service_price: Optional[float] = None
+    product_ids: Optional[List[int]] = None
+    target_datetime: Optional[datetime] = None
+
+class VoucherApplyRequest(BaseModel):
+    voucher_code: str
+    subtotal: float
+    client_phone: str
+    appointment_id: Optional[int] = None
+    order_id: Optional[int] = None
+    client_id: Optional[int] = None
+    service_id: Optional[int] = None
+    service_price: Optional[float] = None
+    product_ids: Optional[List[int]] = None
+
+# ==========================================
+# CLIENT PROFILE & SALES SCHEMAS
+# ==========================================
+class ClientNotesUpdate(BaseModel):
+    notes: Optional[str] = None
+
+class SalesRecordCreate(BaseModel):
+    sale_type: str
+    appointment_id: Optional[int] = None
+    order_id: Optional[int] = None
+    client_id: Optional[int] = None
+    client_name: str
+    barber_id: Optional[int] = None
+    barber_name: Optional[str] = None
+    payment_method: str
+    original_amount: float
+    discount_amount: float = 0.0
+    final_amount: float
+    voucher_code: Optional[str] = None
+    items_detail: Optional[str] = None
+    notes: Optional[str] = None
+
+class SalesRecordRead(BaseModel):
+    id: int
+    sale_type: str
+    appointment_id: Optional[int] = None
+    order_id: Optional[int] = None
+    client_id: Optional[int] = None
+    client_name: str
+    barber_id: Optional[int] = None
+    barber_name: Optional[str] = None
+    payment_method: str
+    original_amount: float
+    discount_amount: float
+    final_amount: float
+    voucher_code: Optional[str] = None
+    items_detail: Optional[str] = None
+    cashier_name: Optional[str] = None
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)

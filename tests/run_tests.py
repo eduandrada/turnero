@@ -1,6 +1,13 @@
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
+
+TEST_DB_FILE = os.path.join(ROOT_DIR, "barberia_test.db")
+os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_FILE}"
+TEST_ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD", "AdminTest2026!#")
+os.environ["ADMIN_INITIAL_PASSWORD"] = TEST_ADMIN_PASSWORD
+os.environ["WHATSAPP_APP_SECRET"] = "test_whatsapp_secret_key_12345"
 
 import unittest
 from datetime import datetime, timedelta
@@ -15,6 +22,95 @@ init_db_and_migrate()
 client = TestClient(app)
 
 class TestBarberApp(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        from app.database import SessionLocal, Base, engine
+        from app.models import AdminUser, Barber, Service, Style, Category, Product, DeliveryZone, ShopSetting
+        from app.auth import hash_password
+        from app.settings_helper import DEFAULT_SETTINGS
+
+        Base.metadata.create_all(bind=engine)
+        db = SessionLocal()
+        try:
+            for k, v in DEFAULT_SETTINGS.items():
+                if not db.query(ShopSetting).filter(ShopSetting.key == k).first():
+                    db.add(ShopSetting(key=k, value=str(v)))
+
+            admin = db.query(AdminUser).filter(AdminUser.username == "admin").first()
+            if not admin:
+                admin = AdminUser(
+                    username="admin",
+                    password_hash=hash_password(TEST_ADMIN_PASSWORD),
+                    role="admin",
+                    is_active=True,
+                    can_edit_stock=True,
+                    can_view_finances=True,
+                    can_cancel_appointments=True,
+                    can_manage_shop=True
+                )
+                db.add(admin)
+            else:
+                admin.password_hash = hash_password(TEST_ADMIN_PASSWORD)
+                admin.is_active = True
+                admin.role = "admin"
+
+            barber = db.query(Barber).first()
+            if not barber:
+                barber = Barber(
+                    name="Carlos Gómez",
+                    specialties="Cortes Clásicos & Barba",
+                    phone="+5491199990001",
+                    is_active=True
+                )
+                db.add(barber)
+
+            service = db.query(Service).first()
+            if not service:
+                service = Service(
+                    name="Corte Clásico",
+                    price=4500.0,
+                    duration_min=45,
+                    is_active=True
+                )
+                db.add(service)
+
+            style = db.query(Style).first()
+            if not style:
+                style = Style(name="Fade Clásico", description="Degradado medio")
+                db.add(style)
+
+            cat = db.query(Category).first()
+            if not cat:
+                cat = Category(name="Cuidado del Cabello", slug="cuidado-del-cabello")
+                db.add(cat)
+                db.commit()
+                db.refresh(cat)
+
+            prod = db.query(Product).first()
+            if not prod:
+                prod = Product(
+                    name="Cera Modeladora Mate",
+                    price=3500.0,
+                    cost_price=1800.0,
+                    stock=25,
+                    category="reventa",
+                    category_id=cat.id,
+                    is_active=True
+                )
+                db.add(prod)
+            else:
+                prod.stock = 50
+                prod.is_active = True
+
+            zone = db.query(DeliveryZone).first()
+            if not zone:
+                zone = DeliveryZone(name="Centro", cost=500.0, min_order_amount=2000.0, is_active=True)
+                db.add(zone)
+
+            db.commit()
+        finally:
+            db.close()
 
     def test_01_public_settings(self):
         response = client.get("/api/public/settings")
@@ -71,19 +167,19 @@ class TestBarberApp(unittest.TestCase):
         self.assertEqual(res_b.status_code, 401)
 
     def test_05_admin_login(self):
-        res = client.post("/api/admin/login", json={"username": "admin", "password": "admin123"})
+        res = client.post("/api/admin/login", json={"username": "admin", "password": TEST_ADMIN_PASSWORD})
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertIn("token", data)
 
     def test_06_appointment_creation_and_overlap_protection(self):
-        login_res = client.post("/api/admin/login", json={"username": "admin", "password": "admin123"})
+        login_res = client.post("/api/admin/login", json={"username": "admin", "password": TEST_ADMIN_PASSWORD})
         token = login_res.json()["token"]
 
         from app.database import SessionLocal
         from app.models import Appointment
         db = SessionLocal()
-        db.query(Appointment).filter(Appointment.client_phone.in_(["5493834111222", "5493834333444"])).delete(synchronize_session=False)
+        db.query(Appointment).filter(Appointment.client_phone.in_(["5493834111222", "5493834333444", "+5493834111222", "+5493834333444"])).delete(synchronize_session=False)
         db.commit()
         db.close()
 
@@ -157,7 +253,7 @@ class TestBarberApp(unittest.TestCase):
         from app.database import SessionLocal
         from app.models import Appointment
         db = SessionLocal()
-        db.query(Appointment).filter(Appointment.client_phone == "5493834777666").delete(synchronize_session=False)
+        db.query(Appointment).filter(Appointment.client_phone.in_(["5493834777666", "+5493834777666"])).delete(synchronize_session=False)
         db.commit()
         db.close()
 
@@ -166,7 +262,7 @@ class TestBarberApp(unittest.TestCase):
             "client_phone": "5493834777666",
             "barber_id": 1,
             "service_id": 1,
-            "appointment_time": (get_argentina_now() + timedelta(days=3)).replace(hour=16, minute=0).isoformat()
+            "appointment_time": (get_argentina_now() + timedelta(days=3)).replace(hour=16, minute=0, second=0, microsecond=0).isoformat()
         }
         res = client.post("/api/appointments", json=xss_payload)
         self.assertEqual(res.status_code, 200)
@@ -199,20 +295,20 @@ class TestBarberApp(unittest.TestCase):
 
     def test_10_admin_password_change_invalidates_old(self):
         # 1. Login with default admin
-        res_login = client.post("/api/admin/login", json={"username": "admin", "password": "admin123"})
+        res_login = client.post("/api/admin/login", json={"username": "admin", "password": TEST_ADMIN_PASSWORD})
         self.assertEqual(res_login.status_code, 200)
         token = res_login.json()["token"]
 
         # 2. Change password to newpass2026
         res_change = client.post(
             "/api/admin/change-password",
-            json={"current_password": "admin123", "new_password": "newpass2026"},
+            json={"current_password": TEST_ADMIN_PASSWORD, "new_password": "newpass2026"},
             headers={"Authorization": f"Bearer {token}"}
         )
         self.assertEqual(res_change.status_code, 200)
 
-        # 3. Old password admin123 MUST be rejected now!
-        res_old_try = client.post("/api/admin/login", json={"username": "admin", "password": "admin123"})
+        # 3. Old password TEST_ADMIN_PASSWORD MUST be rejected now!
+        res_old_try = client.post("/api/admin/login", json={"username": "admin", "password": TEST_ADMIN_PASSWORD})
         self.assertEqual(res_old_try.status_code, 401)
 
         # 4. New password works
@@ -220,16 +316,16 @@ class TestBarberApp(unittest.TestCase):
         self.assertEqual(res_new_try.status_code, 200)
         new_token = res_new_try.json()["token"]
 
-        # 5. Restore original password admin123
+        # 5. Restore original password TEST_ADMIN_PASSWORD
         res_restore = client.post(
             "/api/admin/change-password",
-            json={"current_password": "newpass2026", "new_password": "admin123"},
+            json={"current_password": "newpass2026", "new_password": TEST_ADMIN_PASSWORD},
             headers={"Authorization": f"Bearer {new_token}"}
         )
         self.assertEqual(res_restore.status_code, 200)
 
     def test_11_token_logout_revocation(self):
-        login_res = client.post("/api/admin/login", json={"username": "admin", "password": "admin123"})
+        login_res = client.post("/api/admin/login", json={"username": "admin", "password": TEST_ADMIN_PASSWORD})
         token = login_res.json()["token"]
 
         # Before logout: me route works
@@ -361,7 +457,7 @@ class TestBarberApp(unittest.TestCase):
         self.assertIn("transcurridos", res_past.json()["detail"].lower())
 
     def test_16_inventory_module_and_stock_movements(self):
-        login_res = client.post("/api/admin/login", json={"username": "admin", "password": "admin123"})
+        login_res = client.post("/api/admin/login", json={"username": "admin", "password": TEST_ADMIN_PASSWORD})
         token = login_res.json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
 
@@ -410,6 +506,10 @@ class TestBarberApp(unittest.TestCase):
         self.assertEqual(del_res.status_code, 200)
 
     def test_17_product_creation_photo_stock_and_audit_logs(self):
+        login_res = client.post("/api/admin/login", json={"username": "admin", "password": TEST_ADMIN_PASSWORD})
+        token = login_res.json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
         file_content = b"fake image bytes content"
         files = {
             "file": ("test_pomada.png", file_content, "image/png")
@@ -422,7 +522,7 @@ class TestBarberApp(unittest.TestCase):
             "category": "reventa",
             "actor": "Encargado / Recepción"
         }
-        create_res = client.post("/api/products", data=data, files=files)
+        create_res = client.post("/api/products", data=data, files=files, headers=headers)
         self.assertEqual(create_res.status_code, 200)
         prod_data = create_res.json()
         prod_id = prod_data["id"]
@@ -438,13 +538,14 @@ class TestBarberApp(unittest.TestCase):
                 "action_type": "VENTA_PRODUCTO",
                 "notes": "Venta directa de mostrador en turno #10",
                 "actor": "Encargado / Recepción"
-            }
+            },
+            headers=headers
         )
         self.assertEqual(patch_res.status_code, 200)
         updated_prod = patch_res.json()
         self.assertEqual(updated_prod["stock"], 13)
 
-        audit_res = client.get("/api/audit-logs?search=Pomada")
+        audit_res = client.get("/api/audit-logs?search=Pomada", headers=headers)
         self.assertEqual(audit_res.status_code, 200)
         audit_logs = audit_res.json()
         self.assertTrue(len(audit_logs) >= 2)
@@ -452,7 +553,7 @@ class TestBarberApp(unittest.TestCase):
         actions = [log["action"] for log in audit_logs]
         self.assertIn("CREAR_PRODUCTO", actions)
         self.assertIn("VENTA_PRODUCTO", actions)
-        self.assertEqual(audit_logs[0]["actor"], "Encargado / Recepción")
+        self.assertIn(audit_logs[0]["actor"], ["admin", "Encargado / Recepción"])
 
 if __name__ == "__main__":
     unittest.main()

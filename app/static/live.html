@@ -520,6 +520,23 @@
       }
     };
 
+    function getLiveAuthHeaders(extra = {}) {
+      const token = localStorage.getItem("bladesync_admin_token");
+      const headers = { ...extra };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      return headers;
+    }
+
+    function handleAuthError(res) {
+      if (res.status === 401 || res.status === 403) {
+        showAlertBanner("⚠️ Se requieren permisos de Encargado o Admin. Inicie sesión en Administración.");
+        return true;
+      }
+      return false;
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
       initDigitalClock();
       fetchLiveAgenda();
@@ -871,7 +888,11 @@
       try {
         UISound.playChime();
         showAlertBanner(`🔔 Llamando a "${clientName}" en la Pantalla TV...`);
-        const res = await fetch(`/api/live-agenda/${apptId}/call`, { method: "POST" });
+        const res = await fetch(`/api/live-agenda/${apptId}/call`, {
+          method: "POST",
+          headers: getLiveAuthHeaders()
+        });
+        if (handleAuthError(res)) return;
         if (res.ok) {
           fetchLiveAgenda(true);
         }
@@ -886,9 +907,10 @@
         UISound.playChime();
         const res = await fetch(`/api/live-agenda/${apptId}/status`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getLiveAuthHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({ status: newStatus })
         });
+        if (handleAuthError(res)) return;
         if (res.ok) {
           showAlertBanner(`Estado actualizado a: ${newStatus}`);
           fetchLiveAgenda(true);
@@ -959,7 +981,7 @@
       try {
         const res = await fetch("/api/live-agenda/walk-in", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getLiveAuthHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({
             client_name: name,
             client_phone: phone,
@@ -968,6 +990,8 @@
             duration_min: duration
           })
         });
+
+        if (handleAuthError(res)) return;
 
         if (res.ok) {
           closeWalkInModal();
@@ -1027,9 +1051,11 @@
 
         const res = await fetch(`/api/live-agenda/${id}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: getLiveAuthHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(payload)
         });
+
+        if (handleAuthError(res)) return;
 
         if (res.ok) {
           closeEditLiveModal();
@@ -1079,9 +1105,10 @@
       try {
         const res = await fetch("/api/live-agenda/settings", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getLiveAuthHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(data)
         });
+        if (handleAuthError(res)) return;
         if (res.ok) {
           closeTvConfigModal();
           showAlertBanner("✓ Configuración de Pantalla TV guardada.");

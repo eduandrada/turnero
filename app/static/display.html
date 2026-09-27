@@ -111,7 +111,10 @@
 
       <div class="flex flex-col gap-2">
         <span class="text-sm sm:text-base text-gray-400 uppercase tracking-widest font-mono">POR FAVOR PASAR AL SILLÓN</span>
-        <h2 class="text-4xl sm:text-7xl font-black text-white tracking-tight uppercase" id="calledClientName">
+        <div class="inline-block px-8 py-3 rounded-2xl bg-black/60 border-2 border-[#d4ff00] mx-auto shadow-inner">
+          <span class="text-4xl sm:text-7xl font-black text-[#d4ff00] font-mono tracking-wider" id="calledTurnCode">T-001</span>
+        </div>
+        <h2 class="text-3xl sm:text-6xl font-black text-white tracking-tight uppercase mt-2" id="calledClientName">
           LUCAS GÓMEZ
         </h2>
       </div>
@@ -132,6 +135,18 @@
         Cerrar Aviso
       </button>
     </div>
+  </div>
+
+  <!-- BANNER DE DESBLOQUEO DE AUDIO (AUTOPLAY POLICY) -->
+  <div id="audioUnlockBanner" class="fixed bottom-6 left-6 z-40 bg-[#14141c]/95 border-2 border-[#d4ff00] p-4 rounded-2xl shadow-2xl flex items-center gap-4 transition-all">
+    <span class="text-2xl animate-pulse">🔊</span>
+    <div>
+      <div class="text-xs text-[#d4ff00] font-black uppercase tracking-wider">AUDIO DE TURNOS</div>
+      <div class="text-xs text-gray-300">Click para habilitar la voz y campanilla en esta pantalla</div>
+    </div>
+    <button onclick="unlockDisplayAudio()" class="px-5 py-2.5 bg-[#d4ff00] text-black font-black text-xs rounded-xl hover:bg-white transition uppercase shadow">
+      Activar
+    </button>
   </div>
 
   <!-- MAIN DUAL GIANT DISPLAY (EL QUE SIGUE + AHORA EN SILLÓN) -->
@@ -257,43 +272,227 @@
   <script>
     let lastCalledId = null;
 
-    // Web Audio Chime Synth
-    const TVSound = {
-      ctx: null,
-      init() {
-        if (!this.ctx) {
-          const AudioCtx = window.AudioContext || window.webkitAudioContext;
-          if (AudioCtx) this.ctx = new AudioCtx();
-        }
-        if (this.ctx && this.ctx.state === "suspended") this.ctx.resume();
-      },
-      playChime() {
-        this.init();
-        if (!this.ctx) return;
-        try {
-          const now = this.ctx.currentTime;
-          // Dual Airport Chime: G4 (392Hz) -> C5 (523.25Hz)
-          [392.00, 523.25].forEach((freq, i) => {
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
-            osc.connect(gain);
-            gain.connect(this.ctx.destination);
-            osc.type = "sine";
-            const startTime = now + (i * 0.35);
-            osc.frequency.setValueAtTime(freq, startTime);
-            gain.gain.setValueAtTime(0.3, startTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.8);
-            osc.start(startTime);
-            osc.stop(startTime + 0.8);
-          });
-        } catch(e) {}
+    // 1. NORMALIZACIÓN FONÉTICA DE TURNOS PARA WEB SPEECH API
+    function numberToWordsEs(n) {
+      const unidades = ["cero", "uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve"];
+      const especiales = {
+        10: "diez", 11: "once", 12: "doce", 13: "trece", 14: "catorce", 15: "quince",
+        16: "dieciséis", 17: "diecisiete", 18: "dieciocho", 19: "diecinueve", 20: "veinte"
+      };
+      const decenas = {
+        2: "veinti", 3: "treinta", 4: "cuarenta", 5: "cincuenta",
+        6: "sesenta", 7: "setenta", 8: "ochenta", 9: "noventa"
+      };
+      const centenas = {
+        100: "cien", 1: "ciento", 2: "doscientos", 3: "trescientos", 4: "cuatrocientos",
+        5: "quinientos", 6: "seiscientos", 7: "setecientos", 8: "ochocientos", 9: "novecientos"
+      };
+
+      if (n <= 9) return unidades[n];
+      if (n in especiales) return especiales[n];
+      if (n > 20 && n < 30) return "veinti" + unidades[n - 20];
+      if (n >= 30 && n < 100) {
+        const d = Math.floor(n / 10);
+        const u = n % 10;
+        return u === 0 ? decenas[d] : `${decenas[d]} y ${unidades[u]}`;
       }
-    };
+      if (n === 100) return "cien";
+      if (n > 100 && n < 1000) {
+        const c = Math.floor(n / 100);
+        const resto = n % 100;
+        const cName = centenas[c];
+        return resto === 0 ? cName : `${cName} ${numberToWordsEs(resto)}`;
+      }
+      return String(n);
+    }
+
+    function formatTurnForSpeech(turnCode) {
+      if (!turnCode) return "";
+      const cleaned = String(turnCode).trim().toUpperCase();
+      const match = cleaned.match(/^([A-Z]*)[-_/\s]*(\d+)$/);
+      if (match) {
+        const letters = match[1];
+        const num = parseInt(match[2], 10);
+        const numWords = numberToWordsEs(num);
+        if (!letters) return numWords;
+        const lettersSpaced = letters.split("").join(" ");
+        return `${lettersSpaced} ${numWords}`;
+      }
+      return cleaned.replace(/[-_/\\]/g, " ");
+    }
+
+    // 2. MOTOR DE AUDIO NATIVO Y SÍNTESIS DE VOZ SIN BUG DE GARBAGE COLLECTION
+    class VoiceAnnouncerQueue {
+      constructor() {
+        this.queue = [];
+        this.isPlaying = false;
+        this.audioCtx = null;
+        this.availableVoices = [];
+        this._keepAliveInterval = null;
+        this.initVoices();
+      }
+
+      initVoices() {
+        if ("speechSynthesis" in window) {
+          const load = () => {
+            this.availableVoices = window.speechSynthesis.getVoices();
+          };
+          load();
+          window.speechSynthesis.onvoiceschanged = load;
+        }
+      }
+
+      getBestSpanishVoice() {
+        if (!this.availableVoices.length && "speechSynthesis" in window) {
+          this.availableVoices = window.speechSynthesis.getVoices();
+        }
+        const preferred = ["es-419", "es-AR", "es-ES", "es_AR", "es_ES"];
+        for (const p of preferred) {
+          const v = this.availableVoices.find(voice => voice.lang && voice.lang.includes(p));
+          if (v) return v;
+        }
+        return this.availableVoices.find(voice => voice.lang && voice.lang.startsWith("es")) || null;
+      }
+
+      unlockAudio() {
+        if (!this.audioCtx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.audioCtx = new AudioCtx();
+        }
+        if (this.audioCtx && this.audioCtx.state === "suspended") {
+          this.audioCtx.resume();
+        }
+        if (!this._keepAliveInterval && this.audioCtx) {
+          this._keepAliveInterval = setInterval(() => {
+            try {
+              if (this.audioCtx.state === "running") {
+                const buffer = this.audioCtx.createBuffer(1, 1, 22050);
+                const source = this.audioCtx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(this.audioCtx.destination);
+                source.start(0);
+              }
+            } catch(e) {}
+          }, 30000);
+        }
+      }
+
+      playChime(vol = 0.35) {
+        this.unlockAudio();
+        if (!this.audioCtx) return Promise.resolve();
+
+        return new Promise(resolve => {
+          try {
+            const now = this.audioCtx.currentTime;
+            const freqs = [392.00, 523.25];
+            freqs.forEach((freq, idx) => {
+              const osc = this.audioCtx.createOscillator();
+              const gain = this.audioCtx.createGain();
+              osc.type = "sine";
+              osc.connect(gain);
+              gain.connect(this.audioCtx.destination);
+
+              const startTime = now + (idx * 0.32);
+              osc.frequency.setValueAtTime(freq, startTime);
+              gain.gain.setValueAtTime(vol, startTime);
+              gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.7);
+
+              osc.start(startTime);
+              osc.stop(startTime + 0.7);
+            });
+            setTimeout(resolve, 800);
+          } catch (e) {
+            resolve();
+          }
+        });
+      }
+
+      enqueue(item) {
+        this.queue.push(item);
+        if (!this.isPlaying) {
+          this.processNext();
+        }
+      }
+
+      async processNext() {
+        if (this.queue.length === 0) {
+          this.isPlaying = false;
+          return;
+        }
+
+        this.isPlaying = true;
+        const item = this.queue.shift();
+
+        await this.playChime(item.chimeVolume || 0.35);
+
+        if (item.voiceEnabled !== false && item.text) {
+          await this.speakUtterance(item.text, item);
+          if (item.doubleCall) {
+            await new Promise(r => setTimeout(r, 1400));
+            await this.speakUtterance(item.text, item);
+          }
+        }
+
+        await new Promise(r => setTimeout(r, 1000));
+        this.processNext();
+      }
+
+      speakUtterance(text, options = {}) {
+        return new Promise(resolve => {
+          if (!("speechSynthesis" in window) || !text) {
+            return resolve();
+          }
+
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.voice = this.getBestSpanishVoice();
+          utterance.lang = "es-419";
+          utterance.rate = options.rate || 0.95;
+          utterance.pitch = options.pitch || 1.0;
+          utterance.volume = options.volume || 1.0;
+
+          // Parche Chromium Garbage Collection Bug
+          window.__activeUtterance = utterance;
+
+          let isFinished = false;
+          const finish = () => {
+            if (!isFinished) {
+              isFinished = true;
+              window.__activeUtterance = null;
+              resolve();
+            }
+          };
+
+          utterance.onend = finish;
+          utterance.onerror = finish;
+          setTimeout(finish, 12000);
+
+          window.speechSynthesis.speak(utterance);
+        });
+      }
+    }
+
+    const announcer = new VoiceAnnouncerQueue();
+
+    function unlockDisplayAudio() {
+      announcer.unlockAudio();
+      announcer.playChime(0.2);
+      const banner = document.getElementById("audioUnlockBanner");
+      if (banner) banner.classList.add("hidden");
+      sessionStorage.setItem("displayAudioUnlocked", "true");
+    }
 
     document.addEventListener("DOMContentLoaded", () => {
       initDigitalClock();
       fetchDisplayData();
-      setInterval(fetchDisplayData, 8000); // Polling cada 8s para sincronización con moderador
+      setInterval(fetchDisplayData, 7000);
+
+      if (sessionStorage.getItem("displayAudioUnlocked") === "true") {
+        const banner = document.getElementById("audioUnlockBanner");
+        if (banner) banner.classList.add("hidden");
+        announcer.unlockAudio();
+      }
+      document.body.addEventListener("click", () => announcer.unlockAudio(), { once: true });
     });
 
     function initDigitalClock() {
@@ -320,13 +519,10 @@
     function renderTVBoard(data) {
       if (!data) return;
 
-      // Brand Title
       const titleEl = document.getElementById("tvBarberTitle");
       if (titleEl && data.barber_name) {
         titleEl.innerHTML = `${escapeHtml(data.barber_name.toUpperCase())}<span class="text-[#d4ff00]">_</span>`;
       }
-
-      // Marquee & Subtitle
       if (data.tv_marquee) {
         document.getElementById("tvMarqueeText").textContent = data.tv_marquee;
       }
@@ -377,8 +573,6 @@
       const queueListEl = document.getElementById("tvQueueList");
       const queueCountEl = document.getElementById("tvQueueCount");
       const upcoming = data.upcoming || [];
-
-      // Exclude first if it's already shown as next up
       const waitingList = upcoming.slice(nextClient ? 1 : 0, 5);
       if (queueCountEl) queueCountEl.textContent = `${upcoming.length} en agenda`;
 
@@ -404,17 +598,21 @@
         }
       }
 
-      // 4. CHECK IF A TURN HAS BEEN CALLED VIA LIVE MODERATOR
+      // 4. VERIFICAR TURNO LLAMADO
       if (data.called_appointment) {
         const called = data.called_appointment;
         if (lastCalledId !== called.id) {
           lastCalledId = called.id;
-          triggerCalledAlert(called);
+          triggerCalledAlert(called, data);
         }
       }
     }
 
-    function triggerCalledAlert(called) {
+    function triggerCalledAlert(called, globalData = {}) {
+      const turnCode = called.turn_code || `T-${called.id}`;
+      const turnEl = document.getElementById("calledTurnCode");
+      if (turnEl) turnEl.textContent = turnCode;
+
       document.getElementById("calledClientName").textContent = called.client_name.toUpperCase();
       document.getElementById("calledBarberName").textContent = (called.barber_name || "GENERAL").toUpperCase();
       document.getElementById("calledService").textContent = called.service;
@@ -422,22 +620,16 @@
       const overlay = document.getElementById("calledOverlay");
       if (overlay) overlay.classList.remove("hidden");
 
-      // Play chime
-      TVSound.playChime();
+      // Construir texto de anuncio fonético
+      const speechText = called.speech_text || `Turno ${formatTurnForSpeech(turnCode)}, te esperamos con ${called.barber_name}.`;
 
-      // Announce voice
-      setTimeout(() => {
-        if ("speechSynthesis" in window) {
-          window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(
-            `¡Turno llamado! ${called.client_name}, se tiene que cortar con el barbero ${called.barber_name}. Por favor pasar al sillón.`
-          );
-          utterance.lang = "es-AR";
-          utterance.rate = 0.9;
-          utterance.pitch = 1.0;
-          window.speechSynthesis.speak(utterance);
-        }
-      }, 700);
+      announcer.enqueue({
+        text: speechText,
+        voiceEnabled: globalData.voice_enabled !== false,
+        chimeVolume: 0.4,
+        rate: 0.95,
+        doubleCall: false
+      });
 
       // Auto dismiss after 14 seconds
       setTimeout(dismissCalledOverlay, 14000);

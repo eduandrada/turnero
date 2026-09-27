@@ -108,3 +108,62 @@ def restore_database_backup(db: Session, filename: str, user_name: str = "Admini
     ))
     db.commit()
     return True
+
+def verify_backup_integrity(filename: str) -> dict:
+    """Verifica que un archivo de backup sea JSON valido, tenga tablas y registros consistentes."""
+    ensure_backup_dir()
+    filepath = os.path.join(BACKUP_DIR, filename)
+    if not os.path.exists(filepath):
+        return {"valid": False, "error": "Archivo no encontrado"}
+
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        if not isinstance(data, dict) or not data:
+            return {"valid": False, "error": "El backup está vacío o no tiene formato de tabla válido"}
+
+        total_rows = 0
+        tables_summary = {}
+        for table_name, table_data in data.items():
+            if not isinstance(table_data, dict):
+                return {"valid": False, "error": f"Estructura inválida en tabla {table_name}"}
+            cols = table_data.get("columns", [])
+            rows = table_data.get("rows", [])
+            tables_summary[table_name] = {"columns_count": len(cols), "rows_count": len(rows)}
+            total_rows += len(rows)
+
+        return {
+            "valid": True,
+            "filename": filename,
+            "tables_count": len(data),
+            "total_rows": total_rows,
+            "tables": tables_summary
+        }
+    except Exception as e:
+        return {"valid": False, "error": f"Error de lectura o JSON corrupto: {str(e)}"}
+
+def cleanup_old_backups(retention_days: int = 30, min_to_keep: int = 5) -> dict:
+    """Elimina copias de seguridad anteriores al periodo de retención, preservando un mínimo de backups."""
+    ensure_backup_dir()
+    all_backups = list_backups()
+    if len(all_backups) <= min_to_keep:
+        return {"deleted": 0, "kept": len(all_backups)}
+
+    now = datetime.now()
+    deleted_count = 0
+    # Guardamos los primeros min_to_keep (los más nuevos)
+    candidates = all_backups[min_to_keep:]
+    for b in candidates:
+        try:
+            created_dt = datetime.fromisoformat(b["created_at"])
+            age_days = (now - created_dt).days
+            if age_days > retention_days:
+                fpath = os.path.join(BACKUP_DIR, b["filename"])
+                if os.path.exists(fpath):
+                    os.remove(fpath)
+                    deleted_count += 1
+        except Exception:
+            continue
+
+    return {"deleted": deleted_count, "kept": len(all_backups) - deleted_count}

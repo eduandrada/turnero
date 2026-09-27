@@ -472,6 +472,7 @@ async function submitShopOrder() {
   btn.disabled = true;
   btn.textContent = "GENERANDO PEDIDO...";
 
+  const idempotencyKey = "order_" + Date.now() + "_" + Math.random().toString(36).substring(2, 10);
   const payload = {
     client_name: name,
     client_phone: phone,
@@ -479,13 +480,17 @@ async function submitShopOrder() {
     delivery_zone_id: zoneId,
     address: address,
     payment_method: payment,
+    idempotency_key: idempotencyKey,
     items: shopState.cart.map(i => ({ product_id: i.product.id, quantity: i.quantity }))
   };
 
   try {
     const res = await fetch("/api/shop/orders", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": idempotencyKey
+      },
       body: JSON.stringify(payload)
     });
 

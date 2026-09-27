@@ -798,7 +798,9 @@
 
     async function loadShopStockData() {
       try {
-        const res = await fetch("/api/products");
+        const headers = {};
+        if (opToken) headers["Authorization"] = `Bearer ${opToken}`;
+        const res = await fetch("/api/products", { headers });
         if (res.ok) {
           shopStockProductsList = await res.json();
           renderShopStockGrid();
@@ -891,13 +893,14 @@
 
     async function quickAdjustStock(productId, delta, actionType = 'MODIFICAR_STOCK') {
       try {
+        const headers = { "Content-Type": "application/json" };
+        if (opToken) headers["Authorization"] = `Bearer ${opToken}`;
         const res = await fetch(`/api/products/${productId}/stock`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: headers,
           body: JSON.stringify({
             quantity: delta,
             action_type: actionType,
-            actor: "Encargado / Recepción",
             notes: actionType === "VENTA_PRODUCTO" ? "Venta directa de mostrador" : "Ajuste rápido en mostrador"
           })
         });
@@ -972,8 +975,11 @@
       btn.textContent = "⏳ Guardando...";
 
       try {
+        const headers = {};
+        if (opToken) headers["Authorization"] = `Bearer ${opToken}`;
         const res = await fetch("/api/products", {
           method: "POST",
+          headers: headers,
           body: formData
         });
 

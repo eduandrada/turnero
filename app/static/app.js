@@ -773,6 +773,7 @@ async function submitBooking() {
   submitBtn.disabled = true;
   submitBtn.textContent = "RESERVANDO TURNO...";
 
+  const idempotencyKey = "appt_" + Date.now() + "_" + Math.random().toString(36).substring(2, 10);
   const payload = {
     client_name: name,
     client_phone: phone,
@@ -780,13 +781,17 @@ async function submitBooking() {
     barber_name: state.selectedBarber.name,
     service_id: state.selectedService.id,
     service: state.selectedService.name,
-    appointment_time: `${state.selectedDate}T${state.selectedSlot}:00`
+    appointment_time: `${state.selectedDate}T${state.selectedSlot}:00`,
+    idempotency_key: idempotencyKey
   };
 
   try {
     const res = await fetch("/api/appointments", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": idempotencyKey
+      },
       body: JSON.stringify(payload)
     });
 

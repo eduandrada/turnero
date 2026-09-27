@@ -6,6 +6,9 @@ ENV/
 
 # Python Cache & Bytecode
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
 *.py[cod]
 *$py.class
 *.so
@@ -18,15 +21,19 @@ build/
 
 # Databases & Local Data Files
 *.db
+*.sqlite
 *.sqlite3
 *.sqlite-journal
 *.sqlite-shm
 *.sqlite-wal
-barberia - copia.db
 barberia.db
+barberia - copia.db
+barberia_test.db
+barberia_demo.db
 
 # Backups & Uploads (runtime)
 backups/
+uploads/
 app/static/uploads/*
 !app/static/uploads/.gitkeep
 
@@ -36,9 +43,12 @@ app/static/uploads/*
 .env.*
 !.env.example
 
-# Archives & Temporary files
+# Archives, Temporary & Video files
 *.zip
 *.tar.gz
+*.mp4
+*.mov
+*.avi
 scratch/
 
 # Logs
@@ -49,3 +59,4 @@ scratch/
 .idea/
 .DS_Store
 Thumbs.db
+agregar despues*.txt
