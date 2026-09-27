@@ -187,6 +187,39 @@ def init_db_and_migrate():
                 conn.execute(text("ALTER TABLE notification_logs ADD COLUMN response_payload TEXT"))
                 conn.commit()
 
+        # 8. Migration for idempotency_records
+        if "idempotency_records" in tables:
+            columns = [c["name"] for c in inspector.get_columns("idempotency_records")]
+            if "expires_at" not in columns:
+                conn.execute(text("ALTER TABLE idempotency_records ADD COLUMN expires_at DATETIME"))
+                conn.commit()
+
+        # 9. Migration for vouchers
+        if "vouchers" in tables:
+            columns = [c["name"] for c in inspector.get_columns("vouchers")]
+            if "allowed_start_time" not in columns:
+                conn.execute(text("ALTER TABLE vouchers ADD COLUMN allowed_start_time VARCHAR(10)"))
+                conn.commit()
+            if "allowed_end_time" not in columns:
+                conn.execute(text("ALTER TABLE vouchers ADD COLUMN allowed_end_time VARCHAR(10)"))
+                conn.commit()
+
+        # 10. Migration for sales_records
+        if "sales_records" in tables:
+            columns = [c["name"] for c in inspector.get_columns("sales_records")]
+            if "items_detail" not in columns:
+                conn.execute(text("ALTER TABLE sales_records ADD COLUMN items_detail TEXT"))
+                conn.commit()
+            if "client_id" not in columns:
+                conn.execute(text("ALTER TABLE sales_records ADD COLUMN client_id INTEGER"))
+                conn.commit()
+            if "voucher_code" not in columns:
+                conn.execute(text("ALTER TABLE sales_records ADD COLUMN voucher_code VARCHAR(50)"))
+                conn.commit()
+            if "original_amount" not in columns:
+                conn.execute(text("ALTER TABLE sales_records ADD COLUMN original_amount FLOAT DEFAULT 0.0"))
+                conn.commit()
+
 def get_db():
     """Dependency for obtaining a database session per request."""
     db = SessionLocal()
