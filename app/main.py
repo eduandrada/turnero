@@ -2417,23 +2417,25 @@ def get_admin_appointments(
     date: Optional[str] = None,
     barber_id: Optional[int] = None,
     status: Optional[str] = None,
-    limit: int = 200,
+    limit: int = 500,
     admin: AdminUser = Depends(require_any_staff_role),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Appointment).order_by(Appointment.appointment_time.desc())
+    query = db.query(Appointment)
     if date:
         try:
             t_date = datetime.strptime(date, "%Y-%m-%d").date()
             s_day = datetime.combine(t_date, time.min)
             e_day = datetime.combine(t_date, time.max)
             query = query.filter(Appointment.appointment_time >= s_day, Appointment.appointment_time <= e_day)
+            query = query.order_by(Appointment.appointment_time.asc())
         except ValueError:
-            pass
+            query = query.order_by(Appointment.appointment_time.desc())
+    else:
+        query = query.order_by(Appointment.appointment_time.desc())
 
     user_role = (admin.role or "").strip().lower()
     if user_role == "barbero":
-        # El barbero únicamente puede consultar sus propios turnos
         matched_b = db.query(Barber).filter(Barber.name.ilike(f"%{admin.username}%")).first()
         target_b_id = matched_b.id if matched_b else -1
         query = query.filter(Appointment.barber_id == target_b_id)
@@ -2441,43 +2443,89 @@ def get_admin_appointments(
         query = query.filter(Appointment.barber_id == barber_id)
 
     if status:
-        query = query.filter(Appointment.status == status)
+        st = status.strip().lower()
+        if st in ["activos", "active", "pendientes_atencion"]:
+            # Bandeja limpia: sólo turnos activos pendientes de atención (no completados ni cancelados)
+            query = query.filter(
+                Appointment.status.in_(["PENDIENTE", "CONFIRMADO", "EN_SILLA", "EN_ATENCION"]),
+                Appointment.canceled == False
+            )
+        elif st in ["completados", "completed", "atendidos"]:
+            query = query.filter(Appointment.status == "COMPLETADO")
+        elif st in ["cancelados", "canceled"]:
+            query = query.filter(or_(Appointment.status == "CANCELADO", Appointment.canceled == True))
+        elif st not in ["todos", "all", ""]:
+            query = query.filter(Appointment.status == status.upper())
 
     return query.limit(limit).all()
 
+
 @app.put("/api/admin/appointments/{appointment_id}", response_model=AppointmentRead)
+@app.put("/api/admin/appointments/{appointment_id}/status", response_model=AppointmentRead)
+@app.post("/api/admin/appointments/{appointment_id}/status", response_model=AppointmentRead)
 def update_admin_appointment(
     appointment_id: int,
     appt_in: AppointmentUpdate,
-    admin: AdminUser = Depends(require_encargado_or_admin),
+    admin: AdminUser = Depends(require_any_staff_role),
     db: Session = Depends(get_db)
 ):
     appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appt:
         raise HTTPException(status_code=404, detail="Turno no encontrado.")
 
-    old_status = appt.status
+    user_role = (admin.role or "").strip().lower()
+    if user_role == "barbero":
+        matched_b = db.query(Barber).filter(Barber.name.ilike(f"%{admin.username}%")).first()
+        if not matched_b or appt.barber_id != matched_b.id:
+            raise HTTPException(status_code=403, detail="Un barbero solo puede gestionar sus propios turnos.")
+
+    old_status = appt.status or "PENDIENTE"
     for k, v in appt_in.model_dump(exclude_unset=True).items():
         setattr(appt, k, v)
 
-    # Sync flags
+    # Sincronización robusta de estados y banderas booleanas
     if appt_in.status:
-        if appt_in.status == "CANCELADO":
+        st = appt_in.status.upper().strip()
+        appt.status = st
+        if st == "CANCELADO":
             appt.canceled = True
-        elif appt_in.status == "CONFIRMADO":
-            appt.confirmed = True
+            appt.confirmed = False
+        elif st == "COMPLETADO":
             appt.canceled = False
+            appt.confirmed = True
+        elif st in ["CONFIRMADO", "EN_SILLA", "EN_ATENCION"]:
+            appt.canceled = False
+            appt.confirmed = True
+        elif st == "PENDIENTE":
+            appt.canceled = False
+            appt.confirmed = False
 
     db.commit()
     db.refresh(appt)
 
+    # Registro en historial de auditoría de turnos
+    if appt.status != old_status:
+        try:
+            db.add(AppointmentHistory(
+                appointment_id=appt.id,
+                previous_status=old_status,
+                new_status=appt.status,
+                changed_by=admin.username,
+                change_reason=appt_in.notes or f"Estado cambiado a {appt.status}"
+            ))
+            db.commit()
+        except Exception as e:
+            logger.warning(f"No se pudo registrar historial de turno: {e}")
+
     db.add(AuditLog(
         user_name=admin.username,
+        actor=admin.username,
         module="Turnos",
         action="Actualizar Turno",
         record_id=str(appt.id),
         old_value=f"Estado: {old_status}",
-        new_value=f"Estado: {appt.status}"
+        new_value=f"Estado: {appt.status}",
+        description=f"Turno #{appt.id} ({appt.client_name}) actualizado a {appt.status}"
     ))
     db.commit()
     return appt

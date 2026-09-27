@@ -263,7 +263,7 @@
     <!-- CONTENIDO PRINCIPAL DE TURNOS -->
     <main class="turnos-container">
       
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
         <div>
           <h2 style="font-family: 'Space Grotesk', monospace; margin: 0; font-size: 1.4rem;" id="currentTabLabel">Turnos de Hoy</h2>
           <p style="color: #9ca3af; font-size: 0.85rem; margin: 2px 0 0 0;" id="currentTabSub">Agenda cronológica en tiempo real</p>
@@ -275,6 +275,31 @@
             🔄 Actualizar
           </button>
         </div>
+      </div>
+
+      <!-- BARRA DE FILTROS POR ESTADO: BANDEJA LIMPIA -->
+      <div class="appt-status-pills-bar" style="margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+        <button class="appt-pill active" id="pill-activos" onclick="setLiveStatusFilter('activos')">
+          ⚡ Por Atender <span class="pill-count" id="countLiveActivos">0</span>
+        </button>
+        <button class="appt-pill" id="pill-completado" onclick="setLiveStatusFilter('COMPLETADO')">
+          ✅ Ya Atendidos <span class="pill-count" id="countLiveCompletados">0</span>
+        </button>
+        <button class="appt-pill" id="pill-pendiente" onclick="setLiveStatusFilter('PENDIENTE')">
+          ⏳ Pendientes <span class="pill-count" id="countLivePendientes">0</span>
+        </button>
+        <button class="appt-pill" id="pill-confirmado" onclick="setLiveStatusFilter('CONFIRMADO')">
+          💬 Confirmados <span class="pill-count" id="countLiveConfirmados">0</span>
+        </button>
+        <button class="appt-pill" id="pill-en_silla" onclick="setLiveStatusFilter('EN_SILLA')">
+          💈 En Silla <span class="pill-count" id="countLiveEnSilla">0</span>
+        </button>
+        <button class="appt-pill" id="pill-cancelado" onclick="setLiveStatusFilter('CANCELADO')">
+          ❌ Cancelados <span class="pill-count" id="countLiveCancelados">0</span>
+        </button>
+        <button class="appt-pill" id="pill-todos" onclick="setLiveStatusFilter('todos')">
+          📋 Todos <span class="pill-count" id="countLiveTodos">0</span>
+        </button>
       </div>
 
       <!-- TABLA DE TURNOS OPERATIVA -->
@@ -560,7 +585,13 @@
     });
 
     function showToast(message, type = "success") {
-      const container = document.getElementById("toastContainer");
+      let container = document.getElementById("toastContainer");
+      if (!container) {
+        container = document.createElement("div");
+        container.id = "toastContainer";
+        container.style.cssText = "position: fixed; bottom: 24px; right: 24px; z-index: 99999; display: flex; flex-direction: column; gap: 10px;";
+        document.body.appendChild(container);
+      }
       const toast = document.createElement("div");
       const isErr = type === "error";
       toast.style.cssText = `
@@ -697,38 +728,150 @@
       }
     }
 
+    let currentLiveStatusFilter = 'activos';
+
+    function setLiveStatusFilter(filter) {
+      currentLiveStatusFilter = filter;
+      document.querySelectorAll('.appt-status-pills-bar .appt-pill').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      const activeBtn = document.getElementById(`pill-${filter.toLowerCase()}`);
+      if (activeBtn) activeBtn.classList.add('active');
+      renderLiveTurnos();
+    }
+
     function renderLiveTurnos() {
       const tbody = document.getElementById("liveTurnosBody");
-      const filterText = document.getElementById("searchClientInput").value.toLowerCase().trim();
+      const filterText = (document.getElementById("searchClientInput").value || "").toLowerCase().trim();
+
+      // Cálculo de contadores para las pastillas de estado
+      const totalCount = allLiveAppointments.length;
+      const completedCount = allLiveAppointments.filter(x => x.status === 'COMPLETADO').length;
+      const pendingCount = allLiveAppointments.filter(x => (x.status === 'PENDIENTE' || !x.status) && !x.canceled).length;
+      const confirmedCount = allLiveAppointments.filter(x => x.status === 'CONFIRMADO' && !x.canceled).length;
+      const chairCount = allLiveAppointments.filter(x => (x.status === 'EN_SILLA' || x.status === 'EN_ATENCION') && !x.canceled).length;
+      const canceledCount = allLiveAppointments.filter(x => x.status === 'CANCELADO' || x.canceled).length;
+      const activeCount = allLiveAppointments.filter(x => x.status !== 'COMPLETADO' && x.status !== 'CANCELADO' && !x.canceled).length;
+
+      const elAct = document.getElementById("countLiveActivos");
+      const elComp = document.getElementById("countLiveCompletados");
+      const elPend = document.getElementById("countLivePendientes");
+      const elConf = document.getElementById("countLiveConfirmados");
+      const elChair = document.getElementById("countLiveEnSilla");
+      const elCanc = document.getElementById("countLiveCancelados");
+      const elTodos = document.getElementById("countLiveTodos");
+
+      if (elAct) elAct.textContent = activeCount;
+      if (elComp) elComp.textContent = completedCount;
+      if (elPend) elPend.textContent = pendingCount;
+      if (elConf) elConf.textContent = confirmedCount;
+      if (elChair) elChair.textContent = chairCount;
+      if (elCanc) elCanc.textContent = canceledCount;
+      if (elTodos) elTodos.textContent = totalCount;
 
       let filtered = allLiveAppointments.filter(item => {
-        if (!filterText) return true;
-        const nameMatch = (item.client_name || "").toLowerCase().includes(filterText);
-        const phoneMatch = (item.client_phone || "").toLowerCase().includes(filterText);
-        return nameMatch || phoneMatch;
+        // Filtro por estado / bandeja limpia
+        if (currentLiveStatusFilter === 'activos') {
+          if (item.status === 'COMPLETADO' || item.status === 'CANCELADO' || item.canceled) return false;
+        } else if (currentLiveStatusFilter === 'COMPLETADO') {
+          if (item.status !== 'COMPLETADO') return false;
+        } else if (currentLiveStatusFilter === 'PENDIENTE') {
+          if ((item.status !== 'PENDIENTE' && item.status) || item.canceled) return false;
+        } else if (currentLiveStatusFilter === 'CONFIRMADO') {
+          if (item.status !== 'CONFIRMADO' || item.canceled) return false;
+        } else if (currentLiveStatusFilter === 'EN_SILLA') {
+          if (item.status !== 'EN_SILLA' && item.status !== 'EN_ATENCION') return false;
+        } else if (currentLiveStatusFilter === 'CANCELADO') {
+          if (item.status !== 'CANCELADO' && !item.canceled) return false;
+        }
+
+        // Filtro de texto por cliente / teléfono
+        if (filterText) {
+          const nameMatch = (item.client_name || "").toLowerCase().includes(filterText);
+          const phoneMatch = (item.client_phone || "").toLowerCase().includes(filterText);
+          if (!nameMatch && !phoneMatch) return false;
+        }
+        return true;
       });
 
-      filtered.sort((a, b) => a.time.localeCompare(b.time));
+      filtered.sort((a, b) => {
+        const timeA = a.appointment_time || a.time || "";
+        const timeB = b.appointment_time || b.time || "";
+        return timeA.localeCompare(timeB);
+      });
 
       if (filtered.length === 0) {
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="7" style="text-align: center; padding: 40px; color: #9ca3af;">
-              No hay turnos registrados para ${currentTab === 'today' ? 'hoy' : 'mañana'}.
-            </td>
-          </tr>
-        `;
+        if (currentLiveStatusFilter === 'activos') {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" style="text-align: center; padding: 48px 20px;">
+                <div style="font-size: 2.5rem; margin-bottom: 8px;">🎉</div>
+                <div style="font-size: 1.15rem; font-weight: 800; color: #ffffff; margin-bottom: 6px; font-family: 'Space Grotesk', monospace;">
+                  ¡Bandeja Operativa Limpia!
+                </div>
+                <p style="color: #9ca3af; font-size: 0.85rem; max-width: 440px; margin: 0 auto 16px auto;">
+                  No hay turnos pendientes ni en corte para ${currentTab === 'today' ? 'hoy' : 'mañana'}. Todos los clientes fueron atendidos o la agenda está libre.
+                </p>
+                ${completedCount > 0 ? `
+                  <button class="btn-admin btn-admin-secondary btn-admin-sm" onclick="setLiveStatusFilter('COMPLETADO')">
+                    Ver Turnos Ya Atendidos (${completedCount}) →
+                  </button>
+                ` : ''}
+              </td>
+            </tr>
+          `;
+        } else {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" style="text-align: center; padding: 40px; color: #9ca3af;">
+                No hay turnos registrados con el filtro seleccionado.
+              </td>
+            </tr>
+          `;
+        }
         return;
       }
 
       tbody.innerHTML = "";
       filtered.forEach(item => {
         const tr = document.createElement("tr");
+        const timeStr = item.appointment_time ? item.appointment_time.replace("T", " ").substring(11, 16) : (item.time || "--:--");
         const cleanPhone = (item.client_phone || "").replace(/\D/g, "");
-        const waMsg = encodeURIComponent(`Hola ${item.client_name}, te saludamos de Turnero por tu turno de hoy a las ${item.time}.`);
+        const waMsg = encodeURIComponent(`Hola ${item.client_name}, te saludamos de Pereyras Barbers por tu turno a las ${timeStr} hs.`);
+        const serviceName = item.service || item.service_name || "Corte Tradicional";
+
+        let actionsHtml = '';
+        if (item.status === 'COMPLETADO') {
+          actionsHtml = `
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <span style="color: #10b981; font-weight: bold; font-size: 0.75rem;">✔ Atendido</span>
+              <button onclick="updateStatus(${item.id}, 'EN_SILLA')" class="btn-admin btn-admin-sm btn-admin-secondary" style="padding: 4px 8px; font-size: 0.7rem;" title="Volver a poner en atención">↩ Reabrir</button>
+            </div>
+          `;
+        } else if (item.status === 'CANCELADO' || item.canceled) {
+          actionsHtml = `
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <span style="color: #ef4444; font-weight: bold; font-size: 0.75rem;">✕ Cancelado</span>
+              <button onclick="updateStatus(${item.id}, 'PENDIENTE')" class="btn-admin btn-admin-sm btn-admin-secondary" style="padding: 4px 8px; font-size: 0.7rem;" title="Restablecer como pendiente">🔄 Reactivar</button>
+            </div>
+          `;
+        } else {
+          let confirmBtn = '';
+          if (item.status === 'PENDIENTE') {
+            confirmBtn = `<button onclick="updateStatus(${item.id}, 'CONFIRMADO')" class="btn-admin btn-admin-sm" style="padding: 4px 8px; font-size: 0.7rem; background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4);" title="Confirmar asistencia">💬 Confirmar</button>`;
+          }
+          let chairBtn = '';
+          if (item.status !== 'EN_SILLA' && item.status !== 'EN_ATENCION') {
+            chairBtn = `<button onclick="updateStatus(${item.id}, 'EN_SILLA')" class="btn-admin btn-admin-sm" style="padding: 4px 8px; font-size: 0.7rem; background: rgba(0, 242, 254, 0.2); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.4);" title="Cliente sentado en sillón">💈 En Silla</button>`;
+          }
+          const completeBtn = `<button onclick="updateStatus(${item.id}, 'COMPLETADO')" class="btn-admin btn-admin-sm" style="padding: 4px 8px; font-size: 0.7rem; background: #10b981; color: #000; font-weight: 700;" title="Marcar como atendido y archivar de la bandeja activa">✅ Atendido / Listo</button>`;
+          const cancelBtn = `<button onclick="updateStatus(${item.id}, 'CANCELADO')" class="btn-admin btn-admin-sm btn-admin-danger" style="padding: 4px 8px; font-size: 0.7rem;" title="Cancelar turno">✕ Cancelar</button>`;
+          
+          actionsHtml = `<div style="display: flex; gap: 4px; flex-wrap: wrap;">${confirmBtn}${chairBtn}${completeBtn}${cancelBtn}</div>`;
+        }
 
         tr.innerHTML = `
-          <td><span class="time-badge">${item.time} hs</span></td>
+          <td><span class="time-badge">${timeStr} hs</span></td>
           <td>
             <strong style="color: #ffffff; font-size: 0.95rem;">${escapeHtml(item.client_name)}</strong>
           </td>
@@ -738,19 +881,14 @@
           <td>
             <strong style="color: #d4ff00;">${escapeHtml(item.barber_name || 'Sin asignar')}</strong>
           </td>
-          <td>${escapeHtml(item.service_name || 'Servicio General')}</td>
+          <td>${escapeHtml(serviceName)}</td>
           <td>
             <span class="status-pill status-${item.status}">
               ${getStatusIcon(item.status)} ${item.status}
             </span>
           </td>
           <td>
-            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-              <button onclick="updateStatus(${item.id}, 'PENDIENTE')" class="btn-admin btn-admin-sm btn-admin-secondary" style="padding: 4px 8px; font-size: 0.7rem;">Pendiente</button>
-              <button onclick="updateStatus(${item.id}, 'EN_SILLA')" class="btn-admin btn-admin-sm" style="padding: 4px 8px; font-size: 0.7rem; background: #00f2fe; color: #000;">💈 En Silla</button>
-              <button onclick="updateStatus(${item.id}, 'COMPLETADO')" class="btn-admin btn-admin-sm" style="padding: 4px 8px; font-size: 0.7rem; background: #10b981; color: #000;">✅ Listo</button>
-              <button onclick="updateStatus(${item.id}, 'CANCELADO')" class="btn-admin btn-admin-sm btn-admin-danger" style="padding: 4px 8px; font-size: 0.7rem;">✕ Cancelar</button>
-            </div>
+            ${actionsHtml}
           </td>
         `;
         tbody.appendChild(tr);
@@ -759,7 +897,8 @@
 
     function getStatusIcon(status) {
       if (status === "PENDIENTE") return "⏳";
-      if (status === "EN_SILLA") return "💈";
+      if (status === "CONFIRMADO") return "💬";
+      if (status === "EN_SILLA" || status === "EN_ATENCION") return "💈";
       if (status === "COMPLETADO") return "✅";
       if (status === "CANCELADO") return "❌";
       return "📌";
@@ -777,12 +916,21 @@
           body: JSON.stringify({ status: newStatus })
         });
         if (res.ok) {
-          loadLiveTurnosData();
+          const statusLabels = {
+            'CONFIRMADO': 'Turno confirmado correctamente.',
+            'EN_SILLA': 'Cliente sentado en silla de atención.',
+            'COMPLETADO': 'Turno completado y archivado de la bandeja activa.',
+            'CANCELADO': 'Turno cancelado.',
+            'PENDIENTE': 'Turno restablecido a pendiente.'
+          };
+          showToast(statusLabels[newStatus] || `Estado cambiado a ${newStatus}`);
+          await loadLiveTurnosData();
         } else {
-          alert("Error al actualizar el estado del turno.");
+          const err = await res.json().catch(() => ({}));
+          showToast(err.detail || "Error al actualizar el estado del turno.", "error");
         }
       } catch (e) {
-        alert("Error de conexión.");
+        showToast("Error de conexión con el servidor.", "error");
       }
     }
 

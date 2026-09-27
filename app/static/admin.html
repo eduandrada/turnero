@@ -238,38 +238,111 @@
           </div>
         </div>
 
-        <!-- SECTION: TURNOS -->
+        <!-- SECTION: TURNOS (GESTIÓN INTEGRAL DE TURNOS & SALA DE ATENCIÓN) -->
         <div id="section-appointments" class="admin-section" style="display: none;">
+          
+          <!-- KPI RESUMEN DE TURNOS -->
+          <div class="kpi-grid" style="margin-bottom: 20px;">
+            <div class="kpi-card" onclick="setApptFilterStatus('activos')" style="cursor: pointer;" title="Ver turnos que esperan atención">
+              <div class="kpi-title">⚡ Por Atender (Activos)</div>
+              <div class="kpi-value" id="kpiApptActivos" style="color: #d4ff00;">0</div>
+              <div class="kpi-sub">Bandeja activa de atención</div>
+            </div>
+            <div class="kpi-card" onclick="setApptFilterStatus('completados')" style="cursor: pointer;" title="Ver turnos finalizados">
+              <div class="kpi-title">✅ Ya Atendidos</div>
+              <div class="kpi-value" id="kpiApptCompletados" style="color: #10b981;">0</div>
+              <div class="kpi-sub">Completados del día</div>
+            </div>
+            <div class="kpi-card" onclick="setApptFilterStatus('PENDIENTE')" style="cursor: pointer;" title="Ver turnos sin confirmar">
+              <div class="kpi-title">⏳ Por Confirmar</div>
+              <div class="kpi-value" id="kpiApptPendientes" style="color: #f59e0b;">0</div>
+              <div class="kpi-sub">Esperando confirmación</div>
+            </div>
+            <div class="kpi-card" onclick="setApptFilterStatus('cancelados')" style="cursor: pointer;" title="Ver turnos cancelados">
+              <div class="kpi-title">❌ Cancelados</div>
+              <div class="kpi-value" id="kpiApptCancelados" style="color: #ef4444;">0</div>
+              <div class="kpi-sub">Turnos liberados / cancelados</div>
+            </div>
+          </div>
+
+          <!-- TARJETA PRINCIPAL DE GESTIÓN -->
           <div class="admin-card">
-            <div class="admin-card-header">
-              <h3 class="admin-card-title">Gestión de Turnos</h3>
-              <div style="display: flex; gap: 8px;">
-                <input type="date" id="filterApptDate" class="form-control" onchange="loadAdminAppointments()" style="padding: 6px 10px;">
-                <select id="filterApptStatus" class="form-control" onchange="loadAdminAppointments()" style="padding: 6px 10px;">
-                  <option value="">Todos los Estados</option>
-                  <option value="PENDIENTE">PENDIENTE</option>
-                  <option value="CONFIRMADO">CONFIRMADO</option>
-                  <option value="COMPLETADO">COMPLETADO</option>
-                  <option value="CANCELADO">CANCELADO</option>
+            <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h3 class="admin-card-title">Gestión de Turnos</h3>
+                <p style="font-size: 0.75rem; color: #9ca3af; margin-top: 2px;">
+                  Confirma, inicia y completa turnos. Los turnos atendidos se archivan para mantener tu vista limpia.
+                </p>
+              </div>
+
+              <!-- CONTROLES DE FECHA Y BARBERO -->
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <div style="display: flex; background: #09090c; border: 1px solid var(--admin-border); border-radius: 8px; padding: 2px;">
+                  <button type="button" id="btnDateToday" class="btn-date-filter active" onclick="setApptDatePreset('today')">Hoy</button>
+                  <button type="button" id="btnDateTomorrow" class="btn-date-filter" onclick="setApptDatePreset('tomorrow')">Mañana</button>
+                  <button type="button" id="btnDateAll" class="btn-date-filter" onclick="setApptDatePreset('all')">Histórico</button>
+                </div>
+                <input type="date" id="filterApptDate" class="form-control" onchange="onCustomDateChange()" style="padding: 6px 10px; width: 140px;">
+                <select id="filterApptBarber" class="form-control" onchange="onApptBarberChange()" style="padding: 6px 10px;">
+                  <option value="">Todos los Barberos</option>
                 </select>
               </div>
             </div>
-            <div class="admin-table-wrapper">
+
+            <!-- BARRA DE PESTAÑAS / FILTRO DE ESTADOS -->
+            <div class="appt-status-pills-bar">
+              <button type="button" class="appt-pill active" data-status="activos" onclick="setApptFilterStatus('activos')">
+                ⚡ Por Atender <span class="pill-count" id="pillCountActivos">0</span>
+              </button>
+              <button type="button" class="appt-pill" data-status="completados" onclick="setApptFilterStatus('completados')">
+                ✅ Ya Atendidos <span class="pill-count" id="pillCountCompletados">0</span>
+              </button>
+              <button type="button" class="appt-pill" data-status="PENDIENTE" onclick="setApptFilterStatus('PENDIENTE')">
+                ⏳ Pendientes <span class="pill-count" id="pillCountPendientes">0</span>
+              </button>
+              <button type="button" class="appt-pill" data-status="CONFIRMADO" onclick="setApptFilterStatus('CONFIRMADO')">
+                💬 Confirmados <span class="pill-count" id="pillCountConfirmados">0</span>
+              </button>
+              <button type="button" class="appt-pill" data-status="cancelados" onclick="setApptFilterStatus('cancelados')">
+                ❌ Cancelados <span class="pill-count" id="pillCountCancelados">0</span>
+              </button>
+              <button type="button" class="appt-pill" data-status="todos" onclick="setApptFilterStatus('todos')">
+                📋 Todos <span class="pill-count" id="pillCountTodos">0</span>
+              </button>
+
+              <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+                <input type="text" id="searchApptClient" placeholder="🔍 Buscar cliente..." class="form-control" oninput="renderFilteredAppointmentsTable()" style="padding: 6px 12px; font-size: 0.8rem; width: 180px;">
+              </div>
+            </div>
+
+            <!-- CONTENEDOR DE TABLA -->
+            <div class="admin-table-wrapper" style="min-height: 250px;">
               <table class="admin-table">
                 <thead>
                   <tr>
-                    <th>#ID</th>
+                    <th>Hora</th>
                     <th>Cliente</th>
                     <th>WhatsApp</th>
                     <th>Barbero</th>
                     <th>Servicio</th>
-                    <th>Fecha & Hora</th>
                     <th>Estado</th>
-                    <th>Acciones</th>
+                    <th style="min-width: 200px; text-align: right;">Acciones de Atención</th>
                   </tr>
                 </thead>
                 <tbody id="appointmentsTableBody"></tbody>
               </table>
+
+              <!-- MENSAJE DE VISTA LIMPIA (EMPTY STATE) -->
+              <div id="apptEmptyState" style="display: none; padding: 48px 24px; text-align: center;">
+                <div style="font-size: 2.2rem; margin-bottom: 8px;">🎉</div>
+                <h4 style="font-size: 1.1rem; color: #ffffff; margin-bottom: 4px;" id="emptyStateTitle">¡Bandeja de turnos limpia!</h4>
+                <p style="font-size: 0.85rem; color: #9ca3af; max-width: 440px; margin: 0 auto 16px auto;" id="emptyStateDesc">
+                  No hay turnos pendientes por atender para la selección actual. Los turnos atendidos quedan archivados para tu comodidad.
+                </p>
+                <button type="button" class="btn-admin btn-admin-sm btn-admin-secondary" onclick="setApptFilterStatus('completados')">
+                  Ver clientes ya atendidos
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1248,7 +1321,8 @@
         <button type="button" onclick="closeOrderDetailModal()" class="btn-admin btn-admin-secondary">Cerrar</button>
       </div>
     </div>
-  </div>
+  <!-- TOAST NOTIFICATIONS CONTAINER -->
+  <div id="adminToastContainer" class="admin-toast-container"></div>
 
   <script src="/static/admin.js"></script>
 </body>

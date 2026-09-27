@@ -569,58 +569,390 @@ async function loadAdminDashboard() {
   }
 }
 
-// 2. TURNOS
+// ==============================================================================
+// 2. GESTIÓN INTEGRAL DE TURNOS (CONFIRMAR, ATENDER, COMPLETAR Y VISTA LIMPIA)
+// ==============================================================================
+let apptState = {
+  datePreset: "today",
+  selectedDate: getLocalDateStr(0),
+  selectedStatus: "activos",
+  selectedBarberId: "",
+  allAppointments: []
+};
+
+function getLocalDateStr(offsetDays = 0) {
+  const d = new Date();
+  if (offsetDays !== 0) d.setDate(d.getDate() + offsetDays);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function showToast(message, type = "success") {
+  let container = document.getElementById("adminToastContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "adminToastContainer";
+    container.className = "admin-toast-container";
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement("div");
+  toast.className = "admin-toast";
+  if (type === "error") {
+    toast.style.borderLeftColor = "#ef4444";
+  } else if (type === "warning") {
+    toast.style.borderLeftColor = "#f59e0b";
+  }
+
+  const icon = type === "error" ? "⚠️" : (type === "warning" ? "⏳" : "✅");
+  toast.innerHTML = `<span>${icon}</span> <span>${escapeHtml(message)}</span>`;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateY(10px)";
+    setTimeout(() => toast.remove(), 300);
+  }, 3200);
+}
+
+function setApptDatePreset(preset) {
+  apptState.datePreset = preset;
+  
+  document.getElementById("btnDateToday")?.classList.toggle("active", preset === "today");
+  document.getElementById("btnDateTomorrow")?.classList.toggle("active", preset === "tomorrow");
+  document.getElementById("btnDateAll")?.classList.toggle("active", preset === "all");
+
+  const dateInput = document.getElementById("filterApptDate");
+  if (preset === "today") {
+    apptState.selectedDate = getLocalDateStr(0);
+    if (dateInput) dateInput.value = apptState.selectedDate;
+  } else if (preset === "tomorrow") {
+    apptState.selectedDate = getLocalDateStr(1);
+    if (dateInput) dateInput.value = apptState.selectedDate;
+  } else if (preset === "all") {
+    apptState.selectedDate = "";
+    if (dateInput) dateInput.value = "";
+  }
+
+  loadAdminAppointments();
+}
+
+function onCustomDateChange() {
+  const dateInput = document.getElementById("filterApptDate");
+  if (!dateInput) return;
+  apptState.selectedDate = dateInput.value;
+  apptState.datePreset = "custom";
+
+  document.getElementById("btnDateToday")?.classList.remove("active");
+  document.getElementById("btnDateTomorrow")?.classList.remove("active");
+  document.getElementById("btnDateAll")?.classList.remove("active");
+
+  loadAdminAppointments();
+}
+
+function onApptBarberChange() {
+  const barberSel = document.getElementById("filterApptBarber");
+  apptState.selectedBarberId = barberSel ? barberSel.value : "";
+  loadAdminAppointments();
+}
+
+function setApptFilterStatus(statusKey) {
+  apptState.selectedStatus = statusKey;
+
+  document.querySelectorAll(".appt-pill").forEach(pill => {
+    const isAct = pill.getAttribute("data-status") === statusKey;
+    pill.classList.toggle("active", isAct);
+  });
+
+  renderFilteredAppointmentsTable();
+}
+
+async function populateApptBarberOptions() {
+  const select = document.getElementById("filterApptBarber");
+  if (!select || select.options.length > 1) return;
+  try {
+    const res = await fetch("/api/admin/barbers", { headers: authHeaders() });
+    if (res.ok) {
+      const barbers = await res.json();
+      barbers.forEach(b => {
+        const opt = document.createElement("option");
+        opt.value = b.id;
+        opt.textContent = `Barbero: ${b.name}`;
+        select.appendChild(opt);
+      });
+    }
+  } catch (_) {}
+}
+
 async function loadAdminAppointments() {
-  const date = document.getElementById("filterApptDate").value;
-  const status = document.getElementById("filterApptStatus").value;
+  const dateInput = document.getElementById("filterApptDate");
+  if (dateInput && !dateInput.value && apptState.datePreset === "today") {
+    dateInput.value = apptState.selectedDate;
+  }
+
+  await populateApptBarberOptions();
 
   let url = "/api/admin/appointments?";
-  if (date) url += `date=${date}&`;
-  if (status) url += `status=${status}&`;
+  if (apptState.selectedDate) url += `date=${apptState.selectedDate}&`;
+  if (apptState.selectedBarberId) url += `barber_id=${apptState.selectedBarberId}&`;
 
   try {
     const res = await fetch(url, { headers: authHeaders() });
     if (!res.ok) return;
     const appts = await res.json();
 
-    const tbody = document.getElementById("appointmentsTableBody");
-    tbody.innerHTML = "";
+    apptState.allAppointments = appts || [];
 
-    appts.forEach(a => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>#${a.id}</td>
-        <td><strong>${escapeHtml(a.client_name)}</strong></td>
-        <td><a href="https://wa.me/${a.client_phone.replace(/\D/g, '')}" target="_blank" style="color: #00f2fe;">${escapeHtml(a.client_phone)}</a></td>
-        <td>${escapeHtml(a.barber_name || '-')}</td>
-        <td>${escapeHtml(a.service || '-')}</td>
-        <td>${a.appointment_time.replace("T", " ").substring(0, 16)} hs</td>
-        <td><span class="badge badge-${a.status.toLowerCase()}">${a.status}</span></td>
-        <td>
-          <button class="btn-admin btn-admin-sm btn-admin-secondary" onclick="changeApptStatus(${a.id}, 'CONFIRMADO')">Confirmar</button>
-          <button class="btn-admin btn-admin-sm btn-admin-secondary" onclick="changeApptStatus(${a.id}, 'COMPLETADO')">Completar</button>
-          <button class="btn-admin btn-admin-sm btn-admin-danger" onclick="changeApptStatus(${a.id}, 'CANCELADO')">Cancelar</button>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
+    // Calcular KPIs
+    const activos = apptState.allAppointments.filter(a => 
+      ["PENDIENTE", "CONFIRMADO", "EN_SILLA", "EN_ATENCION"].includes(a.status) && !a.canceled
+    );
+    const completados = apptState.allAppointments.filter(a => a.status === "COMPLETADO");
+    const pendientes = apptState.allAppointments.filter(a => a.status === "PENDIENTE" && !a.canceled);
+    const confirmados = apptState.allAppointments.filter(a => a.status === "CONFIRMADO" && !a.canceled);
+    const cancelados = apptState.allAppointments.filter(a => a.status === "CANCELADO" || a.canceled);
+
+    // Actualizar contadores KPI Cards
+    const kpiAct = document.getElementById("kpiApptActivos");
+    if (kpiAct) kpiAct.textContent = activos.length;
+    const kpiComp = document.getElementById("kpiApptCompletados");
+    if (kpiComp) kpiComp.textContent = completados.length;
+    const kpiPend = document.getElementById("kpiApptPendientes");
+    if (kpiPend) kpiPend.textContent = pendientes.length;
+    const kpiCanc = document.getElementById("kpiApptCancelados");
+    if (kpiCanc) kpiCanc.textContent = cancelados.length;
+
+    // Actualizar contadores de las píldoras
+    const pAct = document.getElementById("pillCountActivos");
+    if (pAct) pAct.textContent = activos.length;
+    const pComp = document.getElementById("pillCountCompletados");
+    if (pComp) pComp.textContent = completados.length;
+    const pPend = document.getElementById("pillCountPendientes");
+    if (pPend) pPend.textContent = pendientes.length;
+    const pConf = document.getElementById("pillCountConfirmados");
+    if (pConf) pConf.textContent = confirmados.length;
+    const pCanc = document.getElementById("pillCountCancelados");
+    if (pCanc) pCanc.textContent = cancelados.length;
+    const pAll = document.getElementById("pillCountTodos");
+    if (pAll) pAll.textContent = apptState.allAppointments.length;
+
+    renderFilteredAppointmentsTable();
+
   } catch (e) {
-    console.error(e);
+    console.error("Error cargando turnos:", e);
+    showToast("Error al cargar listado de turnos", "error");
   }
 }
 
+function renderFilteredAppointmentsTable() {
+  const tbody = document.getElementById("appointmentsTableBody");
+  const emptyState = document.getElementById("apptEmptyState");
+  const table = tbody?.closest("table");
+  if (!tbody) return;
+
+  const searchInput = document.getElementById("searchApptClient");
+  const term = (searchInput ? searchInput.value : "").trim().toLowerCase();
+
+  let list = apptState.allAppointments;
+
+  // Filtro por estado
+  const st = apptState.selectedStatus;
+  if (st === "activos") {
+    list = list.filter(a => ["PENDIENTE", "CONFIRMADO", "EN_SILLA", "EN_ATENCION"].includes(a.status) && !a.canceled);
+  } else if (st === "completados") {
+    list = list.filter(a => a.status === "COMPLETADO");
+  } else if (st === "cancelados") {
+    list = list.filter(a => a.status === "CANCELADO" || a.canceled);
+  } else if (st === "PENDIENTE") {
+    list = list.filter(a => a.status === "PENDIENTE" && !a.canceled);
+  } else if (st === "CONFIRMADO") {
+    list = list.filter(a => a.status === "CONFIRMADO" && !a.canceled);
+  }
+
+  // Filtro por texto de búsqueda
+  if (term) {
+    list = list.filter(a => 
+      (a.client_name || "").toLowerCase().includes(term) ||
+      (a.client_phone || "").toLowerCase().includes(term) ||
+      (a.barber_name || "").toLowerCase().includes(term) ||
+      (a.service || "").toLowerCase().includes(term) ||
+      String(a.id).includes(term)
+    );
+  }
+
+  tbody.innerHTML = "";
+
+  if (list.length === 0) {
+    if (table) table.style.display = "none";
+    if (emptyState) {
+      emptyState.style.display = "block";
+      const title = document.getElementById("emptyStateTitle");
+      const desc = document.getElementById("emptyStateDesc");
+      if (st === "activos") {
+        if (title) title.textContent = "¡Bandeja de turnos limpia! 🎉";
+        if (desc) desc.textContent = "No hay turnos pendientes por atender para esta fecha. Todos los clientes han sido atendidos o no hay turnos activos.";
+      } else {
+        if (title) title.textContent = "Sin resultados";
+        if (desc) desc.textContent = "No se encontraron turnos con el filtro seleccionado.";
+      }
+    }
+    return;
+  }
+
+  if (table) table.style.display = "table";
+  if (emptyState) emptyState.style.display = "none";
+
+  list.forEach(a => {
+    const tr = document.createElement("tr");
+    
+    // Formato de hora limpia
+    const timeStr = a.appointment_time ? a.appointment_time.replace("T", " ").substring(11, 16) : "--:--";
+    const dateStr = a.appointment_time ? a.appointment_time.substring(0, 10) : "";
+    const cleanPhone = (a.client_phone || "").replace(/\D/g, "");
+    const waText = encodeURIComponent(`¡Hola ${a.client_name}! Te saludamos de la Barbería por tu turno programado a las ${timeStr} hs.`);
+
+    // Clase CSS del estado
+    const statusClass = (a.status || "pendiente").toLowerCase();
+
+    // Generar botones contextuales según el estado
+    let actionButtonsHtml = "";
+
+    if (a.status === "PENDIENTE") {
+      actionButtonsHtml = `
+        <div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
+          <button type="button" class="btn-admin btn-admin-sm" onclick="changeApptStatus(${a.id}, 'CONFIRMADO')" style="background: rgba(0, 242, 254, 0.15); border: 1px solid rgba(0, 242, 254, 0.4); color: #00f2fe;" title="Confirmar turno">
+            ✅ Confirmar
+          </button>
+          <button type="button" class="btn-admin btn-admin-sm" onclick="changeApptStatus(${a.id}, 'EN_SILLA')" style="background: rgba(212, 255, 0, 0.15); border: 1px solid rgba(212, 255, 0, 0.4); color: #d4ff00;" title="Iniciar atención en sillón">
+            💈 En Silla
+          </button>
+          <button type="button" class="btn-admin btn-admin-sm" onclick="changeApptStatus(${a.id}, 'COMPLETADO')" style="background: #10b981; color: #000; font-weight: 800;" title="Marcar como atendido y archivar">
+            🏁 Completar
+          </button>
+          <button type="button" class="btn-admin btn-admin-sm btn-admin-danger" onclick="changeApptStatus(${a.id}, 'CANCELADO')" title="Cancelar turno">
+            ✕
+          </button>
+        </div>
+      `;
+    } else if (a.status === "CONFIRMADO") {
+      actionButtonsHtml = `
+        <div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
+          <button type="button" class="btn-admin btn-admin-sm" onclick="changeApptStatus(${a.id}, 'EN_SILLA')" style="background: rgba(212, 255, 0, 0.15); border: 1px solid rgba(212, 255, 0, 0.4); color: #d4ff00;" title="Pasar al sillón de atención">
+            💈 En Silla
+          </button>
+          <button type="button" class="btn-admin btn-admin-sm" onclick="changeApptStatus(${a.id}, 'COMPLETADO')" style="background: #10b981; color: #000; font-weight: 800;" title="Marcar como atendido y archivar">
+            🏁 Completar
+          </button>
+          <button type="button" class="btn-admin btn-admin-sm btn-admin-danger" onclick="changeApptStatus(${a.id}, 'CANCELADO')" title="Cancelar turno">
+            ✕
+          </button>
+        </div>
+      `;
+    } else if (a.status === "EN_SILLA" || a.status === "EN_ATENCION") {
+      actionButtonsHtml = `
+        <div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
+          <button type="button" class="btn-admin btn-admin-sm" onclick="changeApptStatus(${a.id}, 'COMPLETADO')" style="background: #10b981; color: #000; font-weight: 800; padding: 6px 14px;" title="Finalizar servicio y archivar turno">
+            🏁 Finalizar & Completar
+          </button>
+          <button type="button" class="btn-admin btn-admin-sm btn-admin-danger" onclick="changeApptStatus(${a.id}, 'CANCELADO')" title="Cancelar">
+            ✕
+          </button>
+        </div>
+      `;
+    } else if (a.status === "COMPLETADO") {
+      actionButtonsHtml = `
+        <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
+          <span style="font-size: 0.75rem; color: #10b981; font-weight: 700; font-family: monospace;">✅ Atendido</span>
+          <button type="button" class="btn-admin btn-admin-sm btn-admin-secondary" onclick="changeApptStatus(${a.id}, 'CONFIRMADO')" title="Reabrir turno si fue completado por error" style="font-size: 0.7rem; padding: 3px 8px;">
+            ↩️ Reabrir
+          </button>
+        </div>
+      `;
+    } else if (a.status === "CANCELADO") {
+      actionButtonsHtml = `
+        <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
+          <span style="font-size: 0.75rem; color: #ef4444; font-weight: 700; font-family: monospace;">❌ Cancelado</span>
+          <button type="button" class="btn-admin btn-admin-sm btn-admin-secondary" onclick="changeApptStatus(${a.id}, 'PENDIENTE')" title="Reactivar turno" style="font-size: 0.7rem; padding: 3px 8px;">
+            ↩️ Reactivar
+          </button>
+        </div>
+      `;
+    }
+
+    tr.innerHTML = `
+      <td>
+        <div style="display: flex; flex-direction: column;">
+          <span style="font-family: monospace; font-weight: 800; font-size: 0.95rem; color: #d4ff00;">${timeStr} hs</span>
+          ${apptState.datePreset === 'all' ? `<span style="font-size: 0.7rem; color: #9ca3af;">${dateStr}</span>` : ''}
+        </div>
+      </td>
+      <td>
+        <strong style="color: #ffffff; font-size: 0.9rem;">${escapeHtml(a.client_name)}</strong>
+        <div style="font-size: 0.7rem; color: #64748b;">#ID: ${a.id}</div>
+      </td>
+      <td>
+        ${cleanPhone ? `
+          <a href="https://wa.me/${cleanPhone}?text=${waText}" target="_blank" style="display: inline-flex; align-items: center; gap: 4px; color: #00f2fe; text-decoration: none; font-size: 0.8rem; font-family: monospace;" title="Abrir chat de WhatsApp">
+            <span>💬</span> <span>${escapeHtml(a.client_phone)}</span>
+          </a>
+        ` : `<span style="color: #64748b;">-</span>`}
+      </td>
+      <td>
+        <span style="display: inline-block; padding: 2px 8px; border-radius: 6px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); font-size: 0.75rem; font-weight: 600; color: #e5e7eb;">
+          💈 ${escapeHtml(a.barber_name || 'Sin asignar')}
+        </span>
+      </td>
+      <td>
+        <span style="font-size: 0.8rem; color: #e5e7eb;">${escapeHtml(a.service || 'Servicio de Barbería')}</span>
+        ${a.duration_min ? `<span style="font-size: 0.7rem; color: #64748b; margin-left: 4px;">(${a.duration_min}m)</span>` : ''}
+      </td>
+      <td>
+        <span class="badge badge-${statusClass}">
+          ${escapeHtml(a.status)}
+        </span>
+      </td>
+      <td style="text-align: right;">
+        ${actionButtonsHtml}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
 async function changeApptStatus(id, newStatus) {
+  if (newStatus === "CANCELADO") {
+    const ok = confirm(`¿Estás seguro de cancelar el Turno #${id}?\nEl horario quedará liberado en la agenda.`);
+    if (!ok) return;
+  }
+
   try {
-    const res = await fetch(`/api/admin/appointments/${id}`, {
+    const res = await fetch(`/api/admin/appointments/${id}/status`, {
       method: "PUT",
       headers: authHeaders(),
       body: JSON.stringify({ status: newStatus })
     });
+
     if (res.ok) {
+      if (newStatus === "COMPLETADO") {
+        showToast(`Turno #${id} completado. La vista activa queda limpia.`, "success");
+      } else if (newStatus === "CONFIRMADO") {
+        showToast(`Turno #${id} confirmado exitosamente.`, "success");
+      } else if (newStatus === "EN_SILLA") {
+        showToast(`Turno #${id} en atención en sillón.`, "success");
+      } else if (newStatus === "CANCELADO") {
+        showToast(`Turno #${id} cancelado y liberado.`, "warning");
+      } else {
+        showToast(`Turno #${id} actualizado a ${newStatus}.`, "success");
+      }
       loadAdminAppointments();
+    } else {
+      const err = await res.json();
+      showToast(err.detail || "Error al actualizar estado del turno.", "error");
     }
   } catch (e) {
-    alert("Error al actualizar turno.");
+    showToast("Error de conexión al actualizar turno.", "error");
   }
 }
 

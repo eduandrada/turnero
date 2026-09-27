@@ -565,10 +565,110 @@ body {
   text-transform: uppercase;
 }
 
-.badge-pending { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
-.badge-confirmed { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
-.badge-completed { background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
-.badge-canceled { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+.badge-pending, .badge-pendiente { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+.badge-confirmed, .badge-confirmado { background: rgba(0, 242, 254, 0.15); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.3); }
+.badge-en_silla, .badge-en_atencion { background: rgba(212, 255, 0, 0.15); color: #d4ff00; border: 1px solid rgba(212, 255, 0, 0.3); }
+.badge-completed, .badge-completado { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+.badge-canceled, .badge-cancelado { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+/* Píldoras y filtros de Gestión de Turnos */
+.btn-date-filter {
+  background: transparent;
+  border: none;
+  color: var(--admin-text-muted);
+  font-family: 'Space Grotesk', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-date-filter:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+}
+.btn-date-filter.active {
+  background: var(--admin-primary);
+  color: #000000;
+}
+
+.appt-status-pills-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 0 16px 0;
+  border-bottom: 1px solid var(--admin-border);
+  margin-bottom: 16px;
+}
+
+.appt-pill {
+  background: #131318;
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text-muted);
+  font-family: 'Space Grotesk', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+.appt-pill:hover {
+  border-color: rgba(212, 255, 0, 0.4);
+  color: #ffffff;
+}
+.appt-pill.active {
+  background: rgba(212, 255, 0, 0.12);
+  border-color: var(--admin-primary);
+  color: var(--admin-primary);
+  box-shadow: 0 0 12px rgba(212, 255, 0, 0.1);
+}
+
+.pill-count {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+.appt-pill.active .pill-count {
+  background: var(--admin-primary);
+  color: #000000;
+}
+
+/* Toast flotante en Admin */
+.admin-toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+.admin-toast {
+  pointer-events: auto;
+  background: #131318;
+  border: 1px solid var(--admin-border);
+  border-left: 4px solid var(--admin-primary);
+  color: #ffffff;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-family: 'Space Grotesk', monospace;
+  font-size: 0.85rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  animation: adminModalIn 0.25s ease-out;
+}
 
 /* Micro-Interactions & Motion */
 button, a, .btn-admin, .nav-item {
