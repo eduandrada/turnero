@@ -14,8 +14,8 @@ WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "109876543210")
 WHATSAPP_API_URL = f"https://graph.facebook.com/v20.0/{WHATSAPP_PHONE_ID}/messages"
 
 try:
-    from apscheduler.schedulers.asyncio import AsyncIOScheduler
-    scheduler = AsyncIOScheduler()
+    from apscheduler.schedulers.background import BackgroundScheduler
+    scheduler = BackgroundScheduler()
 except ImportError:
     scheduler = None
     logger.warning("apscheduler no está instalado. El planificador de recordatorios por WhatsApp estará en modo manual.")
@@ -137,22 +137,47 @@ async def check_upcoming_appointments():
         db.close()
 
 
+def run_upcoming_appointments_job():
+    """Ejecuta el job asíncrono dentro del hilo en background de APScheduler."""
+    try:
+        import asyncio
+        asyncio.run(check_upcoming_appointments())
+    except Exception as e:
+        logger.exception(f"Excepción en cron job de recordatorios WhatsApp: {e}")
+
+
+def is_scheduler_running() -> bool:
+    """Retorna True si el planificador está activo y ejecutándose."""
+    return bool(scheduler and scheduler.running)
+
+
 def start_scheduler():
-    """Inicializa el planificador si está disponible."""
-    if scheduler and not scheduler.running:
-        scheduler.add_job(
-            check_upcoming_appointments,
-            "interval",
-            minutes=5,
-            id="whatsapp_reminder_job",
-            replace_existing=True
-        )
-        scheduler.start()
-        logger.info("APScheduler iniciado correctamente.")
+    """Inicializa formalmente el planificador si está disponible."""
+    if scheduler is None:
+        logger.warning("APScheduler no disponible (modo manual activo). El planificador de recordatorios WhatsApp no se iniciará automáticamente.")
+        return
+    try:
+        if not scheduler.running:
+            scheduler.add_job(
+                run_upcoming_appointments_job,
+                "interval",
+                minutes=5,
+                id="whatsapp_reminder_job",
+                replace_existing=True
+            )
+            scheduler.start()
+            logger.info("APScheduler BackgroundScheduler iniciado formalmente en background (intervalo: 5 min).")
+    except Exception as e:
+        logger.error(f"Error al iniciar APScheduler: {e}. Continuando en modo manual.")
 
 
 def shutdown_scheduler():
     """Detiene el planificador si está en ejecución."""
-    if scheduler and scheduler.running:
-        scheduler.shutdown(wait=False)
-        logger.info("APScheduler detenido.")
+    if scheduler is not None:
+        try:
+            if scheduler.running:
+                scheduler.shutdown(wait=False)
+                logger.info("APScheduler detenido formalmente.")
+        except Exception as e:
+            logger.error(f"Error al apagar APScheduler: {e}")
+

@@ -49,6 +49,7 @@ from app.schemas import (
     VoucherCreate, VoucherUpdate, VoucherRead, VoucherPreviewRequest, VoucherApplyRequest,
     ClientNotesUpdate, SalesRecordCreate, SalesRecordRead
 )
+from app.config import verify_production_secrets
 from app.auth import (
     get_current_admin,
     require_admin_role,
@@ -81,6 +82,7 @@ from app.utils import normalize_phone, format_turn_for_speech, build_speech_anno
 from app.availability_engine import calculate_available_slots
 from app.voucher_engine import validate_and_calculate_discount, record_voucher_redemption
 from app.rate_limiter import check_rate_limit
+from app.image_service import process_and_save_image, delete_orphan_file, ImageProcessingError
 
 logger = logging.getLogger("bladesync.main")
 logging.basicConfig(level=logging.INFO)
@@ -311,6 +313,7 @@ def seed_initial_data():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    verify_production_secrets()
     init_db_and_migrate()
     seed_initial_data()
     start_scheduler()
@@ -2007,6 +2010,10 @@ async def upload_logo(
     if len(contents) > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="El logo supera el tamaño máximo permitido (5 MB).")
 
+    old_logo = get_setting(db, "logo_url", "")
+    if old_logo:
+        delete_orphan_file(old_logo)
+
     filename = f"logo_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}{ext}"
     filepath = os.path.join(uploads_dir, filename)
 
@@ -2031,6 +2038,10 @@ def delete_logo(
     admin: AdminUser = Depends(require_admin_role),
     db: Session = Depends(get_db)
 ):
+    old_logo = get_setting(db, "logo_url", "")
+    if old_logo:
+        delete_orphan_file(old_logo)
+
     bulk_set_settings(db, {"logo_url": ""})
     db.add(AuditLog(
         user_name=admin.username,
@@ -2040,6 +2051,103 @@ def delete_logo(
     ))
     db.commit()
     return {"status": "success", "logo_url": "", "message": "Logo eliminado correctamente."}
+
+
+# ==============================================================================
+# 4.1 MOTOR UNIVERSAL DE CARGA Y PROCESAMIENTO MULTIMEDIA (Pillow + WebP)
+# ==============================================================================
+@app.post("/api/media/upload")
+async def upload_media_asset(
+    file: UploadFile = File(...),
+    context: str = Form(...),
+    previous_url: Optional[str] = Form(None),
+    current_user: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Motor universal de carga y procesamiento de imágenes:
+    - Contextos: 'avatar', 'product', 'branding'.
+    - Permisos:
+      * 'product' y 'branding': Rol ENCARGADO o ADMIN.
+      * 'avatar': Personal autenticado (staff).
+    - Pipeline Pillow:
+      * Validación real de MIME, extensión y tamaño <= 5MB.
+      * 'avatar': 300x300 px centrado (square crop).
+      * 'product': relación de aspecto hasta 800x800 px max.
+      * 'branding': relación de aspecto hasta 600 px ancho max.
+      * Conversión y compresión a WebP 85%.
+      * Nombre UUID v4 no colisionable.
+      * Eliminación de archivo huérfano si se recibe previous_url.
+    """
+    clean_context = context.strip().lower()
+    user_role = (current_user.role or "").lower()
+
+    if clean_context in ["product", "branding"]:
+        if user_role not in ["admin", "encargado"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acceso denegado: Se requiere rol ENCARGADO o ADMIN para subir activos de producto o branding."
+            )
+    elif clean_context == "avatar":
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Debe iniciar sesión para actualizar la imagen de perfil."
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Contexto '{context}' no válido. Use 'avatar', 'product' o 'branding'."
+        )
+
+    try:
+        contents = await file.read()
+        result = process_and_save_image(
+            file_bytes=contents,
+            original_filename=file.filename or "uploaded_image.jpg",
+            context=clean_context,
+            previous_url=previous_url
+        )
+
+        # Auditoría de subida
+        db.add(AuditLog(
+            user_name=current_user.username,
+            actor=current_user.username,
+            module="Multimedia",
+            action=f"UPLOAD_{clean_context.upper()}",
+            new_value=result["url"],
+            description=f"Subida de imagen ({clean_context}): {result['filename']} ({result['width']}x{result['height']} px)"
+        ))
+        db.commit()
+
+        return result
+    except ImageProcessingError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.exception(f"Error inesperado en upload_media_asset: {e}")
+        raise HTTPException(status_code=500, detail="Error interno al procesar el archivo multimedia.")
+
+
+@app.delete("/api/media/delete")
+def delete_media_asset(
+    file_url: str = Query(...),
+    current_user: AdminUser = Depends(require_encargado_or_admin),
+    db: Session = Depends(get_db)
+):
+    """Elimina de forma segura un archivo multimedia huérfano dentro de uploads."""
+    deleted = delete_orphan_file(file_url)
+    if deleted:
+        db.add(AuditLog(
+            user_name=current_user.username,
+            actor=current_user.username,
+            module="Multimedia",
+            action="DELETE_MEDIA",
+            description=f"Eliminación de recurso multimedia: {file_url}"
+        ))
+        db.commit()
+        return {"status": "success", "message": "Archivo eliminado correctamente."}
+    return {"status": "not_found", "message": "El archivo no existe o no se encuentra dentro del directorio permitido."}
+
 
 
 # 5. GESTIÓN DE BARBEROS
@@ -2074,7 +2182,13 @@ def update_admin_barber(
         raise HTTPException(status_code=404, detail="Barbero no encontrado.")
     
     old_name = b.name
-    for k, v in barber_in.model_dump(exclude_unset=True).items():
+    old_avatar = b.avatar_url
+    updates = barber_in.model_dump(exclude_unset=True)
+
+    if "avatar_url" in updates and updates["avatar_url"] != old_avatar and old_avatar:
+        delete_orphan_file(old_avatar)
+
+    for k, v in updates.items():
         setattr(b, k, v)
     db.commit()
     db.refresh(b)
@@ -2094,8 +2208,12 @@ def delete_admin_barber(
         raise HTTPException(status_code=404, detail="Barbero no encontrado.")
     
     name = b.name
+    old_avatar = b.avatar_url
     db.delete(b)
     db.commit()
+
+    if old_avatar:
+        delete_orphan_file(old_avatar)
 
     db.add(AuditLog(user_name=admin.username, module="Barberos", action="Eliminar Barbero", record_id=str(barber_id), old_value=name))
     db.commit()
@@ -2485,7 +2603,13 @@ def update_admin_product(
         raise HTTPException(status_code=404, detail="Producto no encontrado.")
 
     old_info = f"{p.name} (${p.price}, stock: {p.stock})"
-    for k, v in prod_in.model_dump(exclude_unset=True).items():
+    old_image = p.image_url
+    updates = prod_in.model_dump(exclude_unset=True)
+
+    if "image_url" in updates and updates["image_url"] != old_image and old_image:
+        delete_orphan_file(old_image)
+
+    for k, v in updates.items():
         if k == "price" and v != p.price:
             p.previous_price = p.price
         setattr(p, k, v)
@@ -2507,8 +2631,12 @@ def delete_admin_product(
         raise HTTPException(status_code=404, detail="Producto no encontrado.")
     
     name = p.name
+    old_image = p.image_url
     db.delete(p)
     db.commit()
+
+    if old_image:
+        delete_orphan_file(old_image)
 
     db.add(AuditLog(user_name=admin.username, module="Shop", action="Eliminar Producto", record_id=str(product_id), old_value=name))
     db.commit()
@@ -2602,6 +2730,11 @@ def update_inventory_product(
     data.pop("current_stock", None)
 
     old_info = f"{p.name} (Stock: {p.stock}, Costo: ${p.cost_price}, Venta: ${p.price})"
+    old_image = p.image_url
+
+    if "image_url" in data and data["image_url"] != old_image and old_image:
+        delete_orphan_file(old_image)
+
     for k, v in data.items():
         setattr(p, k, v)
     db.commit()

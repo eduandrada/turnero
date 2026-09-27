@@ -11,20 +11,14 @@ from fastapi import HTTPException, Security, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
+from app.config import verify_production_secrets, get_secret_key, APP_ENV, IS_PRODUCTION
 from app.database import get_db
 from app.models import AdminUser, RevokedToken
 
 logger = logging.getLogger("bladesync.auth")
 
-APP_ENV = os.getenv("ENV", "development").lower()
-SECRET_KEY = os.getenv("APP_SECRET_KEY") or os.getenv("SECRET_KEY")
-
-DEFAULT_SECRET_KEY = "bladesync_secret_key_barberia_2026_x99"
-if not SECRET_KEY:
-    if APP_ENV == "production":
-        raise RuntimeError("CRÍTICO DE SEGURIDAD: Debe definir la variable de entorno APP_SECRET_KEY en producción.")
-    logger.warning("ATENCIÓN: Utilizando APP_SECRET_KEY por defecto para entorno de desarrollo.")
-    SECRET_KEY = DEFAULT_SECRET_KEY
+SECRET_KEY = get_secret_key()
+verify_production_secrets()
 
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # Default 24 horas
 security_bearer = HTTPBearer(auto_error=False)

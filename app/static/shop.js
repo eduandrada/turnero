@@ -544,8 +544,122 @@ function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
+// ==============================================================================
+// STAFF GATEKEEPER - CONTROL DE ACCESO A INVENTARIO
+// ==============================================================================
+async function openStaffGatekeeperModal() {
+  const token = localStorage.getItem("bladesync_admin_token");
+  if (token) {
+    try {
+      const res = await fetch("/api/admin/me", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const user = await res.json();
+        const role = (user.role || "").toLowerCase();
+        if (role === "admin" || role === "encargado") {
+          window.location.href = "/inventario.html";
+          return;
+        }
+      } else {
+        localStorage.removeItem("bladesync_admin_token");
+      }
+    } catch (e) {
+      console.warn("Verificación de sesión de staff falló:", e);
+    }
+  }
+
+  // Si no está autenticado como ENCARGADO o ADMIN, abrir modal flotante
+  const modal = document.getElementById("gatekeeperModal");
+  const errBox = document.getElementById("gatekeeperErrorMsg");
+  if (errBox) errBox.classList.add("hidden");
+  if (modal) {
+    modal.classList.remove("hidden");
+    const userInput = document.getElementById("gatekeeperUser");
+    if (userInput) {
+      userInput.value = "";
+      setTimeout(() => userInput.focus(), 60);
+    }
+    const passInput = document.getElementById("gatekeeperPass");
+    if (passInput) passInput.value = "";
+  }
+}
+
+function closeGatekeeperModal() {
+  const modal = document.getElementById("gatekeeperModal");
+  if (modal) modal.classList.add("hidden");
+  const errBox = document.getElementById("gatekeeperErrorMsg");
+  if (errBox) errBox.classList.add("hidden");
+  
+  // Devolver el foco al botón de inventario en la tienda
+  const btn = document.getElementById("btnStaffInventoryAccess");
+  if (btn) btn.focus();
+}
+
+async function handleGatekeeperSubmit(event) {
+  if (event) event.preventDefault();
+  const username = (document.getElementById("gatekeeperUser")?.value || "").trim();
+  const password = (document.getElementById("gatekeeperPass")?.value || "").trim();
+  const errBox = document.getElementById("gatekeeperErrorMsg");
+  const errText = document.getElementById("gatekeeperErrorText");
+  const submitBtn = document.getElementById("btnGatekeeperLogin");
+
+  if (!username || !password) {
+    if (errText) errText.textContent = "Por favor ingrese usuario y contraseña.";
+    if (errBox) errBox.classList.remove("hidden");
+    return;
+  }
+
+  try {
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>Verificando permisos...</span>';
+    }
+
+    const res = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+
+    if (res.ok && data.token) {
+      const role = (data.role || "").toLowerCase();
+      if (role === "admin" || role === "encargado") {
+        localStorage.setItem("bladesync_admin_token", data.token);
+        window.location.href = "/inventario.html";
+        return;
+      } else {
+        if (errText) {
+          errText.textContent = "Acceso denegado: El usuario no cuenta con rol administrativo (ENCARGADO o ADMIN).";
+        }
+        if (errBox) errBox.classList.remove("hidden");
+      }
+    } else {
+      if (errText) {
+        errText.textContent = data.detail || "Credenciales incorrectas o usuario inactivo.";
+      }
+      if (errBox) errBox.classList.remove("hidden");
+    }
+  } catch (err) {
+    if (errText) errText.textContent = "Error de conexión con el servidor.";
+    if (errBox) errBox.classList.remove("hidden");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<span>🔓 Acceder al Inventario</span>';
+    }
+  }
+}
+
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
+    const gkModal = document.getElementById("gatekeeperModal");
+    if (gkModal && !gkModal.classList.contains("hidden")) {
+      closeGatekeeperModal();
+      return;
+    }
     if (typeof closeCart === "function") closeCart();
     const modal = document.getElementById("productModal");
     if (modal) modal.style.display = "none";
