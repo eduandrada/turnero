@@ -106,11 +106,14 @@ let shopState = {
 
 document.addEventListener("DOMContentLoaded", async () => {
   loadCartFromStorage();
-  await loadShopSettings();
-  await loadShopCategories();
-  await loadShopProducts();
-  await loadDeliveryZones();
+  await Promise.all([
+    loadShopSettings(),
+    loadShopCategories(),
+    loadShopProducts(),
+    loadDeliveryZones()
+  ]);
   updateCartUI();
+
 
   // Bind UI sounds on button clicks
   document.body.addEventListener("click", (e) => {

@@ -80,13 +80,7 @@ function initAudio() {
   const text = document.getElementById("audioText");
   if (!audio) return;
 
-  audio.volume = 0.6;
-  audio.muted = false;
-
-  // Estado por defecto: MÚSICA ON
-  state.bgMusicPlaying = true;
-  if (icon) icon.textContent = "🔊";
-  if (text) text.textContent = "Música ON";
+  audio.volume = 0.5;
 
   const tryPlay = () => {
     audio.play().then(() => {
@@ -94,8 +88,12 @@ function initAudio() {
       if (icon) icon.textContent = "🔊";
       if (text) text.textContent = "Música ON";
     }).catch(() => {
-      // Si el navegador bloquea autoplay por falta de interacción previa del usuario,
-      // la primera interacción (click o toque) iniciará el audio con sonido activado.
+      // Los navegadores modernos bloquean sonido sin interacción previa del usuario.
+      // Reflejamos el estado real y arrancamos al primer toque de pantalla:
+      state.bgMusicPlaying = false;
+      if (icon) icon.textContent = "▶️";
+      if (text) text.textContent = "Música";
+
       const enableAudioOnGesture = () => {
         audio.play().then(() => {
           state.bgMusicPlaying = true;
@@ -134,6 +132,7 @@ function toggleBgMusic() {
     if (text) text.textContent = "Música OFF";
   }
 }
+
 
 // ==========================================
 // SCREEN NAVIGATION
@@ -278,11 +277,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  await loadPublicSettings();
-  await loadBarbers();
-  await loadServices();
+  await Promise.all([
+    loadPublicSettings(),
+    loadBarbers(),
+    loadServices()
+  ]);
 
   navigateTo("screen-intro");
+
 });
 
 function initClock() {

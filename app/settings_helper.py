@@ -101,7 +101,7 @@ DEFAULT_SETTINGS = {
     "pwa_display": "standalone",
 
     # Música de Fondo
-    "bg_music_url": "/static/musica punchi/punchi.mp4",
+    "bg_music_url": "/static/musica punchi/punchi.mp3",
     "bg_music_enabled": "true",
 
     # Agenda en Vivo & Pantalla TV

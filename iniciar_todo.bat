@@ -15,11 +15,9 @@ echo   Panel Admin: http://192.168.100.2:8000/admin.html
 echo   App Publica: http://192.168.100.2:8000/
 echo   Shop Barber: http://192.168.100.2:8000/shop.html
 echo.
-start "" "http://127.0.0.1:8000/"
-start "" "http://127.0.0.1:8000/shop.html"
-start "" "http://127.0.0.1:8000/admin.html"
-echo.
-echo Servidor escuchando en red (0.0.0.0:8000)...
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+echo Iniciando servidor backend...
+start "" /b cmd /c "timeout /t 2 /nobreak >nul & start http://127.0.0.1:8000/ & start http://127.0.0.1:8000/shop.html & start http://127.0.0.1:8000/admin.html"
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app
 pause
+
 
