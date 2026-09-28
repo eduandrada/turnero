@@ -5,9 +5,11 @@ echo =========================================================
 echo   INICIANDO PANTALLA TV CARTELERA (SIGUIENTE EN TURNO)
 echo =========================================================
 echo.
-echo Abriendo pantalla cartelera en http://127.0.0.1:8000/display.html ...
-start "" "http://127.0.0.1:8000/display.html"
+echo [PC Local]:  http://127.0.0.1:8000/display.html
+echo [Desde Smart TV o Red Local]: http://192.168.100.2:8000/display.html
 echo.
-echo Iniciando servidor backend en puerto 8000 si no estuviese activo...
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+start "" "http://127.0.0.1:8000/display.html"
+echo Iniciando servidor backend en 0.0.0.0:8000...
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 pause
+
