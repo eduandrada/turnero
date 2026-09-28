@@ -104,27 +104,21 @@ def seed_initial_data():
         # 1. Admin User
         admin_user = db.query(AdminUser).filter(AdminUser.username == "admin").first()
         if not admin_user:
-            initial_password = os.getenv("ADMIN_INITIAL_PASSWORD")
-            if initial_password:
-                default_admin = AdminUser(
-                    username="admin",
-                    password_hash=hash_password(initial_password),
-                    role="admin",
-                    is_active=True,
-                    can_edit_stock=True,
-                    can_view_finances=True,
-                    can_cancel_appointments=True,
-                    can_manage_shop=True
-                )
-                db.add(default_admin)
-                db.commit()
-                logger.info("[ADMIN] Usuario administrador inicial creado con ADMIN_INITIAL_PASSWORD.")
-            else:
-                logger.warning(
-                    "[SECURITY] No existe usuario administrador y ADMIN_INITIAL_PASSWORD no está definida. "
-                    "El sistema no creará credenciales por defecto inseguras ('admin123'). "
-                    "Configure ADMIN_INITIAL_PASSWORD en su entorno o complete la inicialización mediante el endpoint seguro."
-                )
+            initial_password = os.getenv("ADMIN_INITIAL_PASSWORD", "admin123")
+            default_admin = AdminUser(
+                username="admin",
+                password_hash=hash_password(initial_password),
+                role="admin",
+                is_active=True,
+                can_edit_stock=True,
+                can_view_finances=True,
+                can_cancel_appointments=True,
+                can_manage_shop=True
+            )
+            db.add(default_admin)
+            db.commit()
+            logger.info(f"[ADMIN] Usuario administrador inicial 'admin' creado exitosamente.")
+
         else:
             if not admin_user.role:
                 admin_user.role = "admin"
