@@ -827,7 +827,29 @@ function showSuccessModal(appt) {
     <strong>${escapeHtml(appt.client_name)}</strong>, tu cita para <strong>${escapeHtml(appt.service)}</strong> con <strong>${escapeHtml(appt.barber_name)}</strong> ha sido agendada para el <strong>${d}/${m}/${y} a las ${timeFormatted} hs</strong>.
   `;
 
+  // Configurar enlace directo de WhatsApp para el cliente
+  const waBtn = document.getElementById("btnModalWhatsApp");
+  if (waBtn) {
+    const shopName = (state.settings && state.settings.barber_name) || "la Barbería";
+    const shopPhone = (state.settings && (state.settings.whatsapp || state.settings.phone)) || "";
+    const waText = encodeURIComponent(
+      `💈 ¡Hola! Acabo de reservar mi turno #${appt.id} en ${shopName}:\n\n` +
+      `👤 Cliente: ${appt.client_name}\n` +
+      `✂️ Servicio: ${appt.service}\n` +
+      `💈 Barbero: ${appt.barber_name}\n` +
+      `📅 Fecha: ${d}/${m}/${y} a las ${timeFormatted} hs\n\n` +
+      `¡Muchas gracias!`
+    );
+    if (shopPhone) {
+      const cleanPhone = shopPhone.replace(/\D/g, "");
+      waBtn.href = `https://wa.me/${cleanPhone}?text=${waText}`;
+    } else {
+      waBtn.href = `https://api.whatsapp.com/send?text=${waText}`;
+    }
+  }
+
   modal.classList.remove("hidden");
+
 }
 
 function closeModal() {
