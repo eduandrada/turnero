@@ -275,7 +275,7 @@ def checkout_admin_appointment(
     else:
         service_price = 0.0
 
-    # 2. Extras
+    # 2. Extras (agendados previamente + adicionales personalizados)
     extras_list = []
     extras_total = 0.0
     if appt.extras_snapshot:
@@ -289,6 +289,15 @@ def checkout_admin_appointment(
                     extras_total += ex_price
         except Exception:
             extras_list.append({"name": str(appt.extras_snapshot), "price": 0.0})
+
+    # Gastos extras o servicios adicionales agregados en el momento del cobro
+    if payload.custom_extras:
+        for ce in payload.custom_extras:
+            ce_name = str(ce.name or "").strip()
+            ce_price = float(ce.price or 0.0)
+            if ce_name and ce_price > 0:
+                extras_list.append({"name": f"{ce_name} (Adicional)", "price": ce_price})
+                extras_total += ce_price
 
     # 3. Productos del Shop & Reducción de Stock Conectada
     products_list = []

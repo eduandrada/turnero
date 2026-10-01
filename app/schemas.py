@@ -260,9 +260,14 @@ class CheckoutProductItem(BaseModel):
     quantity: int = 1
     unit_price: Optional[float] = None
 
+class CustomExtraItem(BaseModel):
+    name: str
+    price: float
+
 class AppointmentCheckoutRequest(BaseModel):
     payment_method: str = "efectivo" # efectivo, transferencia, mercadopago, debito, credito
     products: List[CheckoutProductItem] = []
+    custom_extras: List[CustomExtraItem] = []
     discount_amount: float = 0.0
     discount_code: Optional[str] = None
     tip_amount: float = 0.0
