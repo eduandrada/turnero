@@ -5,13 +5,31 @@
  */
 
 async function loadStaffData() {
+  const tbody = document.getElementById("staffTableBody");
   try {
     const res = await fetch("/api/admin/staff", { headers: authHeaders() });
-    if (!res.ok) return;
+    if (!res.ok) {
+      if (res.status === 401) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #f59e0b; padding: 32px;">⚠️ Sesión expirada. Por favor, reingresa tus credenciales.</td></tr>`;
+        if (typeof showLoginOverlay === "function") showLoginOverlay();
+        return;
+      }
+      if (res.status === 403) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #f59e0b; padding: 32px; font-weight: 500;">🔒 Acceso restringido. Esta sección es exclusiva para el Administrador principal.</td></tr>`;
+        return;
+      }
+      const err = await res.json().catch(() => ({}));
+      if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 32px;">${escapeHtml(err.detail || "Error al cargar la lista de personal.")}</td></tr>`;
+      return;
+    }
     const staffList = await res.json();
-    const tbody = document.getElementById("staffTableBody");
     if (!tbody) return;
     tbody.innerHTML = "";
+
+    if (!staffList || staffList.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #9ca3af; padding: 32px;">No hay usuarios registrados.</td></tr>`;
+      return;
+    }
 
     staffList.forEach(u => {
       const tr = document.createElement("tr");
@@ -38,11 +56,14 @@ async function loadStaffData() {
       `;
       tbody.appendChild(tr);
     });
-    loadEncargadoSettingsInAdmin();
-    loadStaffFichajesData();
   } catch (e) {
     console.error("Error al cargar personal:", e);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 32px;">Error de conexión al cargar personal.</td></tr>`;
   }
+
+  // Ejecutar módulos auxiliares de manera independiente
+  loadEncargadoSettingsInAdmin();
+  loadStaffFichajesData();
 }
 
 async function loadEncargadoSettingsInAdmin() {
@@ -207,11 +228,22 @@ async function loadStaffFichajesData() {
 
   try {
     const res = await fetch("/api/admin/staff/fichajes", { headers: authHeaders() });
-    if (!res.ok) return;
+    if (!res.ok) {
+      if (res.status === 401) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #f59e0b; padding: 24px;">⚠️ Sesión expirada.</td></tr>`;
+        return;
+      }
+      if (res.status === 403) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #f59e0b; padding: 24px;">🔒 Acceso restringido al Administrador principal.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 24px;">Error al cargar el historial de fichajes.</td></tr>`;
+      return;
+    }
     const list = await res.json();
     tbody.innerHTML = "";
 
-    if (list.length === 0) {
+    if (!list || list.length === 0) {
       tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #9ca3af; padding: 24px;">No hay registros de fichajes aún.</td></tr>`;
       return;
     }
