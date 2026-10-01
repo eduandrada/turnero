@@ -77,6 +77,12 @@ async function loadEncargadoSettingsInAdmin() {
       document.getElementById("as_encargado_max_services").value = data.encargado_max_services || 3;
       document.getElementById("as_encargado_max_styles").value = data.encargado_max_styles || 3;
       document.getElementById("as_encargado_allow_full").value = data.encargado_allow_full_admin ? "true" : "false";
+      if (document.getElementById("as_encargado_can_edit_schedule")) {
+        document.getElementById("as_encargado_can_edit_schedule").value = data.encargado_can_edit_schedule ? "true" : "false";
+      }
+      if (document.getElementById("as_encargado_can_view_barber_club")) {
+        document.getElementById("as_encargado_can_view_barber_club").value = (data.encargado_can_view_barber_club !== false) ? "true" : "false";
+      }
     }
   } catch (e) {
     console.error("Error al cargar configuración de Encargados:", e);
@@ -89,6 +95,8 @@ async function saveEncargadoSettingsFromAdmin() {
   const maxServices = parseInt(document.getElementById("as_encargado_max_services").value || "3");
   const maxStyles = parseInt(document.getElementById("as_encargado_max_styles").value || "3");
   const allowFull = document.getElementById("as_encargado_allow_full").value === "true";
+  const canEditSchedule = document.getElementById("as_encargado_can_edit_schedule")?.value === "true";
+  const canViewBarberClub = document.getElementById("as_encargado_can_view_barber_club")?.value === "true";
 
   try {
     const res = await fetch("/api/admin/encargado-settings", {
@@ -99,7 +107,9 @@ async function saveEncargadoSettingsFromAdmin() {
         encargado_max_clients_per_day: maxClients,
         encargado_max_services: maxServices,
         encargado_max_styles: maxStyles,
-        encargado_allow_full_admin: allowFull
+        encargado_allow_full_admin: allowFull,
+        encargado_can_edit_schedule: canEditSchedule,
+        encargado_can_view_barber_club: canViewBarberClub
       })
     });
     if (res.ok) {

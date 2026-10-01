@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Check-In Totem • Barbería</title>
   <link rel="icon" href="/static/img/icono.png" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -35,16 +35,20 @@
     }
 
     body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: radial-gradient(circle at 50% 10%, #171e2e 0%, #080b11 100%);
       color: var(--text-bright);
       min-height: 100vh;
+      min-height: 100dvh;
+      min-height: -webkit-fill-available;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: space-between;
-      padding: 1.5rem;
-      overflow: hidden;
+      padding: max(1.2rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1.2rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     /* Ambient Background Effects */
@@ -432,6 +436,110 @@
       transition: width 5s linear;
     }
 
+    /* Mobile / iPhone / Android Media Queries */
+    @media (max-width: 640px) {
+      header {
+        margin-bottom: 0.75rem;
+      }
+      .shop-logo-img {
+        height: 55px;
+        max-width: 180px;
+      }
+      .totem-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.75rem;
+        letter-spacing: 1px;
+      }
+      .clock-display {
+        font-size: 0.95rem;
+      }
+      .welcome-card {
+        padding: 1.5rem 1rem;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      }
+      .welcome-card h1 {
+        font-size: 1.6rem;
+      }
+      .welcome-card p {
+        font-size: 0.92rem;
+        margin-bottom: 1.25rem;
+      }
+      .action-grid {
+        grid-template-columns: 1fr;
+        gap: 0.85rem;
+      }
+      .btn-action-mode {
+        padding: 1.2rem 1rem;
+        border-radius: 16px;
+        gap: 0.6rem;
+      }
+      .btn-action-mode i {
+        font-size: 2.2rem;
+      }
+      .btn-action-mode span {
+        font-size: 1.05rem;
+      }
+      .phone-display {
+        font-size: 1.5rem;
+        letter-spacing: 3px;
+        padding: 0.75rem;
+        min-height: 52px;
+        margin-bottom: 0.8rem;
+      }
+      .keypad-grid {
+        gap: 0.5rem;
+      }
+      .btn-key {
+        height: 54px;
+        font-size: 1.35rem;
+        border-radius: 12px;
+      }
+      .modal-success-card {
+        padding: 2rem 1.2rem;
+        border-radius: 24px;
+        max-height: 92vh;
+        overflow-y: auto;
+      }
+      .icon-circle-success {
+        width: 70px;
+        height: 70px;
+        font-size: 2.2rem;
+        margin-bottom: 1rem;
+      }
+      .modal-success-card h2 {
+        font-size: 1.6rem;
+      }
+      .turn-badge-pill {
+        font-size: 1.15rem;
+        padding: 0.4rem 1.1rem;
+      }
+      .barber-notice-box {
+        font-size: 0.9rem;
+        padding: 0.75rem;
+      }
+      footer {
+        font-size: 0.75rem;
+        margin-top: 0.75rem;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .welcome-card {
+        padding: 1.2rem 0.75rem;
+      }
+      .welcome-card h1 {
+        font-size: 1.35rem;
+      }
+      .btn-key {
+        height: 48px;
+        font-size: 1.2rem;
+      }
+      .phone-display {
+        font-size: 1.3rem;
+      }
+    }
+
     /* Footer */
     footer {
       position: relative;
@@ -450,7 +558,7 @@
 
   <!-- Header -->
   <header>
-    <img src="/static/img/barbershop.png" alt="Barber Shop Logo" class="shop-logo-img" onerror="this.src='/static/img/logo.png'">
+    <img src="/static/img/logo.png" alt="Barbería Logo" class="shop-logo-img" onerror="this.onerror=null; this.src='/static/img/icono.png';">
     <div class="totem-badge">
       <i class="fa-solid fa-location-dot"></i> TOTEM DE CHECK-IN EN SALA DE ESPERA
     </div>

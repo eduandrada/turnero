@@ -217,8 +217,8 @@
         <button class="nav-tab-btn" onclick="switchGestionTab('clientes')">👥 Clientes (Límite 6/día)</button>
         <button class="nav-tab-btn" onclick="switchGestionTab('servicios')">💈 Servicios & Precios (Límite 3)</button>
         <button class="nav-tab-btn" onclick="switchGestionTab('estilos')">✂️ Estilos de Corte (Límite 3)</button>
-        <button class="nav-tab-btn" onclick="switchGestionTab('horarios')">🕐 Horarios de Atención</button>
-        <button class="nav-tab-btn" onclick="switchGestionTab('barberclub')" style="color: #f59e0b; font-weight: bold;">⭐ Barber Club & Señas</button>
+        <button class="nav-tab-btn" id="navTabHorarios" onclick="switchGestionTab('horarios')">🕐 Horarios de Atención</button>
+        <button class="nav-tab-btn" id="navTabBarberClub" onclick="switchGestionTab('barberclub')" style="color: #f59e0b; font-weight: bold;">⭐ Barber Club & Señas</button>
       </nav>
 
       <!-- TAB 1: TURNOS DIARIOS -->
@@ -389,76 +389,143 @@
       <!-- TAB 7: HORARIOS DE ATENCIÓN -->
       <div id="tab-horarios" class="tab-content">
         <div class="admin-card">
-          <div class="admin-card-header">
-            <h3 class="admin-card-title">🕐 Horarios de Atención & Bloqueos de Salón</h3>
+          <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px; justify-content: space-between;">
+            <div>
+              <h3 class="admin-card-title">🕐 Horarios de Atención & Bloqueos de Salón</h3>
+              <p style="color: #9ca3af; font-size: 0.85rem; margin: 4px 0 0 0;">
+                Consulta la jornada de trabajo de la barbería y bloqueos programados.
+              </p>
+            </div>
+            <div id="schedulePermissionBadge"></div>
           </div>
-          <p style="color: #9ca3af; font-size: 0.85rem; margin-bottom: 20px;">
-            Consulta la jornada de trabajo de la barbería y bloqueos programados.
-          </p>
-          <div id="horariosGestionBody">
+
+          <div id="horariosGestionBody" style="margin-top: 16px;">
             <div style="color: #9ca3af; padding: 20px; text-align: center;">Cargando horarios de atención...</div>
           </div>
+        </div>
+
+        <!-- SECCIÓN DE BLOQUEOS PROGRAMADOS / FERIADOS -->
+        <div class="admin-card" style="margin-top: 20px;">
+          <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px; justify-content: space-between;">
+            <div>
+              <h4 style="color: #fff; margin: 0; font-size: 1rem; font-family: 'Space Grotesk', monospace;">🚫 Bloqueos Programados & Feriados</h4>
+              <p style="color: #9ca3af; font-size: 0.8rem; margin: 2px 0 0 0;">Días o franjas específicas donde el salón o un barbero no atiende.</p>
+            </div>
+            <button id="btnNewBlockGestion" class="btn-admin btn-admin-secondary btn-admin-sm" style="display: none;" onclick="openNewBlockModalGestion()">
+              + Agregar Bloqueo
+            </button>
+          </div>
+          <div class="admin-table-wrapper" style="margin-top: 14px;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Horario</th>
+                  <th>Motivo</th>
+                  <th>Tipo</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody id="gestionExceptionsTableBody">
+                <tr><td colspan="5" style="text-align: center; color: #9ca3af; padding: 20px;">Cargando bloqueos...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- TAB 8: BARBER CLUB & SEÑAS -->
       <div id="tab-barberclub" class="tab-content">
-        <div class="admin-card" style="margin-bottom: 20px;">
-          <div class="admin-card-header">
-            <div>
-              <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #f59e0b; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">GESTIÓN OPERATIVA DE PUNTOS Y SEÑAS</span>
-              <h3 class="admin-card-title" style="margin-top: 2px;">⭐ Barber Club & Señas por Turno</h3>
-            </div>
-          </div>
-          <p style="color: #9ca3af; font-size: 0.85rem; margin-bottom: 20px;">
-            Consultá los puntos de fidelización acumulados por un cliente al momento del cobro o canjeá premios y beneficios.
+        <!-- BLOQUEO SI EL ADMIN NO AUTORIZÓ LA SECCIÓN -->
+        <div id="barberClubLockedNotice" style="display: none; background: #131318; border: 1px solid #ef4444; border-radius: 16px; padding: 32px; text-align: center; margin-bottom: 20px;">
+          <div style="font-size: 2.5rem; margin-bottom: 12px;">🔒</div>
+          <h3 style="color: #fff; font-family: 'Space Grotesk', monospace; margin: 0 0 8px 0;">Acceso Restringido</h3>
+          <p style="color: #9ca3af; font-size: 0.9rem; max-width: 480px; margin: 0 auto 16px auto;">
+            El Administrador principal ha configurado esta sección como restringida para el rol Encargado. Si necesitas acceso a puntos y señas, solicítalo al Administrador desde el panel principal.
           </p>
+        </div>
 
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-            <!-- LOOKUP CLIENT POINTS -->
-            <div style="background: #131318; border: 1px solid #23232c; border-radius: 14px; padding: 20px;">
-              <h4 style="color: #fff; font-size: 1rem; margin: 0 0 12px 0; font-family: 'Space Grotesk', monospace;">🔍 Consultar Puntos de Cliente</h4>
-              <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-                <input type="text" id="g_loyalty_phone" class="form-control" placeholder="WhatsApp (ej. 3834123456)">
-                <button class="btn-admin" style="background: #f59e0b; color: #000; font-weight: bold;" onclick="lookupGestionLoyaltyClient()">Buscar</button>
+        <div id="barberClubMainContent">
+          <div class="admin-card" style="margin-bottom: 20px;">
+            <div class="admin-card-header">
+              <div>
+                <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #f59e0b; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">GESTIÓN OPERATIVA DE PUNTOS Y SEÑAS</span>
+                <h3 class="admin-card-title" style="margin-top: 2px;">⭐ Barber Club & Señas por Turno</h3>
               </div>
+            </div>
+            <p style="color: #9ca3af; font-size: 0.85rem; margin-bottom: 20px;">
+              Consultá los puntos de fidelización acumulados por un cliente al momento del cobro o canjeá premios y beneficios.
+            </p>
 
-              <div id="g_loyalty_result" style="display: none; background: #09090c; border: 1px dashed #23232c; border-radius: 12px; padding: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <div>
-                    <strong id="g_club_client_name" style="color: #fff; font-size: 1.1rem; display: block;">-</strong>
-                    <span id="g_club_client_phone" style="color: #9ca3af; font-size: 0.8rem;">-</span>
-                  </div>
-                  <div style="text-align: right;">
-                    <span style="font-size: 0.7rem; color: #f59e0b; font-weight: bold; text-transform: uppercase;">PUNTOS ACCUMULADOS</span>
-                    <div id="g_club_client_points" style="font-size: 1.6rem; font-weight: 900; color: #d4ff00; font-family: monospace;">0 pts</div>
-                  </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+              <!-- LOOKUP CLIENT POINTS -->
+              <div style="background: #131318; border: 1px solid #23232c; border-radius: 14px; padding: 20px;">
+                <h4 style="color: #fff; font-size: 1rem; margin: 0 0 12px 0; font-family: 'Space Grotesk', monospace;">🔍 Consultar Puntos de Cliente</h4>
+                <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                  <input type="text" id="g_loyalty_phone" class="form-control" placeholder="WhatsApp (ej. 3834123456)">
+                  <button class="btn-admin" style="background: #f59e0b; color: #000; font-weight: bold;" onclick="lookupGestionLoyaltyClient()">Buscar</button>
                 </div>
 
-                <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #1a1a22;">
-                  <span style="font-size: 0.75rem; color: #cbd5e1; font-weight: bold; display: block; margin-bottom: 8px;">🎁 CANJEAR PREMIO DISPONIBLE:</span>
-                  <div style="display: flex; gap: 8px;">
-                    <select id="g_club_rewards_select" class="form-control">
-                      <option value="">Cargando premios...</option>
-                    </select>
-                    <button class="btn-admin btn-admin-sm" style="background: #d4ff00; color: #000; font-weight: bold; white-space: nowrap;" onclick="redeemGestionLoyaltyReward()">Canjear →</button>
+                <div id="g_loyalty_result" style="display: none; background: #09090c; border: 1px dashed #23232c; border-radius: 12px; padding: 16px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                      <strong id="g_club_client_name" style="color: #fff; font-size: 1.1rem; display: block;">-</strong>
+                      <span id="g_club_client_phone" style="color: #9ca3af; font-size: 0.8rem;">-</span>
+                    </div>
+                    <div style="text-align: right;">
+                      <span style="font-size: 0.7rem; color: #f59e0b; font-weight: bold; text-transform: uppercase;">PUNTOS ACUMULADOS</span>
+                      <div id="g_club_client_points" style="font-size: 1.6rem; font-weight: 900; color: #d4ff00; font-family: monospace;">0 pts</div>
+                    </div>
                   </div>
+
+                  <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #1a1a22;">
+                    <span style="font-size: 0.75rem; color: #cbd5e1; font-weight: bold; display: block; margin-bottom: 8px;">🎁 CANJEAR PREMIO DISPONIBLE:</span>
+                    <div style="display: flex; gap: 8px;">
+                      <select id="g_club_rewards_select" class="form-control">
+                        <option value="">Cargando premios...</option>
+                      </select>
+                      <button class="btn-admin btn-admin-sm" style="background: #d4ff00; color: #000; font-weight: bold; white-space: nowrap;" onclick="redeemGestionLoyaltyReward()">Canjear →</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- DEPOSIT SEÑA MANAGEMENT -->
+              <div style="background: #131318; border: 1px solid #23232c; border-radius: 14px; padding: 20px;">
+                <h4 style="color: #fff; font-size: 1rem; margin: 0 0 12px 0; font-family: 'Space Grotesk', monospace;">💳 Gestión de Señas Opcionales</h4>
+                <p style="color: #9ca3af; font-size: 0.8rem; margin-bottom: 14px;">
+                  El encargado puede requerir o dispensar seña para turnos específicos directamente desde la tabla de turnos del día o con este selector.
+                </p>
+                <div class="form-group" style="margin-bottom: 12px;">
+                  <label style="font-size: 0.75rem; color: #cbd5e1; font-family: monospace;">SELECCIONAR TURNO DEL DÍA</label>
+                  <select id="g_deposit_appointment_select" class="form-control">
+                    <option value="">Seleccionar turno...</option>
+                  </select>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn-admin btn-admin-secondary" style="border-color: #10b981; color: #10b981; font-weight: bold;" onclick="setGestionDepositPaid(true)">🟢 Marcar Seña Pagada</button>
+                  <button class="btn-admin btn-admin-secondary" style="border-color: #ef4444; color: #ef4444;" onclick="setGestionDepositPaid(false)">🔴 Sin Seña / Pendiente</button>
                 </div>
               </div>
             </div>
 
-            <!-- DEPOSIT SEÑA MANAGEMENT -->
-            <div style="background: #131318; border: 1px solid #23232c; border-radius: 14px; padding: 20px;">
-              <h4 style="color: #fff; font-size: 1rem; margin: 0 0 12px 0; font-family: 'Space Grotesk', monospace;">💳 Gestión de Señas Opcionales</h4>
-              <p style="color: #9ca3af; font-size: 0.8rem; margin-bottom: 14px;">
-                El encargado puede requerir o dispensar seña para turnos específicos directamente desde la tabla de turnos del día o con este selector.
-              </p>
-              <div class="form-group" style="margin-bottom: 12px;">
-                <label style="font-size: 0.75rem; color: #cbd5e1; font-family: monospace;">SELECCIONAR TURNO DEL DÍA</label>
-                <select id="g_deposit_appointment_select" class="form-control">
-                  <option value="">Seleccionar turno...</option>
-                </select>
-              </div>
-              <div style="display: flex; gap: 8px;">
-                <button class="btn-admin btn-admin-secondary" style="border-color: #10b981; color: #10b981; font-weight: bold;" onclick="setGestionDepositPaid(true)">🟢 Marcar Seña Pagada</button>
-                <button class="btn-admin btn-admin-secondary" style="border-color: #ef4444; color: #ef4444;" onclick="setGestionDepositPaid(false)">🔴 Sin Seña / Pendiente</button>
+            <!-- TABLA DE PREMIOS DEL CLUB -->
+            <div style="margin-top: 24px;">
+              <h4 style="color: #fff; font-size: 1rem; margin: 0 0 12px 0; font-family: 'Space Grotesk', monospace;">🎁 Catálogo de Premios & Beneficios Activos</h4>
+              <div class="admin-table-wrapper">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Premio / Beneficio</th>
+                      <th>Puntos Requeridos</th>
+                      <th>Tipo</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody id="gestionRewardsTableBody">
+                    <tr><td colspan="4" style="text-align: center; color: #9ca3af; padding: 20px;">Cargando catálogo...</td></tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -480,7 +547,41 @@
       <div style="background: #09090c; padding: 12px; border-radius: 10px; border: 1px dashed #23232c; margin-bottom: 20px; font-size: 0.8rem; color: #cbd5e1;">
         💡 Para ampliar este cupo o eliminar la restricción, ingresá como <strong>Administrador (Llave Maestra)</strong> o solicitá la actualización de límites en el panel principal.
       </div>
-      <button onclick="document.getElementById('limitAlertModal').style.display='none';" class="btn-admin" style="width: 100%; justify-content: center; padding: 12px; background: #ef4444; color: #fff;">Entendido</button>
+  <!-- MODAL: CREAR BLOQUEO PROGRAMADO (ROL ENCARGADO / ADMIN) -->
+  <div id="blockModalGestion" style="position: fixed; inset: 0; background: rgba(0,0,0,0.88); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; width: 100%; max-width: 440px; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.9);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <div>
+          <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #d4ff00; letter-spacing: 2px;">GESTIÓN DE HORARIOS</span>
+          <h3 style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 2px 0 0 0; font-size: 1.15rem;">🚫 Nuevo Bloqueo / Feriado</h3>
+        </div>
+        <button onclick="closeNewBlockModalGestion()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <form onsubmit="event.preventDefault(); submitNewBlockGestion();">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">FECHA DEL BLOQUEO *</label>
+          <input type="date" id="g_block_date" class="form-control" required>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+          <div>
+            <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">DESDE (HH:MM)</label>
+            <input type="time" id="g_block_start" class="form-control" value="09:00">
+          </div>
+          <div>
+            <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">HASTA (HH:MM)</label>
+            <input type="time" id="g_block_end" class="form-control" value="20:00">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">MOTIVO / RAZÓN *</label>
+          <input type="text" id="g_block_reason" class="form-control" placeholder="Ej: Feriado Nacional / Mantenimiento Salón" required>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn-admin btn-admin-secondary" onclick="closeNewBlockModalGestion()">Cancelar</button>
+          <button type="submit" class="btn-admin" style="background: #d4ff00; color: #000; font-weight: bold;">💾 Guardar Bloqueo</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -653,6 +754,30 @@
       const isMaster = gLimits.is_master_admin || gLimits.allow_full_admin;
       document.getElementById("masterKeyBadge").style.display = isMaster ? "inline-block" : "none";
 
+      // 1. Permiso: Barber Club & Señas
+      const canViewClub = isMaster || gLimits.can_view_barber_club !== false;
+      const navBtnClub = document.getElementById("navTabBarberClub");
+      const clubLockNotice = document.getElementById("barberClubLockedNotice");
+      const clubMainContent = document.getElementById("barberClubMainContent");
+      if (navBtnClub) navBtnClub.style.display = canViewClub ? "inline-block" : "none";
+      if (clubLockNotice) clubLockNotice.style.display = canViewClub ? "none" : "block";
+      if (clubMainContent) clubMainContent.style.display = canViewClub ? "block" : "none";
+
+      // 2. Permiso: Horarios de Atención
+      window.gCanEditSchedule = isMaster || gLimits.can_edit_schedule === true;
+      const schedBadge = document.getElementById("schedulePermissionBadge");
+      const btnNewBlock = document.getElementById("btnNewBlockGestion");
+      if (schedBadge) {
+        if (window.gCanEditSchedule) {
+          schedBadge.innerHTML = `<span style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #10b981; font-size: 0.75rem; font-weight: bold; padding: 4px 12px; border-radius: 99px;">🔓 Edición Habilitada por Admin</span>`;
+        } else {
+          schedBadge.innerHTML = `<span style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; font-size: 0.75rem; font-weight: bold; padding: 4px 12px; border-radius: 99px;">🔒 Solo Lectura (Admin no autorizó cambios)</span>`;
+        }
+      }
+      if (btnNewBlock) {
+        btnNewBlock.style.display = window.gCanEditSchedule ? "inline-block" : "none";
+      }
+
       const lim = gLimits.limits;
       
       const apptTxt = isMaster ? `${lim.today_appointments_count} / ∞` : `${lim.today_appointments_count} / ${lim.max_appointments_per_day}`;
@@ -689,11 +814,18 @@
       document.querySelectorAll(".nav-tab-btn").forEach(btn => btn.classList.remove("active"));
       document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
 
-      const targetBtn = Array.from(document.querySelectorAll(".nav-tab-btn")).find(b => b.getAttribute("onclick").includes(tabId));
+      const targetBtn = Array.from(document.querySelectorAll(".nav-tab-btn")).find(b => (b.getAttribute("onclick") || "").includes(tabId));
       if (targetBtn) targetBtn.classList.add("active");
 
       const targetTab = document.getElementById(`tab-${tabId}`);
       if (targetTab) targetTab.classList.add("active");
+
+      if (tabId === "horarios") {
+        loadGestionSchedules();
+        loadGestionExceptions();
+      } else if (tabId === "barberclub") {
+        loadGestionLoyaltyRewards();
+      }
     }
 
     async function lookupGestionLoyaltyClient() {
@@ -980,7 +1112,9 @@
       alert("Para agregar nuevos estilos ingresá con credenciales de Administrador.");
     }
 
-    // --- HORARIOS DE ATENCIÓN ---
+    // --- HORARIOS DE ATENCIÓN & BLOQUEOS DE SALÓN ---
+    let cachedBusinessHours = null;
+
     async function loadGestionSchedules() {
       const body = document.getElementById("horariosGestionBody");
       if (!body) return;
@@ -1006,35 +1140,88 @@
             "Domingo": { active: false, open: "09:00", close: "14:00" }
           };
         }
+        cachedBusinessHours = bh;
 
         const days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
-        const rowsHtml = days.map(d => {
-          const item = bh[d];
-          let statusText = `<span style="color: #ef4444; font-weight: bold;">CERRADO</span>`;
-          if (item && item.active) {
-            let detail = `${item.open} a ${item.close} hs`;
-            if (item.pause_start && item.pause_end) detail += ` (Pausa ${item.pause_start} - ${item.pause_end})`;
-            statusText = `<span style="color: #10b981; font-weight: bold;">${detail}</span>`;
-          }
 
-          return `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #09090c; border: 1px solid #1a1a22; border-radius: 10px;">
-              <strong style="color: #fff; font-family: 'Space Grotesk', monospace;">${d}</strong>
-              <div style="font-size: 0.88rem; font-family: monospace;">${statusText}</div>
+        if (window.gCanEditSchedule) {
+          // MODO EDICIÓN HABILITADO POR ADMIN
+          const editCardsHtml = days.map(d => {
+            const item = bh[d] || { active: true, open: "09:00", close: "20:00" };
+            return `
+              <div style="background: #09090c; border: 1px solid #1a1a22; border-radius: 12px; padding: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                  <strong style="color: #fff; font-family: 'Space Grotesk', monospace;">${d}</strong>
+                  <label style="color: #cbd5e1; font-size: 0.8rem; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="checkbox" id="g_bh_active_${d}" ${item.active ? 'checked' : ''} style="accent-color: #d4ff00; width: 16px; height: 16px;">
+                    <span>Abierto</span>
+                  </label>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  <div>
+                    <label style="color: #9ca3af; font-size: 0.7rem; display: block; margin-bottom: 2px;">Apertura</label>
+                    <input type="time" id="g_bh_open_${d}" class="form-control" value="${item.open || '09:00'}" style="padding: 6px 8px; font-size: 0.85rem;">
+                  </div>
+                  <div>
+                    <label style="color: #9ca3af; font-size: 0.7rem; display: block; margin-bottom: 2px;">Cierre</label>
+                    <input type="time" id="g_bh_close_${d}" class="form-control" value="${item.close || '20:00'}" style="padding: 6px 8px; font-size: 0.85rem;">
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join("");
+
+          body.innerHTML = `
+            <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; padding: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                <div>
+                  <h4 style="font-family: 'Space Grotesk', monospace; color: #d4ff00; font-weight: bold; margin: 0; font-size: 1.05rem;">
+                    ⚙️ Configurar Jornada Semanal de Salón
+                  </h4>
+                  <p style="color: #9ca3af; font-size: 0.8rem; margin: 2px 0 0 0;">Modificá los horarios de apertura y cierre de cada día.</p>
+                </div>
+                <button class="btn-admin" style="background: #d4ff00; color: #000; font-weight: bold; padding: 8px 18px;" onclick="saveGestionBusinessHours()">
+                  💾 Guardar Horarios Modificados
+                </button>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px;">
+                ${editCardsHtml}
+              </div>
             </div>
           `;
-        }).join("");
+        } else {
+          // MODO SOLO LECTURA (ADMIN NO PERMITIÓ MODIFICAR)
+          const rowsHtml = days.map(d => {
+            const item = bh[d];
+            let statusText = `<span style="color: #ef4444; font-weight: bold;">CERRADO</span>`;
+            if (item && item.active) {
+              let detail = `${item.open} a ${item.close} hs`;
+              if (item.pause_start && item.pause_end) detail += ` (Pausa ${item.pause_start} - ${item.pause_end})`;
+              statusText = `<span style="color: #10b981; font-weight: bold;">${detail}</span>`;
+            }
 
-        body.innerHTML = `
-          <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; padding: 20px;">
-            <h4 style="font-family: 'Space Grotesk', monospace; color: #d4ff00; font-weight: bold; margin: 0 0 14px 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
-              📅 HORARIOS DE ATENCIÓN DE LA BARBERÍA
-            </h4>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px;">
-              ${rowsHtml}
+            return `
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #09090c; border: 1px solid #1a1a22; border-radius: 10px;">
+                <strong style="color: #fff; font-family: 'Space Grotesk', monospace;">${d}</strong>
+                <div style="font-size: 0.88rem; font-family: monospace;">${statusText}</div>
+              </div>
+            `;
+          }).join("");
+
+          body.innerHTML = `
+            <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; padding: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                <h4 style="font-family: 'Space Grotesk', monospace; color: #d4ff00; font-weight: bold; margin: 0; font-size: 1.05rem;">
+                  📅 HORARIOS DE ATENCIÓN DE LA BARBERÍA
+                </h4>
+                <small style="color: #9ca3af;">(Consulta de jornada activa)</small>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px;">
+                ${rowsHtml}
+              </div>
             </div>
-          </div>
-        `;
+          `;
+        }
 
       } catch (e) {
         body.innerHTML = `
@@ -1044,6 +1231,177 @@
             <div style="font-size: 0.8rem; color: #9ca3af; margin-top: 4px;">Domingos y Feriados: Cerrado.</div>
           </div>
         `;
+      }
+    }
+
+    async function saveGestionBusinessHours() {
+      if (!window.gCanEditSchedule) {
+        alert("⚠️ No tienes permisos para modificar los horarios. Solicite la habilitación al Administrador.");
+        return;
+      }
+      const days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+      const bh = {};
+      days.forEach(d => {
+        bh[d] = {
+          active: document.getElementById(`g_bh_active_${d}`)?.checked || false,
+          open: document.getElementById(`g_bh_open_${d}`)?.value || "09:00",
+          close: document.getElementById(`g_bh_close_${d}`)?.value || "20:00"
+        };
+      });
+
+      try {
+        const res = await fetch("/api/admin/settings/business-hours", {
+          method: "PUT",
+          headers: authHeaders(),
+          body: JSON.stringify({ business_hours: bh })
+        });
+        if (res.ok) {
+          alert("✅ Horarios de atención actualizados y guardados correctamente.");
+          loadGestionSchedules();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          alert(err.detail || "Error al guardar horarios.");
+        }
+      } catch (e) {
+        alert("Error de conexión al guardar horarios.");
+      }
+    }
+
+    async function loadGestionExceptions() {
+      const tbody = document.getElementById("gestionExceptionsTableBody");
+      if (!tbody) return;
+      try {
+        const res = await fetch("/api/admin/schedules/exceptions", { headers: authHeaders() });
+        if (!res.ok) {
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #9ca3af; padding: 20px;">Sin bloqueos activos</td></tr>`;
+          return;
+        }
+        const data = await res.json();
+        if (!data || data.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #9ca3af; padding: 20px;">No hay bloqueos ni feriados programados</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = data.map(exc => `
+          <tr>
+            <td style="font-weight: bold; color: #fff;">${exc.date}</td>
+            <td style="color: #cbd5e1; font-family: monospace;">${exc.start_time || 'Jornada Completa'} ${exc.end_time ? 'a ' + exc.end_time : ''}</td>
+            <td style="color: #e2e8f0;">${escapeHtml(exc.reason || 'Sin motivo')}</td>
+            <td><span class="badge badge-canceled">${exc.exception_type || 'Bloqueo'}</span></td>
+            <td>
+              ${window.gCanEditSchedule ? `<button class="btn-admin btn-admin-sm btn-admin-danger" onclick="deleteGestionException(${exc.id})">🗑️ Eliminar</button>` : `<span style="color: #6b7280; font-size: 0.8rem;">Solo lectura</span>`}
+            </td>
+          </tr>
+        `).join("");
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #ef4444; padding: 20px;">Error al cargar bloqueos</td></tr>`;
+      }
+    }
+
+    async function deleteGestionException(id) {
+      if (!window.gCanEditSchedule) {
+        alert("⚠️ No tienes permisos para eliminar bloqueos.");
+        return;
+      }
+      if (!confirm("¿Deseas eliminar este bloqueo de horario?")) return;
+      try {
+        const res = await fetch(`/api/admin/schedules/exceptions/${id}`, {
+          method: "DELETE",
+          headers: authHeaders()
+        });
+        if (res.ok) {
+          loadGestionExceptions();
+        } else {
+          alert("Error al eliminar el bloqueo.");
+        }
+      } catch (e) {
+        alert("Error de conexión.");
+      }
+    }
+
+    function openNewBlockModalGestion() {
+      if (!window.gCanEditSchedule) {
+        alert("⚠️ No tienes permisos para crear bloqueos. Solicite la habilitación al Administrador.");
+        return;
+      }
+      const m = document.getElementById("blockModalGestion");
+      if (m) m.style.display = "flex";
+    }
+
+    function closeNewBlockModalGestion() {
+      const m = document.getElementById("blockModalGestion");
+      if (m) m.style.display = "none";
+    }
+
+    async function submitNewBlockGestion() {
+      const date = document.getElementById("g_block_date")?.value;
+      const start = document.getElementById("g_block_start")?.value;
+      const end = document.getElementById("g_block_end")?.value;
+      const reason = document.getElementById("g_block_reason")?.value.trim();
+
+      if (!date || !reason) {
+        alert("Por favor completá la fecha y el motivo del bloqueo.");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/admin/schedules/exceptions", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            date: date,
+            start_time: start || null,
+            end_time: end || null,
+            reason: reason,
+            exception_type: "bloqueo"
+          })
+        });
+
+        if (res.ok) {
+          closeNewBlockModalGestion();
+          loadGestionExceptions();
+          alert("✅ Bloqueo programado guardado correctamente.");
+        } else {
+          const err = await res.json().catch(() => ({}));
+          alert(err.detail || "Error al crear bloqueo.");
+        }
+      } catch (e) {
+        alert("Error de conexión.");
+      }
+    }
+
+    async function loadGestionLoyaltyRewards() {
+      try {
+        const res = await fetch("/api/loyalty/rewards");
+        if (!res.ok) return;
+        const rewards = await res.json();
+        
+        // Populate select in search tool
+        const sel = document.getElementById("g_club_rewards_select");
+        if (sel) {
+          sel.innerHTML = rewards.length === 0 ? `<option value="">Sin premios disponibles</option>` : rewards.map(r => `<option value="${r.id}">${r.name} (${r.points_required} pts)</option>`).join("");
+        }
+
+        // Populate table in Barber Club tab
+        const tbody = document.getElementById("gestionRewardsTableBody");
+        if (tbody) {
+          if (!rewards || rewards.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #9ca3af; padding: 24px;">No hay premios configurados en el sistema actualmente.</td></tr>`;
+            return;
+          }
+          tbody.innerHTML = rewards.map(r => `
+            <tr>
+              <td>
+                <strong style="color: #fff;">${escapeHtml(r.name)}</strong>
+                ${r.description ? `<br><small style="color: #9ca3af;">${escapeHtml(r.description)}</small>` : ''}
+              </td>
+              <td><span style="font-family: monospace; font-size: 1.1rem; color: #d4ff00; font-weight: bold;">⭐ ${r.points_required} pts</span></td>
+              <td style="color: #cbd5e1; text-transform: capitalize;">${escapeHtml(r.reward_type || 'Beneficio')}</td>
+              <td><span class="badge ${r.is_active ? 'badge-confirmed' : 'badge-canceled'}">${r.is_active ? 'ACTIVO' : 'INACTIVO'}</span></td>
+            </tr>
+          `).join("");
+        }
+      } catch (e) {
+        console.error("Error al cargar premios del club:", e);
       }
     }
 

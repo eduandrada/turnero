@@ -1500,7 +1500,7 @@
               </div>
             </div>
 
-            <div style="background: #09090c; border: 1px solid #23232c; border-radius: 12px; padding: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <div style="background: #09090c; border: 1px solid #23232c; border-radius: 12px; padding: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
               <div>
                 <strong style="color: #fff; font-size: 0.9rem;">Habilitar Funciones Completas de Admin a Encargados</strong>
                 <p style="color: #9ca3af; font-size: 0.8rem; margin: 2px 0 0 0;">Si está activado, elimina todas las restricciones numéricas para los Encargados.</p>
@@ -1508,6 +1508,28 @@
               <select id="as_encargado_allow_full" class="form-control" style="width: 220px;">
                 <option value="false">🔒 Modo Restringido (Con Límites)</option>
                 <option value="true">🔓 Modo Ilimitado (Acceso Admin)</option>
+              </select>
+            </div>
+
+            <div style="background: #09090c; border: 1px solid #23232c; border-radius: 12px; padding: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
+              <div>
+                <strong style="color: #fff; font-size: 0.9rem;">🕐 Modificar Horarios de Atención y Bloqueos de Salón</strong>
+                <p style="color: #9ca3af; font-size: 0.8rem; margin: 2px 0 0 0;">Permite o deniega que el Encargado pueda cambiar horarios de apertura/cierre y crear bloqueos.</p>
+              </div>
+              <select id="as_encargado_can_edit_schedule" class="form-control" style="width: 220px;">
+                <option value="false">🔒 Solo Lectura (No Modificar)</option>
+                <option value="true">🔓 Permitido (Puede Modificar)</option>
+              </select>
+            </div>
+
+            <div style="background: #09090c; border: 1px solid #23232c; border-radius: 12px; padding: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <strong style="color: #fff; font-size: 0.9rem;">⭐ Acceso a Sección Barber Club & Señas</strong>
+                <p style="color: #9ca3af; font-size: 0.8rem; margin: 2px 0 0 0;">Controla si el Encargado puede ver y gestionar puntos de fidelización y señas en su panel.</p>
+              </div>
+              <select id="as_encargado_can_view_barber_club" class="form-control" style="width: 220px;">
+                <option value="true">🔓 Habilitado (Sección Visible)</option>
+                <option value="false">🔒 Deshabilitado (Sección Oculta)</option>
               </select>
             </div>
           </div>

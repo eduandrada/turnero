@@ -362,6 +362,16 @@ def create_schedule_exception(
     admin: AdminUser = Depends(require_encargado_or_admin)
 ):
     """Crea una excepción de horario, feriado o bloqueo para uno o todos los barberos."""
+    from app.settings_helper import get_setting
+    if admin.role != "admin":
+        allow_full = get_setting(db, "encargado_allow_full_admin", "false").lower() == "true"
+        can_edit = get_setting(db, "encargado_can_edit_schedule", "false").lower() == "true"
+        if not (allow_full or can_edit):
+            raise HTTPException(
+                status_code=403,
+                detail="Acción no autorizada: El rol Encargado no tiene permisos para crear bloqueos de horario."
+            )
+
     exc = ScheduleException(
         barber_id=data.barber_id,
         date=data.date,
@@ -390,6 +400,16 @@ def delete_schedule_exception(
     admin: AdminUser = Depends(require_encargado_or_admin)
 ):
     """Elimina una excepción o bloqueo programado."""
+    from app.settings_helper import get_setting
+    if admin.role != "admin":
+        allow_full = get_setting(db, "encargado_allow_full_admin", "false").lower() == "true"
+        can_edit = get_setting(db, "encargado_can_edit_schedule", "false").lower() == "true"
+        if not (allow_full or can_edit):
+            raise HTTPException(
+                status_code=403,
+                detail="Acción no autorizada: El rol Encargado no tiene permisos para eliminar bloqueos de horario."
+            )
+
     exc = db.query(ScheduleException).filter(ScheduleException.id == exception_id).first()
     if not exc:
         raise HTTPException(status_code=404, detail="Excepción o bloqueo no encontrado.")
@@ -437,11 +457,16 @@ def get_encargado_limits(
     current_services = db.query(Service).count()
     current_styles = db.query(Style).count()
 
+    can_edit_schedule = is_admin or allow_full_admin or (get_setting(db, "encargado_can_edit_schedule", "false").lower() == "true")
+    can_view_barber_club = is_admin or allow_full_admin or (get_setting(db, "encargado_can_view_barber_club", "true").lower() == "true")
+
     return {
         "username": current_user.username,
         "role": current_user.role,
         "is_master_admin": is_admin,
         "allow_full_admin": allow_full_admin or is_admin,
+        "can_edit_schedule": can_edit_schedule,
+        "can_view_barber_club": can_view_barber_club,
         "limits": {
             "max_appointments_per_day": 9999 if (is_admin or allow_full_admin) else max_appts,
             "today_appointments_count": today_appts,
@@ -466,7 +491,9 @@ def get_admin_encargado_settings(
         "encargado_max_clients_per_day": int(get_setting(db, "encargado_max_clients_per_day", "6")),
         "encargado_max_services": int(get_setting(db, "encargado_max_services", "3")),
         "encargado_max_styles": int(get_setting(db, "encargado_max_styles", "3")),
-        "encargado_allow_full_admin": get_setting(db, "encargado_allow_full_admin", "false").lower() == "true"
+        "encargado_allow_full_admin": get_setting(db, "encargado_allow_full_admin", "false").lower() == "true",
+        "encargado_can_edit_schedule": get_setting(db, "encargado_can_edit_schedule", "false").lower() == "true",
+        "encargado_can_view_barber_club": get_setting(db, "encargado_can_view_barber_club", "true").lower() == "true"
     }
 
 
@@ -489,6 +516,10 @@ def update_admin_encargado_settings(
         set_setting(db, "encargado_max_styles", str(payload["encargado_max_styles"]))
     if "encargado_allow_full_admin" in payload:
         set_setting(db, "encargado_allow_full_admin", "true" if payload["encargado_allow_full_admin"] else "false")
+    if "encargado_can_edit_schedule" in payload:
+        set_setting(db, "encargado_can_edit_schedule", "true" if payload["encargado_can_edit_schedule"] else "false")
+    if "encargado_can_view_barber_club" in payload:
+        set_setting(db, "encargado_can_view_barber_club", "true" if payload["encargado_can_view_barber_club"] else "false")
 
     db.add(AuditLog(
         user_name=admin.username,
@@ -499,7 +530,48 @@ def update_admin_encargado_settings(
     ))
     db.commit()
 
-    return {"status": "success", "message": "Configuración de límites de Encargado actualizada."}
+    return {"status": "success", "message": "Configuración de permisos y cuotas de Encargado actualizada exitosamente."}
+
+
+@router.put("/api/admin/settings/business-hours")
+def update_business_hours_by_role(
+    payload: dict,
+    current_user: AdminUser = Depends(require_encargado_or_admin),
+    db: Session = Depends(get_db)
+):
+    """Permite actualizar los horarios de atención si es Admin o Encargado autorizado."""
+    from app.settings_helper import get_setting, set_setting
+
+    is_admin = (current_user.role == "admin")
+    allow_full = get_setting(db, "encargado_allow_full_admin", "false").lower() == "true"
+    can_edit = get_setting(db, "encargado_can_edit_schedule", "false").lower() == "true"
+
+    if not (is_admin or allow_full or can_edit):
+        raise HTTPException(
+            status_code=403,
+            detail="Acción no autorizada: El rol Encargado no tiene permisos para modificar los horarios de atención. Solicite permiso al Administrador."
+        )
+
+    hours_data = payload.get("business_hours")
+    if not hours_data:
+        raise HTTPException(status_code=400, detail="business_hours es requerido.")
+
+    if not isinstance(hours_data, str):
+        import json
+        hours_data = json.dumps(hours_data)
+
+    set_setting(db, "business_hours", hours_data)
+
+    db.add(AuditLog(
+        user_name=current_user.username,
+        module="Horarios",
+        action="Modificar Horarios de Atención",
+        record_id="business_hours",
+        new_value=hours_data[:300]
+    ))
+    db.commit()
+
+    return {"status": "success", "message": "Horarios de atención actualizados correctamente."}
 
 
 @router.get("/api/admin/staff/fichajes")
