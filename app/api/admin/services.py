@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import AdminUser, Service, Style, Category, DeliveryZone, AuditLog
+from app.models import AdminUser, Service, Style, Category, DeliveryZone, AuditLog, Appointment, WaitlistEntry
 from app.schemas import (
     ServiceRead,
     ServiceCreate,
@@ -82,6 +82,10 @@ def delete_admin_service(
         raise HTTPException(status_code=404, detail="Servicio no encontrado.")
 
     name = s.name
+    # Desvincular de citas y lista de espera para preservar historial y evitar error de FK
+    db.query(Appointment).filter(Appointment.service_id == service_id).update({Appointment.service_id: None}, synchronize_session=False)
+    db.query(WaitlistEntry).filter(WaitlistEntry.service_id == service_id).update({WaitlistEntry.service_id: None}, synchronize_session=False)
+
     db.delete(s)
     db.commit()
 

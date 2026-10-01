@@ -37,77 +37,111 @@ async function loadAdminServices() {
 }
 
 async function deleteService(id) {
-  if (!confirm("¿Eliminar este servicio?")) return;
-  await fetch(`/api/admin/services/${id}`, { method: "DELETE", headers: authHeaders() });
-  loadAdminServices();
+  if (!confirm("¿Eliminar este servicio? Esta acción no se puede deshacer.")) return;
+  try {
+    const res = await fetch(`/api/admin/services/${id}`, { method: "DELETE", headers: authHeaders() });
+    if (res.ok) {
+      showAdminToast("Servicio eliminado correctamente.", "success");
+      loadAdminServices();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showAdminToast(err.detail || "Error al eliminar servicio.", "error");
+      loadAdminServices();
+    }
+  } catch (e) {
+    showAdminToast("Error de conexión al eliminar servicio.", "error");
+  }
 }
 
 function openServiceModal() {
   currentModalType = "service";
   editingRecordId = null;
-  document.getElementById("modalAdminTitle").textContent = "+ AGREGAR SERVICIO";
-  document.getElementById("modalAdminBody").innerHTML = `
-    <div class="form-group">
-      <label>NOMBRE DEL SERVICIO</label>
-      <input type="text" id="modal_service_name" class="form-control" placeholder="Ej: Corte Ejecutivo" required>
-    </div>
-    <div class="form-group">
-      <label>CATEGORÍA</label>
-      <input type="text" id="modal_service_category" class="form-control" placeholder="Ej: Corte, Barba, Combo" value="Corte">
-    </div>
-    <div class="form-group">
-      <label>PRECIO ($)</label>
-      <input type="number" step="0.01" id="modal_service_price" class="form-control" placeholder="8000" required>
-    </div>
-    <div class="form-group">
-      <label>PRECIO ANTERIOR ($ - Opcional tachado)</label>
-      <input type="number" step="0.01" id="modal_service_prev_price" class="form-control" placeholder="10000">
-    </div>
-    <div class="form-group">
-      <label>DURACIÓN ESTIMADA (MINUTOS)</label>
-      <input type="number" id="modal_service_duration" class="form-control" value="30" required>
-    </div>
-    <div class="form-group">
-      <label>DESCRIPCIÓN</label>
-      <input type="text" id="modal_service_desc" class="form-control" placeholder="Corte de cabello a tijera/máquina con acabado premium">
-    </div>
-  `;
-  document.getElementById("adminModal").style.display = "flex";
+  const titleEl = document.getElementById("modalAdminTitle");
+  if (titleEl) titleEl.textContent = "+ AGREGAR SERVICIO";
+  const bodyEl = document.getElementById("modalAdminBody");
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div class="form-group">
+        <label>NOMBRE DEL SERVICIO</label>
+        <input type="text" id="modal_service_name" class="form-control" placeholder="Ej: Corte Ejecutivo" required>
+      </div>
+      <div class="form-group">
+        <label>CATEGORÍA</label>
+        <input type="text" id="modal_service_category" class="form-control" placeholder="Ej: Corte, Barba, Combo" value="Corte">
+      </div>
+      <div class="form-group">
+        <label>PRECIO ($)</label>
+        <input type="number" step="0.01" id="modal_service_price" class="form-control" placeholder="8000" required>
+      </div>
+      <div class="form-group">
+        <label>PRECIO ANTERIOR ($ - Opcional tachado)</label>
+        <input type="number" step="0.01" id="modal_service_prev_price" class="form-control" placeholder="10000">
+      </div>
+      <div class="form-group">
+        <label>DURACIÓN ESTIMADA (MINUTOS)</label>
+        <input type="number" id="modal_service_duration" class="form-control" value="30" required>
+      </div>
+      <div class="form-group">
+        <label>DESCRIPCIÓN</label>
+        <input type="text" id="modal_service_desc" class="form-control" placeholder="Corte de cabello a tijera/máquina con acabado premium">
+      </div>
+    `;
+  }
+  const modalEl = document.getElementById("adminModal");
+  if (modalEl) modalEl.style.display = "flex";
 }
 
-function editServiceModal(id) {
-  const s = adminServicesList.find(item => item.id === id);
-  if (!s) return;
+async function editServiceModal(id) {
+  let s = adminServicesList.find(item => item.id == id);
+  if (!s) {
+    try {
+      const res = await fetch("/api/admin/services", { headers: authHeaders() });
+      if (res.ok) {
+        adminServicesList = await res.json();
+        s = adminServicesList.find(item => item.id == id);
+      }
+    } catch (e) {}
+  }
+  if (!s) {
+    showAdminToast("No se encontró el servicio en el servidor. Actualizando...", "warning");
+    loadAdminServices();
+    return;
+  }
   currentModalType = "service";
   editingRecordId = id;
-  document.getElementById("modalAdminTitle").textContent = `✏️ EDITAR SERVICIO #${id}`;
-  document.getElementById("modalAdminBody").innerHTML = `
-    <div class="form-group">
-      <label>NOMBRE DEL SERVICIO</label>
-      <input type="text" id="modal_service_name" class="form-control" value="${escapeHtml(s.name)}" required>
-    </div>
-    <div class="form-group">
-      <label>CATEGORÍA</label>
-      <input type="text" id="modal_service_category" class="form-control" value="${escapeHtml(s.category || 'Corte')}">
-    </div>
-    <div class="form-group">
-      <label>PRECIO ($)</label>
-      <input type="number" step="0.01" id="modal_service_price" class="form-control" value="${s.price}" required>
-    </div>
-    <div class="form-group">
-      <label>PRECIO ANTERIOR ($ - Opcional tachado)</label>
-      <input type="number" step="0.01" id="modal_service_prev_price" class="form-control" value="${s.previous_price || ''}">
-    </div>
-    <div class="form-group">
-      <label>DURACIÓN ESTIMADA (MINUTOS)</label>
-      <input type="number" id="modal_service_duration" class="form-control" value="${s.duration_min}" required>
-    </div>
-    <div class="form-group">
-      <label>DESCRIPCIÓN</label>
-      <input type="text" id="modal_service_desc" class="form-control" value="${escapeHtml(s.description || '')}">
-    </div>
-  `;
-  document.getElementById("adminModal").style.display = "flex";
+  const titleEl = document.getElementById("modalAdminTitle");
+  if (titleEl) titleEl.textContent = `✏️ EDITAR SERVICIO #${id}`;
+  const bodyEl = document.getElementById("modalAdminBody");
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div class="form-group">
+        <label>NOMBRE DEL SERVICIO</label>
+        <input type="text" id="modal_service_name" class="form-control" value="${escapeHtml(s.name)}" required>
+      </div>
+      <div class="form-group">
+        <label>CATEGORÍA</label>
+        <input type="text" id="modal_service_category" class="form-control" value="${escapeHtml(s.category || 'Corte')}">
+      </div>
+      <div class="form-group">
+        <label>PRECIO ($)</label>
+        <input type="number" step="0.01" id="modal_service_price" class="form-control" value="${s.price}" required>
+      </div>
+      <div class="form-group">
+        <label>PRECIO ANTERIOR ($ - Opcional tachado)</label>
+        <input type="number" step="0.01" id="modal_service_prev_price" class="form-control" value="${s.previous_price || ''}">
+      </div>
+      <div class="form-group">
+        <label>DURACIÓN ESTIMADA (MINUTOS)</label>
+        <input type="number" id="modal_service_duration" class="form-control" value="${s.duration_min}" required>
+      </div>
+      <div class="form-group">
+        <label>DESCRIPCIÓN</label>
+        <input type="text" id="modal_service_desc" class="form-control" value="${escapeHtml(s.description || '')}">
+      </div>
+    `;
+  }
+  const modalEl = document.getElementById("adminModal");
+  if (modalEl) modalEl.style.display = "flex";
 }
 
 // 2. ESTILOS DE CORTE
@@ -138,77 +172,111 @@ async function loadAdminStyles() {
 }
 
 async function deleteStyle(id) {
-  if (!confirm("¿Eliminar este estilo?")) return;
-  await fetch(`/api/admin/styles/${id}`, { method: "DELETE", headers: authHeaders() });
-  loadAdminStyles();
+  if (!confirm("¿Eliminar este estilo? Esta acción no se puede deshacer.")) return;
+  try {
+    const res = await fetch(`/api/admin/styles/${id}`, { method: "DELETE", headers: authHeaders() });
+    if (res.ok) {
+      showAdminToast("Estilo eliminado correctamente.", "success");
+      loadAdminStyles();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showAdminToast(err.detail || "Error al eliminar estilo.", "error");
+      loadAdminStyles();
+    }
+  } catch (e) {
+    showAdminToast("Error de conexión al eliminar estilo.", "error");
+  }
 }
 
 function openStyleModal() {
   currentModalType = "style";
   editingRecordId = null;
-  document.getElementById("modalAdminTitle").textContent = "+ AGREGAR ESTILO DE CORTE";
-  document.getElementById("modalAdminBody").innerHTML = `
-    <div class="form-group">
-      <label>NOMBRE DEL ESTILO</label>
-      <input type="text" id="modal_style_name" class="form-control" placeholder="Ej: Mid Fade Textured" required>
-    </div>
-    <div class="form-group">
-      <label>CATEGORÍA / TIPO DE ROSTRO</label>
-      <input type="text" id="modal_style_category" class="form-control" placeholder="Ej: Fade, Ovalado, Cuadrado" value="Fade">
-    </div>
-    <div class="form-group">
-      <label>PRECIO SUGERIDO ($)</label>
-      <input type="number" step="0.01" id="modal_style_price" class="form-control" placeholder="8500" required>
-    </div>
-    <div class="form-group">
-      <label>DURACIÓN APROX (MINUTOS)</label>
-      <input type="number" id="modal_style_duration" class="form-control" value="40" required>
-    </div>
-    <div class="form-group">
-      <label>URL IMAGEN ILUSTRATIVA</label>
-      <input type="text" id="modal_style_image" class="form-control" placeholder="/static/styles/fade.jpg">
-    </div>
-    <div class="form-group">
-      <label>DESCRIPCIÓN / RECOMENDACIÓN</label>
-      <input type="text" id="modal_style_desc" class="form-control" placeholder="Ideal para rostros ovalados y angulares">
-    </div>
-  `;
-  document.getElementById("adminModal").style.display = "flex";
+  const titleEl = document.getElementById("modalAdminTitle");
+  if (titleEl) titleEl.textContent = "+ AGREGAR ESTILO DE CORTE";
+  const bodyEl = document.getElementById("modalAdminBody");
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div class="form-group">
+        <label>NOMBRE DEL ESTILO</label>
+        <input type="text" id="modal_style_name" class="form-control" placeholder="Ej: Mid Fade Textured" required>
+      </div>
+      <div class="form-group">
+        <label>CATEGORÍA / TIPO DE ROSTRO</label>
+        <input type="text" id="modal_style_category" class="form-control" placeholder="Ej: Fade, Ovalado, Cuadrado" value="Fade">
+      </div>
+      <div class="form-group">
+        <label>PRECIO SUGERIDO ($)</label>
+        <input type="number" step="0.01" id="modal_style_price" class="form-control" placeholder="8500" required>
+      </div>
+      <div class="form-group">
+        <label>DURACIÓN APROX (MINUTOS)</label>
+        <input type="number" id="modal_style_duration" class="form-control" value="40" required>
+      </div>
+      <div class="form-group">
+        <label>URL IMAGEN ILUSTRATIVA</label>
+        <input type="text" id="modal_style_image" class="form-control" placeholder="/static/styles/fade.jpg">
+      </div>
+      <div class="form-group">
+        <label>DESCRIPCIÓN / RECOMENDACIÓN</label>
+        <input type="text" id="modal_style_desc" class="form-control" placeholder="Ideal para rostros ovalados y angulares">
+      </div>
+    `;
+  }
+  const modalEl = document.getElementById("adminModal");
+  if (modalEl) modalEl.style.display = "flex";
 }
 
-function editStyleModal(id) {
-  const st = adminStylesList.find(item => item.id === id);
-  if (!st) return;
+async function editStyleModal(id) {
+  let st = adminStylesList.find(item => item.id == id);
+  if (!st) {
+    try {
+      const res = await fetch("/api/admin/styles", { headers: authHeaders() });
+      if (res.ok) {
+        adminStylesList = await res.json();
+        st = adminStylesList.find(item => item.id == id);
+      }
+    } catch (e) {}
+  }
+  if (!st) {
+    showAdminToast("No se encontró el estilo en el servidor. Actualizando...", "warning");
+    loadAdminStyles();
+    return;
+  }
   currentModalType = "style";
   editingRecordId = id;
-  document.getElementById("modalAdminTitle").textContent = `✏️ EDITAR ESTILO #${id}`;
-  document.getElementById("modalAdminBody").innerHTML = `
-    <div class="form-group">
-      <label>NOMBRE DEL ESTILO</label>
-      <input type="text" id="modal_style_name" class="form-control" value="${escapeHtml(st.name)}" required>
-    </div>
-    <div class="form-group">
-      <label>CATEGORÍA / TIPO DE ROSTRO</label>
-      <input type="text" id="modal_style_category" class="form-control" value="${escapeHtml(st.category || 'Fade')}">
-    </div>
-    <div class="form-group">
-      <label>PRECIO SUGERIDO ($)</label>
-      <input type="number" step="0.01" id="modal_style_price" class="form-control" value="${st.suggested_price}" required>
-    </div>
-    <div class="form-group">
-      <label>DURACIÓN APROX (MINUTOS)</label>
-      <input type="number" id="modal_style_duration" class="form-control" value="${st.approx_duration}" required>
-    </div>
-    <div class="form-group">
-      <label>URL IMAGEN ILUSTRATIVA</label>
-      <input type="text" id="modal_style_image" class="form-control" value="${escapeHtml(st.image_url || '')}">
-    </div>
-    <div class="form-group">
-      <label>DESCRIPCIÓN / RECOMENDACIÓN</label>
-      <input type="text" id="modal_style_desc" class="form-control" value="${escapeHtml(st.description || '')}">
-    </div>
-  `;
-  document.getElementById("adminModal").style.display = "flex";
+  const titleEl = document.getElementById("modalAdminTitle");
+  if (titleEl) titleEl.textContent = `✏️ EDITAR ESTILO #${id}`;
+  const bodyEl = document.getElementById("modalAdminBody");
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div class="form-group">
+        <label>NOMBRE DEL ESTILO</label>
+        <input type="text" id="modal_style_name" class="form-control" value="${escapeHtml(st.name)}" required>
+      </div>
+      <div class="form-group">
+        <label>CATEGORÍA / TIPO DE ROSTRO</label>
+        <input type="text" id="modal_style_category" class="form-control" value="${escapeHtml(st.category || 'Fade')}">
+      </div>
+      <div class="form-group">
+        <label>PRECIO SUGERIDO ($)</label>
+        <input type="number" step="0.01" id="modal_style_price" class="form-control" value="${st.suggested_price}" required>
+      </div>
+      <div class="form-group">
+        <label>DURACIÓN APROX (MINUTOS)</label>
+        <input type="number" id="modal_style_duration" class="form-control" value="${st.approx_duration}" required>
+      </div>
+      <div class="form-group">
+        <label>URL IMAGEN ILUSTRATIVA</label>
+        <input type="text" id="modal_style_image" class="form-control" value="${escapeHtml(st.image_url || '')}">
+      </div>
+      <div class="form-group">
+        <label>DESCRIPCIÓN / RECOMENDACIÓN</label>
+        <input type="text" id="modal_style_desc" class="form-control" value="${escapeHtml(st.description || '')}">
+      </div>
+    `;
+  }
+  const modalEl = document.getElementById("adminModal");
+  if (modalEl) modalEl.style.display = "flex";
 }
 
 // 3. ZONAS DE DELIVERY
@@ -238,51 +306,85 @@ async function loadAdminDelivery() {
 }
 
 async function deleteDeliveryZone(id) {
-  if (!confirm("¿Eliminar esta zona de delivery?")) return;
-  await fetch(`/api/admin/delivery-zones/${id}`, { method: "DELETE", headers: authHeaders() });
-  loadAdminDelivery();
+  if (!confirm("¿Eliminar esta zona de delivery? Esta acción no se puede deshacer.")) return;
+  try {
+    const res = await fetch(`/api/admin/delivery-zones/${id}`, { method: "DELETE", headers: authHeaders() });
+    if (res.ok) {
+      showAdminToast("Zona de delivery eliminada correctamente.", "success");
+      loadAdminDelivery();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showAdminToast(err.detail || "Error al eliminar zona de delivery.", "error");
+      loadAdminDelivery();
+    }
+  } catch (e) {
+    showAdminToast("Error de conexión al eliminar zona.", "error");
+  }
 }
 
 function openDeliveryModal() {
   currentModalType = "delivery";
   editingRecordId = null;
-  document.getElementById("modalAdminTitle").textContent = "+ AGREGAR ZONA DE DELIVERY";
-  document.getElementById("modalAdminBody").innerHTML = `
-    <div class="form-group">
-      <label>NOMBRE DE LA ZONA</label>
-      <input type="text" id="modal_delivery_name" class="form-control" placeholder="Ej: Zona Norte / San Fernando" required>
-    </div>
-    <div class="form-group">
-      <label>COSTO DE ENVÍO ($)</label>
-      <input type="number" step="0.01" id="modal_delivery_cost" class="form-control" placeholder="2000" required>
-    </div>
-    <div class="form-group">
-      <label>MONTO MÍNIMO DE COMPRA ($)</label>
-      <input type="number" step="0.01" id="modal_delivery_min_amount" class="form-control" value="0" required>
-    </div>
-  `;
-  document.getElementById("adminModal").style.display = "flex";
+  const titleEl = document.getElementById("modalAdminTitle");
+  if (titleEl) titleEl.textContent = "+ AGREGAR ZONA DE DELIVERY";
+  const bodyEl = document.getElementById("modalAdminBody");
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div class="form-group">
+        <label>NOMBRE DE LA ZONA</label>
+        <input type="text" id="modal_delivery_name" class="form-control" placeholder="Ej: Zona Norte / San Fernando" required>
+      </div>
+      <div class="form-group">
+        <label>COSTO DE ENVÍO ($)</label>
+        <input type="number" step="0.01" id="modal_delivery_cost" class="form-control" placeholder="2000" required>
+      </div>
+      <div class="form-group">
+        <label>MONTO MÍNIMO DE COMPRA ($)</label>
+        <input type="number" step="0.01" id="modal_delivery_min_amount" class="form-control" value="0" required>
+      </div>
+    `;
+  }
+  const modalEl = document.getElementById("adminModal");
+  if (modalEl) modalEl.style.display = "flex";
 }
 
-function editDeliveryModal(id) {
-  const z = adminDeliveryList.find(item => item.id === id);
-  if (!z) return;
+async function editDeliveryModal(id) {
+  let z = adminDeliveryList.find(item => item.id == id);
+  if (!z) {
+    try {
+      const res = await fetch("/api/admin/delivery-zones", { headers: authHeaders() });
+      if (res.ok) {
+        adminDeliveryList = await res.json();
+        z = adminDeliveryList.find(item => item.id == id);
+      }
+    } catch (e) {}
+  }
+  if (!z) {
+    showAdminToast("No se encontró la zona en el servidor. Actualizando...", "warning");
+    loadAdminDelivery();
+    return;
+  }
   currentModalType = "delivery";
   editingRecordId = id;
-  document.getElementById("modalAdminTitle").textContent = `✏️ EDITAR ZONA DE DELIVERY #${id}`;
-  document.getElementById("modalAdminBody").innerHTML = `
-    <div class="form-group">
-      <label>NOMBRE DE LA ZONA</label>
-      <input type="text" id="modal_delivery_name" class="form-control" value="${escapeHtml(z.name)}" required>
-    </div>
-    <div class="form-group">
-      <label>COSTO DE ENVÍO ($)</label>
-      <input type="number" step="0.01" id="modal_delivery_cost" class="form-control" value="${z.cost}" required>
-    </div>
-    <div class="form-group">
-      <label>MONTO MÍNIMO DE COMPRA ($)</label>
-      <input type="number" step="0.01" id="modal_delivery_min_amount" class="form-control" value="${z.min_order_amount}" required>
-    </div>
-  `;
-  document.getElementById("adminModal").style.display = "flex";
+  const titleEl = document.getElementById("modalAdminTitle");
+  if (titleEl) titleEl.textContent = `✏️ EDITAR ZONA DE DELIVERY #${id}`;
+  const bodyEl = document.getElementById("modalAdminBody");
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div class="form-group">
+        <label>NOMBRE DE LA ZONA</label>
+        <input type="text" id="modal_delivery_name" class="form-control" value="${escapeHtml(z.name)}" required>
+      </div>
+      <div class="form-group">
+        <label>COSTO DE ENVÍO ($)</label>
+        <input type="number" step="0.01" id="modal_delivery_cost" class="form-control" value="${z.cost}" required>
+      </div>
+      <div class="form-group">
+        <label>MONTO MÍNIMO DE COMPRA ($)</label>
+        <input type="number" step="0.01" id="modal_delivery_min_amount" class="form-control" value="${z.min_order_amount}" required>
+      </div>
+    `;
+  }
+  const modalEl = document.getElementById("adminModal");
+  if (modalEl) modalEl.style.display = "flex";
 }

@@ -38,103 +38,137 @@ async function loadAdminBarbers() {
 }
 
 async function deleteBarber(id) {
-  if (!confirm("¿Eliminar este barbero?")) return;
-  await fetch(`/api/admin/barbers/${id}`, { method: "DELETE", headers: authHeaders() });
-  loadAdminBarbers();
+  if (!confirm("¿Eliminar este barbero? Esta acción no se puede deshacer.")) return;
+  try {
+    const res = await fetch(`/api/admin/barbers/${id}`, { method: "DELETE", headers: authHeaders() });
+    if (res.ok) {
+      showAdminToast("Barbero eliminado correctamente.", "success");
+      loadAdminBarbers();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showAdminToast(err.detail || "Error al eliminar barbero.", "error");
+      loadAdminBarbers();
+    }
+  } catch (e) {
+    showAdminToast("Error de conexión al eliminar barbero.", "error");
+  }
 }
 
 function openBarberModal() {
   currentModalType = "barber";
   editingRecordId = null;
-  document.getElementById("modalAdminTitle").textContent = "+ AGREGAR BARBERO";
-  document.getElementById("modalAdminBody").innerHTML = `
-    <div class="form-group">
-      <label>NOMBRE COMPLETO</label>
-      <input type="text" id="modal_barber_name" class="form-control" placeholder="Ej: Mateo Rossi" required>
-    </div>
-    <div class="form-group">
-      <label>📱 TELÉFONO / WHATSAPP (PRIVADO - NOTIFICACIONES)</label>
-      <input type="text" id="modal_barber_phone" class="form-control" placeholder="5493834123456" required>
-      <small style="color: #94a3b8; font-size: 0.7rem;">⚠️ Uso interno del negocio. NUNCA se mostrará en el perfil público.</small>
-    </div>
-    <div class="form-group">
-      <label>EXPERIENCIA / DESCRIPCIÓN</label>
-      <input type="text" id="modal_barber_experience" class="form-control" placeholder="Ej: 5 años - Master Barber especialista en Fade & Barba">
-    </div>
-    <div class="form-group">
-      <label>ESTILOS DESTACADOS (Separados por coma)</label>
-      <input type="text" id="modal_barber_featured_styles" class="form-control" placeholder="Skin Fade, Mullet, Barba Exfoliante">
-    </div>
-    <div class="form-group">
-      <label>INSTAGRAM (Opcional)</label>
-      <input type="text" id="modal_barber_instagram" class="form-control" placeholder="@mateobarber">
-    </div>
-    <div class="form-group">
-      <label>FACEBOOK (Opcional)</label>
-      <input type="text" id="modal_barber_facebook" class="form-control" placeholder="mateo.barber">
-    </div>
-    <div class="form-group">
-      <label>ESPECIALIDADES</label>
-      <input type="text" id="modal_barber_specialties" class="form-control" placeholder="Ej: Fade, Barba, Profilado">
-    </div>
-    <div class="form-group">
-      <label>DÍAS DE TRABAJO</label>
-      <input type="text" id="modal_barber_days" class="form-control" placeholder="Ej: Lunes a Sábado" value="Lunes a Sábado">
-    </div>
-    <div class="form-group">
-      <label>URL FOTO / AVATAR</label>
-      <input type="text" id="modal_barber_avatar" class="form-control" placeholder="/static/barbers/barber1.jpg">
-    </div>
-  `;
-  document.getElementById("adminModal").style.display = "flex";
+  const titleEl = document.getElementById("modalAdminTitle");
+  if (titleEl) titleEl.textContent = "+ AGREGAR BARBERO";
+  const bodyEl = document.getElementById("modalAdminBody");
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div class="form-group">
+        <label>NOMBRE COMPLETO</label>
+        <input type="text" id="modal_barber_name" class="form-control" placeholder="Ej: Mateo Rossi" required>
+      </div>
+      <div class="form-group">
+        <label>📱 TELÉFONO / WHATSAPP (PRIVADO - NOTIFICACIONES)</label>
+        <input type="text" id="modal_barber_phone" class="form-control" placeholder="5493834123456" required>
+        <small style="color: #94a3b8; font-size: 0.7rem;">⚠️ Uso interno del negocio. NUNCA se mostrará en el perfil público.</small>
+      </div>
+      <div class="form-group">
+        <label>EXPERIENCIA / DESCRIPCIÓN</label>
+        <input type="text" id="modal_barber_experience" class="form-control" placeholder="Ej: 5 años - Master Barber especialista en Fade & Barba">
+      </div>
+      <div class="form-group">
+        <label>ESTILOS DESTACADOS (Separados por coma)</label>
+        <input type="text" id="modal_barber_featured_styles" class="form-control" placeholder="Skin Fade, Mullet, Barba Exfoliante">
+      </div>
+      <div class="form-group">
+        <label>INSTAGRAM (Opcional)</label>
+        <input type="text" id="modal_barber_instagram" class="form-control" placeholder="@mateobarber">
+      </div>
+      <div class="form-group">
+        <label>FACEBOOK (Opcional)</label>
+        <input type="text" id="modal_barber_facebook" class="form-control" placeholder="mateo.barber">
+      </div>
+      <div class="form-group">
+        <label>ESPECIALIDADES</label>
+        <input type="text" id="modal_barber_specialties" class="form-control" placeholder="Ej: Fade, Barba, Profilado">
+      </div>
+      <div class="form-group">
+        <label>DÍAS DE TRABAJO</label>
+        <input type="text" id="modal_barber_days" class="form-control" placeholder="Ej: Lunes a Sábado" value="Lunes a Sábado">
+      </div>
+      <div class="form-group">
+        <label>URL FOTO / AVATAR</label>
+        <input type="text" id="modal_barber_avatar" class="form-control" placeholder="/static/barbers/barber1.jpg">
+      </div>
+    `;
+  }
+  const modalEl = document.getElementById("adminModal");
+  if (modalEl) modalEl.style.display = "flex";
 }
 
-function editBarberModal(id) {
-  const b = adminBarbersList.find(item => item.id === id);
-  if (!b) return;
+async function editBarberModal(id) {
+  let b = adminBarbersList.find(item => item.id == id);
+  if (!b) {
+    try {
+      const res = await fetch("/api/admin/barbers", { headers: authHeaders() });
+      if (res.ok) {
+        adminBarbersList = await res.json();
+        b = adminBarbersList.find(item => item.id == id);
+      }
+    } catch (e) {}
+  }
+  if (!b) {
+    showAdminToast("No se encontró el barbero en el servidor. Actualizando lista...", "warning");
+    loadAdminBarbers();
+    return;
+  }
   currentModalType = "barber";
   editingRecordId = id;
-  document.getElementById("modalAdminTitle").textContent = `✏️ EDITAR BARBERO #${id}`;
-  document.getElementById("modalAdminBody").innerHTML = `
-    <div class="form-group">
-      <label>NOMBRE COMPLETO</label>
-      <input type="text" id="modal_barber_name" class="form-control" value="${escapeHtml(b.name)}" required>
-    </div>
-    <div class="form-group">
-      <label>📱 TELÉFONO / WHATSAPP (PRIVADO - NOTIFICACIONES)</label>
-      <input type="text" id="modal_barber_phone" class="form-control" value="${escapeHtml(b.phone || '')}" required>
-      <small style="color: #94a3b8; font-size: 0.7rem;">⚠️ Uso interno del negocio. NUNCA se mostrará en el perfil público.</small>
-    </div>
-    <div class="form-group">
-      <label>EXPERIENCIA / DESCRIPCIÓN</label>
-      <input type="text" id="modal_barber_experience" class="form-control" value="${escapeHtml(b.experience || '')}">
-    </div>
-    <div class="form-group">
-      <label>ESTILOS DESTACADOS (Separados por coma)</label>
-      <input type="text" id="modal_barber_featured_styles" class="form-control" value="${escapeHtml(b.featured_styles || '')}">
-    </div>
-    <div class="form-group">
-      <label>INSTAGRAM (Opcional)</label>
-      <input type="text" id="modal_barber_instagram" class="form-control" value="${escapeHtml(b.instagram || '')}">
-    </div>
-    <div class="form-group">
-      <label>FACEBOOK (Opcional)</label>
-      <input type="text" id="modal_barber_facebook" class="form-control" value="${escapeHtml(b.facebook || '')}">
-    </div>
-    <div class="form-group">
-      <label>ESPECIALIDADES</label>
-      <input type="text" id="modal_barber_specialties" class="form-control" value="${escapeHtml(b.specialties || '')}">
-    </div>
-    <div class="form-group">
-      <label>DÍAS DE TRABAJO</label>
-      <input type="text" id="modal_barber_days" class="form-control" value="${escapeHtml(b.working_days || '')}">
-    </div>
-    <div class="form-group">
-      <label>URL FOTO / AVATAR</label>
-      <input type="text" id="modal_barber_avatar" class="form-control" value="${escapeHtml(b.avatar_url || '')}">
-    </div>
-  `;
-  document.getElementById("adminModal").style.display = "flex";
+  const titleEl = document.getElementById("modalAdminTitle");
+  if (titleEl) titleEl.textContent = `✏️ EDITAR BARBERO #${id}`;
+  const bodyEl = document.getElementById("modalAdminBody");
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div class="form-group">
+        <label>NOMBRE COMPLETO</label>
+        <input type="text" id="modal_barber_name" class="form-control" value="${escapeHtml(b.name)}" required>
+      </div>
+      <div class="form-group">
+        <label>📱 TELÉFONO / WHATSAPP (PRIVADO - NOTIFICACIONES)</label>
+        <input type="text" id="modal_barber_phone" class="form-control" value="${escapeHtml(b.phone || '')}" required>
+        <small style="color: #94a3b8; font-size: 0.7rem;">⚠️ Uso interno del negocio. NUNCA se mostrará en el perfil público.</small>
+      </div>
+      <div class="form-group">
+        <label>EXPERIENCIA / DESCRIPCIÓN</label>
+        <input type="text" id="modal_barber_experience" class="form-control" value="${escapeHtml(b.experience || '')}">
+      </div>
+      <div class="form-group">
+        <label>ESTILOS DESTACADOS (Separados por coma)</label>
+        <input type="text" id="modal_barber_featured_styles" class="form-control" value="${escapeHtml(b.featured_styles || '')}">
+      </div>
+      <div class="form-group">
+        <label>INSTAGRAM (Opcional)</label>
+        <input type="text" id="modal_barber_instagram" class="form-control" value="${escapeHtml(b.instagram || '')}">
+      </div>
+      <div class="form-group">
+        <label>FACEBOOK (Opcional)</label>
+        <input type="text" id="modal_barber_facebook" class="form-control" value="${escapeHtml(b.facebook || '')}">
+      </div>
+      <div class="form-group">
+        <label>ESPECIALIDADES</label>
+        <input type="text" id="modal_barber_specialties" class="form-control" value="${escapeHtml(b.specialties || '')}">
+      </div>
+      <div class="form-group">
+        <label>DÍAS DE TRABAJO</label>
+        <input type="text" id="modal_barber_days" class="form-control" value="${escapeHtml(b.working_days || '')}">
+      </div>
+      <div class="form-group">
+        <label>URL FOTO / AVATAR</label>
+        <input type="text" id="modal_barber_avatar" class="form-control" value="${escapeHtml(b.avatar_url || '')}">
+      </div>
+    `;
+  }
+  const modalEl = document.getElementById("adminModal");
+  if (modalEl) modalEl.style.display = "flex";
 }
 
 async function loadAdminSchedules() {

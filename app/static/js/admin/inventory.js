@@ -87,94 +87,128 @@ async function quickAdjustStock(productId, delta) {
 }
 
 async function deleteProduct(id) {
-  if (!confirm("¿Eliminar este producto?")) return;
-  await fetch(`/api/admin/products/${id}`, { method: "DELETE", headers: authHeaders() });
-  loadAdminProducts();
+  if (!confirm("¿Eliminar este producto? Esta acción no se puede deshacer.")) return;
+  try {
+    const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE", headers: authHeaders() });
+    if (res.ok) {
+      showAdminToast("Producto eliminado correctamente.", "success");
+      loadAdminProducts();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showAdminToast(err.detail || "Error al eliminar producto.", "error");
+      loadAdminProducts();
+    }
+  } catch (e) {
+    showAdminToast("Error de conexión al eliminar producto.", "error");
+  }
 }
 
 function openProductModal() {
   currentModalType = "product";
   editingRecordId = null;
-  document.getElementById("modalAdminTitle").textContent = "+ AGREGAR PRODUCTO AL INVENTARIO";
-  document.getElementById("modalAdminBody").innerHTML = `
-    <div class="form-group">
-      <label>NOMBRE DEL PRODUCTO</label>
-      <input type="text" id="modal_product_name" class="form-control" placeholder="Ej: Cera Modeladora Matte" required>
-    </div>
-    <div class="form-group">
-      <label>PRECIO DE VENTA ($)</label>
-      <input type="number" step="0.01" id="modal_product_price" class="form-control" placeholder="12500" required>
-    </div>
-    <div class="form-group">
-      <label>STOCK ACTUAL</label>
-      <input type="number" id="modal_product_stock" class="form-control" value="15" required>
-    </div>
-    <div class="form-group">
-      <label>STOCK MÍNIMO (ALERTA)</label>
-      <input type="number" id="modal_product_min_stock" class="form-control" value="3" required>
-    </div>
-    <div class="form-group">
-      <label>CATEGORÍA</label>
-      <input type="text" id="modal_product_category" class="form-control" placeholder="Ej: Ceras & Pomadas, Cuidado Barba" value="Ceras & Pomadas">
-    </div>
-    <div class="form-group">
-      <label>IMAGEN (SUBIR DESDE CELULAR/PC O PEGAR LINK URL)</label>
-      <input type="file" accept="image/*" onchange="uploadProductFileAdmin(this)" class="form-control" style="padding: 6px; margin-bottom: 6px;">
-      <input type="text" id="modal_product_image" class="form-control" placeholder="/static/products/cera.jpg u URL..." oninput="document.getElementById('admin_img_preview').src=this.value; document.getElementById('admin_img_preview').style.display=this.value?'block':'none';">
-      <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
-        <img id="admin_img_preview" src="" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; display: none;">
-        <span id="admin_img_status" style="font-size: 0.75rem; color: #9ca3af;">Foto de cámara/galería o link web.</span>
+  const titleEl = document.getElementById("modalAdminTitle");
+  if (titleEl) titleEl.textContent = "+ AGREGAR PRODUCTO AL INVENTARIO";
+  const bodyEl = document.getElementById("modalAdminBody");
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div class="form-group">
+        <label>NOMBRE DEL PRODUCTO</label>
+        <input type="text" id="modal_product_name" class="form-control" placeholder="Ej: Cera Modeladora Matte" required>
       </div>
-    </div>
-    <div class="form-group">
-      <label>DESCRIPCIÓN</label>
-      <input type="text" id="modal_product_desc" class="form-control" placeholder="Fijación fuerte efecto mate 100g">
-    </div>
-  `;
-  document.getElementById("adminModal").style.display = "flex";
+      <div class="form-group">
+        <label>PRECIO DE VENTA ($)</label>
+        <input type="number" step="0.01" id="modal_product_price" class="form-control" placeholder="12500" required>
+      </div>
+      <div class="form-group">
+        <label>STOCK ACTUAL</label>
+        <input type="number" id="modal_product_stock" class="form-control" value="15" required>
+      </div>
+      <div class="form-group">
+        <label>STOCK MÍNIMO (ALERTA)</label>
+        <input type="number" id="modal_product_min_stock" class="form-control" value="3" required>
+      </div>
+      <div class="form-group">
+        <label>CATEGORÍA</label>
+        <input type="text" id="modal_product_category" class="form-control" placeholder="Ej: Ceras & Pomadas, Cuidado Barba" value="Ceras & Pomadas">
+      </div>
+      <div class="form-group">
+        <label>IMAGEN (SUBIR DESDE CELULAR/PC O PEGAR LINK URL)</label>
+        <input type="file" accept="image/*" onchange="uploadProductFileAdmin(this)" class="form-control" style="padding: 6px; margin-bottom: 6px;">
+        <input type="text" id="modal_product_image" class="form-control" placeholder="/static/products/cera.jpg u URL..." oninput="document.getElementById('admin_img_preview').src=this.value; document.getElementById('admin_img_preview').style.display=this.value?'block':'none';">
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
+          <img id="admin_img_preview" src="" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; display: none;">
+          <span id="admin_img_status" style="font-size: 0.75rem; color: #9ca3af;">Foto de cámara/galería o link web.</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>DESCRIPCIÓN</label>
+        <input type="text" id="modal_product_desc" class="form-control" placeholder="Fijación fuerte efecto mate 100g">
+      </div>
+    `;
+  }
+  const modalEl = document.getElementById("adminModal");
+  if (modalEl) modalEl.style.display = "flex";
 }
 
-function editProductModal(id) {
-  const p = adminProductsList.find(item => item.id === id);
-  if (!p) return;
+async function editProductModal(id) {
+  let p = adminProductsList.find(item => item.id == id);
+  if (!p) {
+    try {
+      const res = await fetch("/api/admin/products", { headers: authHeaders() });
+      if (res.ok) {
+        adminProductsList = await res.json();
+        p = adminProductsList.find(item => item.id == id);
+      }
+    } catch (e) {}
+  }
+  if (!p) {
+    showAdminToast("No se encontró el producto en el servidor. Actualizando...", "warning");
+    loadAdminProducts();
+    return;
+  }
   currentModalType = "product";
   editingRecordId = id;
   const initialImg = p.image_url || '';
-  document.getElementById("modalAdminTitle").textContent = `✏️ EDITAR PRODUCTO #${id}`;
-  document.getElementById("modalAdminBody").innerHTML = `
-    <div class="form-group">
-      <label>NOMBRE DEL PRODUCTO</label>
-      <input type="text" id="modal_product_name" class="form-control" value="${escapeHtml(p.name)}" required>
-    </div>
-    <div class="form-group">
-      <label>PRECIO DE VENTA ($)</label>
-      <input type="number" step="0.01" id="modal_product_price" class="form-control" value="${p.price}" required>
-    </div>
-    <div class="form-group">
-      <label>STOCK ACTUAL</label>
-      <input type="number" id="modal_product_stock" class="form-control" value="${p.stock}" required>
-    </div>
-    <div class="form-group">
-      <label>STOCK MÍNIMO (ALERTA CRÍTICA)</label>
-      <input type="number" id="modal_product_min_stock" class="form-control" value="${p.min_stock}" required>
-    </div>
-    <div class="form-group">
-      <label>CATEGORÍA</label>
-      <input type="text" id="modal_product_category" class="form-control" value="${escapeHtml(p.category_name || 'Ceras & Pomadas')}">
-    </div>
-    <div class="form-group">
-      <label>IMAGEN (SUBIR DESDE CELULAR/PC O PEGAR LINK URL)</label>
-      <input type="file" accept="image/*" onchange="uploadProductFileAdmin(this)" class="form-control" style="padding: 6px; margin-bottom: 6px;">
-      <input type="text" id="modal_product_image" class="form-control" value="${escapeHtml(initialImg)}" oninput="document.getElementById('admin_img_preview').src=this.value; document.getElementById('admin_img_preview').style.display=this.value?'block':'none';">
-      <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
-        <img id="admin_img_preview" src="${escapeHtml(initialImg)}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; ${initialImg ? 'display:block;' : 'display:none;'}">
-        <span id="admin_img_status" style="font-size: 0.75rem; color: #9ca3af;">Foto de cámara/galería o link web.</span>
+  const titleEl = document.getElementById("modalAdminTitle");
+  if (titleEl) titleEl.textContent = `✏️ EDITAR PRODUCTO #${id}`;
+  const bodyEl = document.getElementById("modalAdminBody");
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div class="form-group">
+        <label>NOMBRE DEL PRODUCTO</label>
+        <input type="text" id="modal_product_name" class="form-control" value="${escapeHtml(p.name)}" required>
       </div>
-    </div>
-    <div class="form-group">
-      <label>DESCRIPCIÓN</label>
-      <input type="text" id="modal_product_desc" class="form-control" value="${escapeHtml(p.description || '')}">
-    </div>
-  `;
-  document.getElementById("adminModal").style.display = "flex";
+      <div class="form-group">
+        <label>PRECIO DE VENTA ($)</label>
+        <input type="number" step="0.01" id="modal_product_price" class="form-control" value="${p.price}" required>
+      </div>
+      <div class="form-group">
+        <label>STOCK ACTUAL</label>
+        <input type="number" id="modal_product_stock" class="form-control" value="${p.stock}" required>
+      </div>
+      <div class="form-group">
+        <label>STOCK MÍNIMO (ALERTA CRÍTICA)</label>
+        <input type="number" id="modal_product_min_stock" class="form-control" value="${p.min_stock}" required>
+      </div>
+      <div class="form-group">
+        <label>CATEGORÍA</label>
+        <input type="text" id="modal_product_category" class="form-control" value="${escapeHtml(p.category_name || 'Ceras & Pomadas')}">
+      </div>
+      <div class="form-group">
+        <label>IMAGEN (SUBIR DESDE CELULAR/PC O PEGAR LINK URL)</label>
+        <input type="file" accept="image/*" onchange="uploadProductFileAdmin(this)" class="form-control" style="padding: 6px; margin-bottom: 6px;">
+        <input type="text" id="modal_product_image" class="form-control" value="${escapeHtml(initialImg)}" oninput="document.getElementById('admin_img_preview').src=this.value; document.getElementById('admin_img_preview').style.display=this.value?'block':'none';">
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
+          <img id="admin_img_preview" src="${escapeHtml(initialImg)}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; ${initialImg ? 'display:block;' : 'display:none;'}">
+          <span id="admin_img_status" style="font-size: 0.75rem; color: #9ca3af;">Foto de cámara/galería o link web.</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>DESCRIPCIÓN</label>
+        <input type="text" id="modal_product_desc" class="form-control" value="${escapeHtml(p.description || '')}">
+      </div>
+    `;
+  }
+  const modalEl = document.getElementById("adminModal");
+  if (modalEl) modalEl.style.display = "flex";
 }

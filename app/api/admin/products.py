@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import AdminUser, Product, Order, AuditLog
+from app.models import AdminUser, Product, Order, OrderItem, AuditLog
 from app.schemas import ProductRead, ProductCreate, ProductUpdate, OrderRead, OrderStatusUpdate
 from app.core.dependencies import get_current_admin
 from app.image_service import delete_orphan_file
@@ -85,6 +85,10 @@ def delete_admin_product(
 
     name = p.name
     old_image = p.image_url
+
+    # Desvincular de pedidos históricos para no violar constraints de PostgreSQL
+    db.query(OrderItem).filter(OrderItem.product_id == product_id).update({OrderItem.product_id: None}, synchronize_session=False)
+
     db.delete(p)
     db.commit()
 

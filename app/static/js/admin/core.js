@@ -68,6 +68,33 @@ let currentActiveSection = "dashboard";
 let currentModalType = "";
 let editingRecordId = null;
 
+function showAdminToast(msg, type = "info") {
+  let container = document.getElementById("adminToastContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "adminToastContainer";
+    container.className = "admin-toast-container";
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement("div");
+  toast.className = `admin-toast ${type}`;
+  let icon = "ℹ️";
+  if (type === "success") icon = "✅";
+  if (type === "error" || type === "danger") icon = "❌";
+  if (type === "warning") icon = "⚠️";
+
+  toast.innerHTML = `<span style="font-size:1.1rem; line-height:1;">${icon}</span> <span>${escapeHtml(msg)}</span>`;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateX(40px)";
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
+window.showAdminToast = showAdminToast;
+window.showToast = showAdminToast;
+
 function showLoginOverlay() {
   const overlay = document.getElementById("loginOverlay");
   const app = document.getElementById("adminApp");
@@ -356,15 +383,15 @@ async function submitAdminModal() {
     const method = isEdit ? "PUT" : "POST";
 
     if (currentModalType === "barber") {
-      const name = document.getElementById("modal_barber_name").value.trim();
-      const phone = document.getElementById("modal_barber_phone").value.trim();
-      const experience = document.getElementById("modal_barber_experience").value.trim();
-      const featured_styles = document.getElementById("modal_barber_featured_styles").value.trim();
-      const instagram = document.getElementById("modal_barber_instagram").value.trim();
-      const facebook = document.getElementById("modal_barber_facebook").value.trim();
-      const specialties = document.getElementById("modal_barber_specialties").value.trim();
-      const working_days = document.getElementById("modal_barber_days").value.trim();
-      const avatar_url = document.getElementById("modal_barber_avatar").value.trim();
+      const name = document.getElementById("modal_barber_name")?.value?.trim() || "";
+      const phone = document.getElementById("modal_barber_phone")?.value?.trim() || "";
+      const experience = document.getElementById("modal_barber_experience")?.value?.trim() || "";
+      const featured_styles = document.getElementById("modal_barber_featured_styles")?.value?.trim() || "";
+      const instagram = document.getElementById("modal_barber_instagram")?.value?.trim() || "";
+      const facebook = document.getElementById("modal_barber_facebook")?.value?.trim() || "";
+      const specialties = document.getElementById("modal_barber_specialties")?.value?.trim() || "";
+      const working_days = document.getElementById("modal_barber_days")?.value?.trim() || "";
+      const avatar_url = document.getElementById("modal_barber_avatar")?.value?.trim() || "";
       const url = isEdit ? `/api/admin/barbers/${editingRecordId}` : "/api/admin/barbers";
 
       const res = await fetch(url, {
@@ -374,19 +401,20 @@ async function submitAdminModal() {
       });
       if (res.ok) {
         closeAdminModal();
+        showAdminToast(isEdit ? "Barbero actualizado correctamente." : "Barbero creado exitosamente.", "success");
         if (typeof loadAdminBarbers === "function") loadAdminBarbers();
       } else {
-        const err = await res.json();
-        alert(err.detail || "Error al procesar barbero.");
+        const err = await res.json().catch(() => ({}));
+        showAdminToast(err.detail || "Error al procesar barbero.", "error");
       }
     } else if (currentModalType === "service") {
-      const name = document.getElementById("modal_service_name").value.trim();
-      const category = document.getElementById("modal_service_category").value.trim();
-      const price = parseFloat(document.getElementById("modal_service_price").value || "0");
-      const prevVal = document.getElementById("modal_service_prev_price").value;
+      const name = document.getElementById("modal_service_name")?.value?.trim() || "";
+      const category = document.getElementById("modal_service_category")?.value?.trim() || "Corte";
+      const price = parseFloat(document.getElementById("modal_service_price")?.value || "0");
+      const prevVal = document.getElementById("modal_service_prev_price")?.value;
       const previous_price = prevVal ? parseFloat(prevVal) : null;
-      const duration_min = parseInt(document.getElementById("modal_service_duration").value || "30");
-      const description = document.getElementById("modal_service_desc").value.trim();
+      const duration_min = parseInt(document.getElementById("modal_service_duration")?.value || "30");
+      const description = document.getElementById("modal_service_desc")?.value?.trim() || "";
       const url = isEdit ? `/api/admin/services/${editingRecordId}` : "/api/admin/services";
 
       const res = await fetch(url, {
@@ -396,18 +424,20 @@ async function submitAdminModal() {
       });
       if (res.ok) {
         closeAdminModal();
+        showAdminToast(isEdit ? "Servicio actualizado correctamente." : "Servicio creado exitosamente.", "success");
         if (typeof loadAdminServices === "function") loadAdminServices();
       } else {
-        const err = await res.json();
-        alert(err.detail || "Error al procesar servicio.");
+        const err = await res.json().catch(() => ({}));
+        showAdminToast(err.detail || "Error al procesar servicio.", "error");
       }
     } else if (currentModalType === "style") {
-      const name = document.getElementById("modal_style_name").value.trim();
-      const category = document.getElementById("modal_style_category").value.trim();
-      const suggested_price = parseFloat(document.getElementById("modal_style_price").value || "0");
-      const approx_duration = parseInt(document.getElementById("modal_style_duration").value || "30");
-      const image_url = document.getElementById("modal_style_image").value.trim();
-      const description = document.getElementById("modal_style_desc").value.trim();
+      const name = document.getElementById("modal_style_name")?.value?.trim() || "";
+      const category = document.getElementById("modal_style_category")?.value?.trim() || "Fade";
+      const suggested_price = parseFloat(document.getElementById("modal_style_price")?.value || "0");
+      const approx_duration = parseInt(document.getElementById("modal_style_duration")?.value || "30");
+      const imgEl = document.getElementById("modal_style_img") || document.getElementById("modal_style_image");
+      const image_url = imgEl ? imgEl.value.trim() : "";
+      const description = document.getElementById("modal_style_desc")?.value?.trim() || "";
       const url = isEdit ? `/api/admin/styles/${editingRecordId}` : "/api/admin/styles";
 
       const res = await fetch(url, {
@@ -417,19 +447,20 @@ async function submitAdminModal() {
       });
       if (res.ok) {
         closeAdminModal();
+        showAdminToast(isEdit ? "Estilo actualizado correctamente." : "Estilo creado exitosamente.", "success");
         if (typeof loadAdminStyles === "function") loadAdminStyles();
       } else {
-        const err = await res.json();
-        alert(err.detail || "Error al procesar estilo.");
+        const err = await res.json().catch(() => ({}));
+        showAdminToast(err.detail || "Error al procesar estilo.", "error");
       }
     } else if (currentModalType === "product") {
-      const name = document.getElementById("modal_product_name").value.trim();
-      const price = parseFloat(document.getElementById("modal_product_price").value || "0");
-      const stock = parseInt(document.getElementById("modal_product_stock").value || "0");
-      const min_stock = parseInt(document.getElementById("modal_product_min_stock").value || "0");
-      const category_name = document.getElementById("modal_product_category").value.trim();
-      const image_url = document.getElementById("modal_product_image").value.trim();
-      const description = document.getElementById("modal_product_desc").value.trim();
+      const name = document.getElementById("modal_product_name")?.value?.trim() || "";
+      const price = parseFloat(document.getElementById("modal_product_price")?.value || "0");
+      const stock = parseInt(document.getElementById("modal_product_stock")?.value || "0");
+      const min_stock = parseInt(document.getElementById("modal_product_min_stock")?.value || "0");
+      const category_name = document.getElementById("modal_product_category")?.value?.trim() || "";
+      const image_url = document.getElementById("modal_product_image")?.value?.trim() || "";
+      const description = document.getElementById("modal_product_desc")?.value?.trim() || "";
       const url = isEdit ? `/api/admin/products/${editingRecordId}` : "/api/admin/products";
 
       const res = await fetch(url, {
@@ -439,15 +470,16 @@ async function submitAdminModal() {
       });
       if (res.ok) {
         closeAdminModal();
+        showAdminToast(isEdit ? "Producto actualizado correctamente." : "Producto creado exitosamente.", "success");
         if (typeof loadAdminProducts === "function") loadAdminProducts();
       } else {
-        const err = await res.json();
-        alert(err.detail || "Error al procesar producto.");
+        const err = await res.json().catch(() => ({}));
+        showAdminToast(err.detail || "Error al procesar producto.", "error");
       }
     } else if (currentModalType === "delivery") {
-      const name = document.getElementById("modal_delivery_name").value.trim();
-      const cost = parseFloat(document.getElementById("modal_delivery_cost").value || "0");
-      const min_order_amount = parseFloat(document.getElementById("modal_delivery_min_amount").value || "0");
+      const name = document.getElementById("modal_delivery_name")?.value?.trim() || "";
+      const cost = parseFloat(document.getElementById("modal_delivery_cost")?.value || "0");
+      const min_order_amount = parseFloat(document.getElementById("modal_delivery_min_amount")?.value || "0");
       const url = isEdit ? `/api/admin/delivery-zones/${editingRecordId}` : "/api/admin/delivery-zones";
 
       const res = await fetch(url, {
@@ -457,14 +489,16 @@ async function submitAdminModal() {
       });
       if (res.ok) {
         closeAdminModal();
+        showAdminToast(isEdit ? "Zona actualizada correctamente." : "Zona creada exitosamente.", "success");
         if (typeof loadAdminDelivery === "function") loadAdminDelivery();
       } else {
-        const err = await res.json();
-        alert(err.detail || "Error al procesar zona.");
+        const err = await res.json().catch(() => ({}));
+        showAdminToast(err.detail || "Error al procesar zona.", "error");
       }
     }
   } catch (e) {
-    alert("Error de conexión al procesar la solicitud.");
+    showAdminToast("Error inesperado al guardar.", "error");
+    console.error("submitAdminModal error:", e);
   }
 }
 

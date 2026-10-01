@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from app.core.database import get_db
-from app.models import AdminUser, Barber, Appointment, BarberSchedule, ScheduleException, AuditLog
+from app.models import AdminUser, Barber, Appointment, BarberSchedule, ScheduleException, WaitlistEntry, AuditLog
 from app.schemas import (
     StaffUserRead,
     StaffUserCreate,
@@ -190,6 +190,13 @@ def delete_admin_barber(
 
     name = b.name
     old_avatar = b.avatar_url
+
+    # Desvincular y limpiar registros relacionados para no violar constraints en PostgreSQL
+    db.query(BarberSchedule).filter(BarberSchedule.barber_id == barber_id).delete(synchronize_session=False)
+    db.query(ScheduleException).filter(ScheduleException.barber_id == barber_id).delete(synchronize_session=False)
+    db.query(WaitlistEntry).filter(WaitlistEntry.barber_id == barber_id).update({WaitlistEntry.barber_id: None}, synchronize_session=False)
+    db.query(Appointment).filter(Appointment.barber_id == barber_id).update({Appointment.barber_id: None}, synchronize_session=False)
+
     db.delete(b)
     db.commit()
 
