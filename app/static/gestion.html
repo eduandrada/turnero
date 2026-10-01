@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Gestión Encargado // Pereyras Barbers</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/admin.css">
+  <style>
+    body {
+      background-color: #0a0a0c;
+      color: #f3f4f6;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+    .gestion-header {
+      background: #131318;
+      border-bottom: 1px solid #23232c;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .gestion-brand {
+      font-family: 'Space Grotesk', monospace;
+      font-weight: 800;
+      font-size: 1.25rem;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .gestion-brand span { color: #d4ff00; }
+
+    .limit-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid #23232c;
+      padding: 6px 12px;
+      border-radius: 10px;
+      font-family: 'Space Grotesk', monospace;
+      font-size: 0.78rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .limit-pill strong { color: #d4ff00; }
+    .limit-reached {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #ef4444;
+      animation: pulseAlert 2s infinite;
+    }
+    @keyframes pulseAlert {
+      0%, 100% { box-shadow: 0 0 4px rgba(239, 68, 68, 0.3); }
+      50% { box-shadow: 0 0 12px rgba(239, 68, 68, 0.7); }
+    }
+
+    .gestion-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      background: #131318;
+      padding: 6px;
+      border-radius: 14px;
+      border: 1px solid #23232c;
+      margin-bottom: 24px;
+      overflow-x: auto;
+    }
+    .nav-tab-btn {
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-family: 'Space Grotesk', monospace;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .nav-tab-btn:hover { color: #fff; background: rgba(255,255,255,0.04); }
+    .nav-tab-btn.active {
+      background: #d4ff00;
+      color: #0a0a0c;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body>
+
+  <!-- AUTH LOCK OVERLAY -->
+  <div id="gestionAuthOverlay" style="position: fixed; inset: 0; background: rgba(10, 10, 12, 0.95); backdrop-filter: blur(12px); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 20px; width: 100%; max-width: 420px; padding: 36px; box-shadow: 0 20px 40px rgba(0,0,0,0.9); text-align: center;">
+      <div style="margin-bottom: 24px;">
+        <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #d4ff00; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">ROL OPERATIVO DE RECEPCIÓN</span>
+        <h2 style="font-family: 'Space Grotesk', monospace; color: #ffffff; margin: 8px 0 4px 0; font-size: 1.6rem;">GESTIÓN ENCARGADO</h2>
+        <p style="color: #9ca3af; font-size: 0.85rem; margin: 0;">Ingresá con tu usuario de Encargado o Administrador (Llave Maestra).</p>
+      </div>
+
+      <form onsubmit="event.preventDefault(); handleGestionLogin();">
+        <div class="form-group" style="text-align: left; margin-bottom: 16px;">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">USUARIO</label>
+          <input type="text" id="g_username" class="form-control" placeholder="encargado" value="encargado" required style="margin-top: 4px;">
+        </div>
+        <div class="form-group" style="text-align: left; margin-bottom: 24px;">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">CONTRASEÑA</label>
+          <input type="password" id="g_password" class="form-control" placeholder="••••••••" required style="margin-top: 4px;">
+        </div>
+
+        <button type="submit" class="btn-admin" style="width: 100%; justify-content: center; padding: 14px; font-size: 0.95rem; margin-bottom: 16px; background: #d4ff00; color: #000; font-weight: bold;">
+          🔑 INGRESAR A GESTIÓN →
+        </button>
+
+        <a href="/" style="display: block; color: #94a3b8; font-size: 0.85rem; text-decoration: none; padding: 8px;">
+          ← Volver al Inicio (App Pública)
+        </a>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- MAIN APP CONTAINER -->
+  <div id="gestionApp" style="display: none;">
+    
+    <!-- HEADER -->
+    <header class="gestion-header">
+      <div class="gestion-brand">
+        <a href="/" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 8px;">
+          💈 BARBERÍA <span>//</span> GESTIÓN ENCARGADO
+        </a>
+        <span id="masterKeyBadge" style="display: none; background: rgba(210, 255, 0, 0.2); color: #d4ff00; border: 1px solid #d4ff00; font-size: 0.65rem; padding: 2px 8px; border-radius: 6px; font-weight: bold;">
+          🔓 LLAVE MAESTRA (SIN LÍMITES)
+        </span>
+      </div>
+
+      <!-- STATUS & LIMIT PILLS -->
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <div class="limit-pill" id="pillAppts" title="Límite diario de turnos">
+          📅 Turnos Hoy: <strong id="lblPillAppts">0 / 6</strong>
+        </div>
+        <div class="limit-pill" id="pillClients" title="Límite diario de clientes atendidos">
+          👥 Clientes: <strong id="lblPillClients">0 / 6</strong>
+        </div>
+        <div class="limit-pill" id="pillServices" title="Límite de servicios creados">
+          💈 Servicios: <strong id="lblPillServices">0 / 3</strong>
+        </div>
+        <div class="limit-pill" id="pillStyles" title="Límite de estilos de corte creados">
+          ✂️ Estilos: <strong id="lblPillStyles">0 / 3</strong>
+        </div>
+
+        <a href="/turnolive.html" target="_blank" class="btn-admin btn-admin-secondary btn-admin-sm">
+          📋 Turnos en Vivo ↗
+        </a>
+        <a href="/display.html" target="_blank" class="btn-admin btn-admin-secondary btn-admin-sm">
+          📺 Pantalla TV ↗
+        </a>
+        <button onclick="openShiftClosureModal()" class="btn-admin btn-admin-sm" style="background: #d4ff00; color: #000; font-weight: bold; font-family: 'Space Grotesk', monospace;">
+          🔒 Cierre & Rendición
+        </button>
+        <button onclick="gestionLogout()" class="btn-admin btn-admin-secondary btn-admin-sm" style="color: #ef4444; border-color: rgba(239,68,68,0.3);">
+          🚪 Salir
+        </button>
+      </div>
+    </header>
+
+    <!-- CONTAINER -->
+    <main class="gestion-container">
+      
+      <!-- RELOJ FICHERO DIGITAL LUMINOSO (HORA DE ARGENTINA & AUDITORÍA DE INGRESO) -->
+      <div id="relojFicheroBanner" style="background: #050508; border: 1px solid rgba(255, 0, 51, 0.4); border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: 0 0 25px rgba(255, 0, 51, 0.15); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <div style="width: 52px; height: 52px; border-radius: 14px; background: rgba(255, 0, 51, 0.12); border: 1px solid rgba(255, 0, 51, 0.5); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; color: #ff0033; box-shadow: 0 0 15px rgba(255, 0, 51, 0.3);">
+            ⏱️
+          </div>
+          <div>
+            <div style="font-family: 'Space Grotesk', monospace; font-size: 0.75rem; color: #ff3355; letter-spacing: 1.5px; font-weight: 800; text-transform: uppercase; display: flex; align-items: center; gap: 6px;">
+              <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ff0033; box-shadow: 0 0 8px #ff0033; animation: pulseGlow 1.5s infinite;"></span>
+              RELOJ FICHERO DIGITAL // HORA OFICIAL ARGENTINA (ART)
+            </div>
+            <div id="gestionDigitalClock" style="font-family: 'Courier New', monospace; font-size: 2.3rem; font-weight: 900; color: #ff0033; text-shadow: 0 0 12px rgba(255, 0, 51, 0.8), 0 0 24px rgba(255, 0, 51, 0.4); margin: 2px 0; letter-spacing: 2px;">
+              00:00:00 ART
+            </div>
+            <div style="color: #9ca3af; font-size: 0.8rem; font-family: 'Plus Jakarta Sans', sans-serif;">
+              Catamarca, Argentina • Zona Horaria UTC-3
+            </div>
+          </div>
+        </div>
+
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 0, 51, 0.25); border-radius: 12px; padding: 12px 20px; min-width: 240px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);">
+          <span style="font-size: 0.7rem; color: #9ca3af; font-family: monospace; display: block; text-transform: uppercase; letter-spacing: 0.5px;">📌 HORARIO DE INGRESO AUDITADO:</span>
+          <strong id="fichajeTimeDisplay" style="color: #d4ff00; font-family: 'Courier New', monospace; font-size: 1.15rem; display: block; margin-top: 2px;">Registrando...</strong>
+          <div style="font-size: 0.75rem; color: #ff3355; margin-top: 4px; font-family: monospace;" id="fichajeUserDisplay">Rol: Encargado</div>
+        </div>
+      </div>
+
+      <!-- NAV TABS -->
+      <nav class="nav-tabs">
+        <button class="nav-tab-btn active" onclick="switchGestionTab('turnos')">📅 Turnos (Límite 6/día)</button>
+        <button class="nav-tab-btn" onclick="switchGestionTab('turnolive')">📋 Turnos en Vivo</button>
+        <button class="nav-tab-btn" onclick="switchGestionTab('display')">📺 Pantalla TV</button>
+        <button class="nav-tab-btn" onclick="switchGestionTab('clientes')">👥 Clientes (Límite 6/día)</button>
+        <button class="nav-tab-btn" onclick="switchGestionTab('servicios')">💈 Servicios & Precios (Límite 3)</button>
+        <button class="nav-tab-btn" onclick="switchGestionTab('estilos')">✂️ Estilos de Corte (Límite 3)</button>
+        <button class="nav-tab-btn" onclick="switchGestionTab('horarios')">🕐 Horarios de Atención</button>
+        <button class="nav-tab-btn" onclick="switchGestionTab('barberclub')" style="color: #f59e0b; font-weight: bold;">⭐ Barber Club & Señas</button>
+      </nav>
+
+      <!-- TAB 1: TURNOS DIARIOS -->
+      <div id="tab-turnos" class="tab-content active">
+        <div class="admin-card" style="margin-bottom: 20px;">
+          <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h3 class="admin-card-title">📅 Gestión Diaria de Turnos</h3>
+              <p style="color: #9ca3af; font-size: 0.85rem; margin: 2px 0 0 0;">Visualizá, atendé y agendá turnos para el día de hoy.</p>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button class="btn-admin btn-admin-secondary" style="border-color: #d4ff00; color: #d4ff00; font-weight: bold;" onclick="openShiftClosureModal()">
+                🔒 Cierre & Rendición
+              </button>
+              <button class="btn-admin" style="background: #d4ff00; color: #000; font-weight: bold;" onclick="openNewAppointmentGestion()">
+                + Agendar Nuevo Turno
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-card" style="padding: 0; overflow: hidden;">
+          <div class="admin-table-wrapper">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Hora</th>
+                  <th>Cliente</th>
+                  <th>Teléfono</th>
+                  <th>Servicio</th>
+                  <th>Barbero</th>
+                  <th>Monto</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="turnosGestionTableBody">
+                <tr>
+                  <td colspan="8" style="text-align: center; color: #9ca3af; padding: 40px;">
+                    Cargando turnos del día...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- TAB 2: TURNOS EN VIVO -->
+      <div id="tab-turnolive" class="tab-content">
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h3 class="admin-card-title">📋 Consola de Turnos en Vivo (TurnoLive)</h3>
+            <a href="/turnolive.html" target="_blank" class="btn-admin btn-admin-secondary">Abrir en Pestaña Completa ↗</a>
+          </div>
+          <iframe src="/turnolive.html" style="width: 100%; height: 75vh; border: 1px solid #23232c; border-radius: 12px; margin-top: 12px;"></iframe>
+        </div>
+      </div>
+
+
+      <!-- TAB 3: PANTALLA TV -->
+      <div id="tab-display" class="tab-content">
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h3 class="admin-card-title">📺 Pantalla TV de Llamados en Salón</h3>
+            <a href="/display.html" target="_blank" class="btn-admin btn-admin-secondary">Abrir en Pestaña Completa ↗</a>
+          </div>
+          <iframe src="/display.html" style="width: 100%; height: 75vh; border: 1px solid #23232c; border-radius: 12px; margin-top: 12px;"></iframe>
+        </div>
+      </div>
+
+
+      <!-- TAB 4: CLIENTES -->
+      <div id="tab-clientes" class="tab-content">
+        <div class="admin-card" style="margin-bottom: 20px;">
+          <div class="admin-card-header">
+            <h3 class="admin-card-title">👥 Listado de Clientes del Día</h3>
+            <input type="text" class="form-control" placeholder="🔍 Buscar por nombre o WhatsApp..." style="width: 260px;" onkeyup="filterGestionClients(this.value)">
+          </div>
+        </div>
+        <div class="admin-card" style="padding: 0; overflow: hidden;">
+          <div class="admin-table-wrapper">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>WhatsApp</th>
+                  <th>Último Turno</th>
+                  <th>Servicio</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="clientesGestionTableBody">
+                <tr>
+                  <td colspan="5" style="text-align: center; color: #9ca3af; padding: 40px;">
+                    Cargando listado de clientes...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- TAB 5: SERVICIOS & PRECIOS -->
+      <div id="tab-servicios" class="tab-content">
+        <div class="admin-card" style="margin-bottom: 20px;">
+          <div class="admin-card-header">
+            <div>
+              <h3 class="admin-card-title">💈 Catálogo de Servicios & Precios</h3>
+              <p style="color: #9ca3af; font-size: 0.85rem; margin: 2px 0 0 0;">El rol Encargado cuenta con un límite de hasta 3 servicios configurables.</p>
+            </div>
+            <button class="btn-admin" style="background: #d4ff00; color: #000; font-weight: bold;" onclick="openNewServiceGestion()">
+              + Agregar Servicio
+            </button>
+          </div>
+        </div>
+        <div class="admin-card" style="padding: 0; overflow: hidden;">
+          <div class="admin-table-wrapper">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Nombre Servicio</th>
+                  <th>Duración</th>
+                  <th>Precio ($)</th>
+                  <th>Descripción</th>
+                </tr>
+              </thead>
+              <tbody id="serviciosGestionTableBody">
+                <tr>
+                  <td colspan="4" style="text-align: center; color: #9ca3af; padding: 40px;">
+                    Cargando servicios...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- TAB 6: ESTILOS DE CORTE -->
+      <div id="tab-estilos" class="tab-content">
+        <div class="admin-card" style="margin-bottom: 20px;">
+          <div class="admin-card-header">
+            <div>
+              <h3 class="admin-card-title">✂️ Galería de Estilos de Corte</h3>
+              <p style="color: #9ca3af; font-size: 0.85rem; margin: 2px 0 0 0;">El rol Encargado cuenta con un límite de hasta 3 estilos visuales.</p>
+            </div>
+            <button class="btn-admin" style="background: #d4ff00; color: #000; font-weight: bold;" onclick="openNewStyleGestion()">
+              + Agregar Estilo de Corte
+            </button>
+          </div>
+        </div>
+        <div id="estilosGestionGrid" class="form-grid" style="grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));">
+          <div style="color: #9ca3af; text-align: center; grid-column: 1 / -1; padding: 40px;">
+            Cargando estilos de corte...
+          </div>
+        </div>
+      </div>
+
+
+      <!-- TAB 7: HORARIOS DE ATENCIÓN -->
+      <div id="tab-horarios" class="tab-content">
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h3 class="admin-card-title">🕐 Horarios de Atención & Bloqueos de Salón</h3>
+          </div>
+          <p style="color: #9ca3af; font-size: 0.85rem; margin-bottom: 20px;">
+            Consulta la jornada de trabajo de la barbería y bloqueos programados.
+          </p>
+          <div id="horariosGestionBody">
+            <div style="color: #9ca3af; padding: 20px; text-align: center;">Cargando horarios de atención...</div>
+          </div>
+      <!-- TAB 8: BARBER CLUB & SEÑAS -->
+      <div id="tab-barberclub" class="tab-content">
+        <div class="admin-card" style="margin-bottom: 20px;">
+          <div class="admin-card-header">
+            <div>
+              <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #f59e0b; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">GESTIÓN OPERATIVA DE PUNTOS Y SEÑAS</span>
+              <h3 class="admin-card-title" style="margin-top: 2px;">⭐ Barber Club & Señas por Turno</h3>
+            </div>
+          </div>
+          <p style="color: #9ca3af; font-size: 0.85rem; margin-bottom: 20px;">
+            Consultá los puntos de fidelización acumulados por un cliente al momento del cobro o canjeá premios y beneficios.
+          </p>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            <!-- LOOKUP CLIENT POINTS -->
+            <div style="background: #131318; border: 1px solid #23232c; border-radius: 14px; padding: 20px;">
+              <h4 style="color: #fff; font-size: 1rem; margin: 0 0 12px 0; font-family: 'Space Grotesk', monospace;">🔍 Consultar Puntos de Cliente</h4>
+              <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                <input type="text" id="g_loyalty_phone" class="form-control" placeholder="WhatsApp (ej. 3834123456)">
+                <button class="btn-admin" style="background: #f59e0b; color: #000; font-weight: bold;" onclick="lookupGestionLoyaltyClient()">Buscar</button>
+              </div>
+
+              <div id="g_loyalty_result" style="display: none; background: #09090c; border: 1px dashed #23232c; border-radius: 12px; padding: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <strong id="g_club_client_name" style="color: #fff; font-size: 1.1rem; display: block;">-</strong>
+                    <span id="g_club_client_phone" style="color: #9ca3af; font-size: 0.8rem;">-</span>
+                  </div>
+                  <div style="text-align: right;">
+                    <span style="font-size: 0.7rem; color: #f59e0b; font-weight: bold; text-transform: uppercase;">PUNTOS ACCUMULADOS</span>
+                    <div id="g_club_client_points" style="font-size: 1.6rem; font-weight: 900; color: #d4ff00; font-family: monospace;">0 pts</div>
+                  </div>
+                </div>
+
+                <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #1a1a22;">
+                  <span style="font-size: 0.75rem; color: #cbd5e1; font-weight: bold; display: block; margin-bottom: 8px;">🎁 CANJEAR PREMIO DISPONIBLE:</span>
+                  <div style="display: flex; gap: 8px;">
+                    <select id="g_club_rewards_select" class="form-control">
+                      <option value="">Cargando premios...</option>
+                    </select>
+                    <button class="btn-admin btn-admin-sm" style="background: #d4ff00; color: #000; font-weight: bold; white-space: nowrap;" onclick="redeemGestionLoyaltyReward()">Canjear →</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- DEPOSIT SEÑA MANAGEMENT -->
+            <div style="background: #131318; border: 1px solid #23232c; border-radius: 14px; padding: 20px;">
+              <h4 style="color: #fff; font-size: 1rem; margin: 0 0 12px 0; font-family: 'Space Grotesk', monospace;">💳 Gestión de Señas Opcionales</h4>
+              <p style="color: #9ca3af; font-size: 0.8rem; margin-bottom: 14px;">
+                El encargado puede requerir o dispensar seña para turnos específicos directamente desde la tabla de turnos del día o con este selector.
+              </p>
+              <div class="form-group" style="margin-bottom: 12px;">
+                <label style="font-size: 0.75rem; color: #cbd5e1; font-family: monospace;">SELECCIONAR TURNO DEL DÍA</label>
+                <select id="g_deposit_appointment_select" class="form-control">
+                  <option value="">Seleccionar turno...</option>
+                </select>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn-admin btn-admin-secondary" style="border-color: #10b981; color: #10b981; font-weight: bold;" onclick="setGestionDepositPaid(true)">🟢 Marcar Seña Pagada</button>
+                <button class="btn-admin btn-admin-secondary" style="border-color: #ef4444; color: #ef4444;" onclick="setGestionDepositPaid(false)">🔴 Sin Seña / Pendiente</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+
+  <!-- MODAL: LÍMITE ALCANZADO (ADVERTENCIA ROL ENCARGADO) -->
+  <div id="limitAlertModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #ef4444; border-radius: 16px; width: 100%; max-width: 440px; padding: 28px; box-shadow: 0 10px 40px rgba(239,68,68,0.3); text-align: center;">
+      <div style="font-size: 2.5rem; margin-bottom: 12px;">⚠️</div>
+      <h3 style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 0 0 8px 0; font-size: 1.3rem;">Límite Alcanzado para Encargado</h3>
+      <p id="limitAlertMsg" style="color: #9ca3af; font-size: 0.9rem; line-height: 1.4; margin-bottom: 20px;">
+        Has alcanzado el límite máximo configurado para esta acción.
+      </p>
+      <div style="background: #09090c; padding: 12px; border-radius: 10px; border: 1px dashed #23232c; margin-bottom: 20px; font-size: 0.8rem; color: #cbd5e1;">
+        💡 Para ampliar este cupo o eliminar la restricción, ingresá como <strong>Administrador (Llave Maestra)</strong> o solicitá la actualización de límites en el panel principal.
+      </div>
+      <button onclick="document.getElementById('limitAlertModal').style.display='none';" class="btn-admin" style="width: 100%; justify-content: center; padding: 12px; background: #ef4444; color: #fff;">Entendido</button>
+    </div>
+  </div>
+
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    let gToken = localStorage.getItem("hiddensync_admin_token") || localStorage.getItem("bladesync_admin_token") || "";
+    let gLimits = null;
+    let cachedAppts = [];
+    let cachedClients = [];
+    let cachedServices = [];
+    let cachedStyles = [];
+
+    document.addEventListener("DOMContentLoaded", () => {
+      if (gToken) {
+        verifyGestionSession();
+      } else {
+        showGestionAuthOverlay();
+      }
+    });
+
+    function showGestionAuthOverlay() {
+      document.getElementById("gestionAuthOverlay").style.display = "flex";
+      document.getElementById("gestionApp").style.display = "none";
+    }
+
+    function hideGestionAuthOverlay() {
+      document.getElementById("gestionAuthOverlay").style.display = "none";
+      document.getElementById("gestionApp").style.display = "block";
+    }
+
+    async function handleGestionLogin() {
+      const u = document.getElementById("g_username").value.trim();
+      const p = document.getElementById("g_password").value.trim();
+      try {
+        const res = await fetch("/api/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: u, password: p })
+        });
+        const data = await res.json();
+        const token = data.access_token || data.token;
+        if (res.ok && token) {
+          gToken = token;
+          localStorage.setItem("hiddensync_admin_token", gToken);
+          localStorage.setItem("bladesync_admin_token", gToken);
+          hideGestionAuthOverlay();
+          fetchLimitsAndLoadData();
+        } else {
+          alert(data.detail || "Credenciales incorrectas.");
+        }
+      } catch (e) { alert("Error de conexión."); }
+    }
+
+    function gestionLogout() {
+      gToken = "";
+      localStorage.removeItem("hiddensync_admin_token");
+      localStorage.removeItem("bladesync_admin_token");
+      showGestionAuthOverlay();
+    }
+
+    function authHeaders() {
+      return {
+        "Authorization": `Bearer ${gToken}`,
+        "Content-Type": "application/json"
+      };
+    }
+
+    async function verifyGestionSession() {
+      try {
+        const res = await fetch("/api/admin/me", { headers: authHeaders() });
+        if (res.ok) {
+          hideGestionAuthOverlay();
+          fetchLimitsAndLoadData();
+        } else {
+          gestionLogout();
+        }
+      } catch (e) { gestionLogout(); }
+    }
+
+    let gClockStarted = false;
+    let gFichajeRecorded = false;
+
+    function startGestionClock() {
+      if (gClockStarted) return;
+      gClockStarted = true;
+
+      function updateClock() {
+        const clockEl = document.getElementById("gestionDigitalClock");
+        if (!clockEl) return;
+
+        const now = new Date();
+        const options = {
+          timeZone: "America/Argentina/Buenos_Aires",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false
+        };
+        const timeStr = now.toLocaleTimeString("es-AR", options);
+        clockEl.textContent = `${timeStr} ART`;
+      }
+
+      updateClock();
+      setInterval(updateClock, 1000);
+    }
+
+    async function recordManagerFichaje() {
+      if (gFichajeRecorded) return;
+      try {
+        const res = await fetch("/api/admin/fichaje", {
+          method: "POST",
+          headers: authHeaders()
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          gFichajeRecorded = true;
+          const timeEl = document.getElementById("fichajeTimeDisplay");
+          const userEl = document.getElementById("fichajeUserDisplay");
+          if (timeEl) timeEl.textContent = data.fichaje_time || `${data.raw_time} ART`;
+          if (userEl) userEl.textContent = `Fichado: @${data.username}`;
+        }
+      } catch (e) {
+        console.error("Error al registrar fichaje:", e);
+      }
+    }
+
+    async function fetchLimitsAndLoadData() {
+      startGestionClock();
+      recordManagerFichaje();
+
+      try {
+        const res = await fetch("/api/encargado/limits", { headers: authHeaders() });
+        if (res.ok) {
+          gLimits = await res.json();
+          renderLimitPills();
+        }
+      } catch (e) { console.error("Error al obtener límites", e); }
+
+      loadGestionAppointments();
+      loadGestionClients();
+      loadGestionServices();
+      loadGestionStyles();
+      loadGestionSchedules();
+    }
+
+    function renderLimitPills() {
+      if (!gLimits) return;
+
+      const isMaster = gLimits.is_master_admin || gLimits.allow_full_admin;
+      document.getElementById("masterKeyBadge").style.display = isMaster ? "inline-block" : "none";
+
+      const lim = gLimits.limits;
+      
+      const apptTxt = isMaster ? `${lim.today_appointments_count} / ∞` : `${lim.today_appointments_count} / ${lim.max_appointments_per_day}`;
+      document.getElementById("lblPillAppts").textContent = apptTxt;
+      if (!isMaster && lim.today_appointments_count >= lim.max_appointments_per_day) {
+        document.getElementById("pillAppts").className = "limit-pill limit-reached";
+      }
+
+      const clientTxt = isMaster ? `${lim.today_clients_count} / ∞` : `${lim.today_clients_count} / ${lim.max_clients_per_day}`;
+      document.getElementById("lblPillClients").textContent = clientTxt;
+      if (!isMaster && lim.today_clients_count >= lim.max_clients_per_day) {
+        document.getElementById("pillClients").className = "limit-pill limit-reached";
+      }
+
+      const srvTxt = isMaster ? `${lim.current_services_count} / ∞` : `${lim.current_services_count} / ${lim.max_services}`;
+      document.getElementById("lblPillServices").textContent = srvTxt;
+      if (!isMaster && lim.current_services_count >= lim.max_services) {
+        document.getElementById("pillServices").className = "limit-pill limit-reached";
+      }
+
+      const styTxt = isMaster ? `${lim.current_styles_count} / ∞` : `${lim.current_styles_count} / ${lim.max_styles}`;
+      document.getElementById("lblPillStyles").textContent = styTxt;
+      if (!isMaster && lim.current_styles_count >= lim.max_styles) {
+        document.getElementById("pillStyles").className = "limit-pill limit-reached";
+      }
+    }
+
+    function showLimitAlert(msg) {
+      document.getElementById("limitAlertMsg").textContent = msg;
+      document.getElementById("limitAlertModal").style.display = "flex";
+    }
+
+    function switchGestionTab(tabId) {
+      document.querySelectorAll(".nav-tab-btn").forEach(btn => btn.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+
+      const targetBtn = Array.from(document.querySelectorAll(".nav-tab-btn")).find(b => b.getAttribute("onclick").includes(tabId));
+      if (targetBtn) targetBtn.classList.add("active");
+
+      const targetTab = document.getElementById(`tab-${tabId}`);
+      if (targetTab) targetTab.classList.add("active");
+    }
+
+    async function lookupGestionLoyaltyClient() {
+      const phone = document.getElementById("g_loyalty_phone").value.trim();
+      if (!phone) return alert("Ingresá un número de WhatsApp para buscar.");
+
+      try {
+        const res = await fetch(`/api/loyalty/client/${encodeURIComponent(phone)}`);
+        const data = await res.json();
+        if (!data.found) {
+          alert("Cliente no encontrado en el sistema.");
+          return;
+        }
+
+        document.getElementById("g_club_client_name").textContent = data.name;
+        document.getElementById("g_club_client_phone").textContent = `${data.phone} (${data.tier})`;
+        document.getElementById("g_club_client_points").textContent = `${data.points} pts`;
+        document.getElementById("g_loyalty_result").style.display = "block";
+
+        const resRewards = await fetch("/api/loyalty/rewards");
+        if (resRewards.ok) {
+          const rewards = await resRewards.json();
+          const sel = document.getElementById("g_club_rewards_select");
+          sel.innerHTML = rewards.map(r => `<option value="${r.id}">${r.name} (${r.points_required} pts)</option>`).join("");
+        }
+      } catch (e) {
+        alert("Error al consultar puntos.");
+      }
+    }
+
+    async function redeemGestionLoyaltyReward() {
+      const phone = document.getElementById("g_loyalty_phone").value.trim();
+      const rewardId = document.getElementById("g_club_rewards_select").value;
+      if (!phone || !rewardId) return alert("Seleccioná un cliente y un premio válido.");
+
+      try {
+        const res = await fetch("/api/loyalty/redeem", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ client_phone: phone, reward_id: parseInt(rewardId) })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert(`✅ ¡Premio Canjeado con éxito!\nCódigo de Cupón: ${data.coupon_code}\nPuntos restantes: ${data.remaining_points}`);
+          lookupGestionLoyaltyClient();
+        } else {
+          alert(data.detail || "No se pudo realizar el canje.");
+        }
+      } catch (e) {
+        alert("Error de conexión.");
+      }
+    }
+
+    async function setGestionDepositPaid(isPaid) {
+      const apptId = document.getElementById("g_deposit_appointment_select").value;
+      if (!apptId) return alert("Seleccioná un turno del listado.");
+
+      try {
+        const res = await fetch(`/api/payments/appointment/${apptId}/deposit`, {
+          method: "PUT",
+          headers: authHeaders(),
+          body: JSON.stringify({ deposit_paid: isPaid, deposit_required: true })
+        });
+        if (res.ok) {
+          alert(`✅ Estado de seña del turno #${apptId} actualizado a: ${isPaid ? 'SEÑA PAGADA' : 'PENDIENTE'}`);
+          loadGestionAppointments();
+        }
+      } catch (e) {
+        alert("Error al actualizar estado de seña.");
+      }
+    }
+
+    // --- TURNOS ---
+    async function loadGestionAppointments() {
+      try {
+        const res = await fetch("/api/admin/appointments", { headers: authHeaders() });
+        if (!res.ok) return;
+        cachedAppts = await res.json();
+        
+        // Populate deposit select
+        const depSel = document.getElementById("g_deposit_appointment_select");
+        if (depSel) {
+          depSel.innerHTML = `<option value="">Seleccionar turno...</option>` + cachedAppts.map(a => 
+            `<option value="${a.id}">Turno #${a.id} - ${a.client_name} (${a.appointment_time || ''}) - ${a.deposit_paid ? '🟢 Seña Pagada' : '🔴 Sin Seña'}</option>`
+          ).join("");
+        }
+
+        renderGestionAppts(cachedAppts);
+      } catch (e) { console.error("Error al cargar turnos", e); }
+    }
+
+    function renderGestionAppts(list) {
+      const tbody = document.getElementById("turnosGestionTableBody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+
+      if (list.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" style="text-align: center; color: #9ca3af; padding: 40px;">
+              No hay turnos registrados para hoy.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      list.forEach(a => {
+        const checkinTimeFormatted = a.checked_in_at ? (a.checked_in_at.includes("T") ? a.checked_in_at.split("T")[1].substring(0, 5) : a.checked_in_at.substring(11, 16)) : "";
+        const checkinBadge = a.is_checked_in 
+          ? `<br><span style="display:inline-block; margin-top:2px; font-size:0.72rem; background:rgba(0, 242, 254, 0.15); color:#00f2fe; border:1px solid rgba(0, 242, 254, 0.4); padding:2px 8px; border-radius:99px; font-weight:800; box-shadow: 0 0 10px rgba(0, 242, 254, 0.25);">📍 EN SALA ${checkinTimeFormatted ? '(' + checkinTimeFormatted + ')' : ''}</span>`
+          : '';
+        const pinBadge = a.checkin_token ? `<div style="font-size:0.68rem; color:#38bdf8; font-family:monospace; margin-top:2px;">🔑 PIN: ${a.checkin_token}</div>` : '';
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td style="font-family: monospace; font-weight: bold; color: #d4ff00;">${escapeHtml(a.appointment_time || '-')}</td>
+          <td><strong>${escapeHtml(a.client_name)}</strong>${checkinBadge}${pinBadge}</td>
+          <td style="font-family: monospace;">${escapeHtml(a.client_phone || '-')}</td>
+          <td>${escapeHtml(a.service_name || a.service || '-')}</td>
+          <td>${escapeHtml(a.barber_name || '-')}</td>
+          <td style="font-family: monospace; font-weight: bold; color: #00f2fe;">$${(a.total_price || a.service_price || a.price || 0).toLocaleString("es-AR")}</td>
+          <td><span class="badge badge-confirmed">${escapeHtml(a.status || 'PENDIENTE')}</span></td>
+          <td>
+            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+              ${!a.is_checked_in ? `<button class="btn-admin btn-admin-sm" onclick="manualCheckinGestion(${a.id})" style="background: rgba(0, 242, 254, 0.15); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.35);" title="Registrar llegada a sala de espera">📍 Llegó</button>` : ''}
+              <button class="btn-admin btn-admin-sm btn-admin-secondary" onclick="updateApptStatusGestion(${a.id}, 'atendiendo')">Atender</button>
+              <button class="btn-admin btn-admin-sm btn-admin-secondary" onclick="updateApptStatusGestion(${a.id}, 'atendido')" style="color: #10b981;">Finalizar</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function manualCheckinGestion(id) {
+      try {
+        const res = await fetch("/api/public/checkin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ identifier: String(id) })
+        });
+        if (res.ok) {
+          fetchLimitsAndLoadData();
+        } else {
+          const err = await res.json();
+          alert(err.detail || "Error al registrar llegada.");
+        }
+      } catch (e) { alert("Error de conexión al registrar llegada."); }
+    }
+
+    async function updateApptStatusGestion(id, status) {
+      try {
+        const res = await fetch(`/api/admin/appointments/${id}`, {
+          method: "PUT",
+          headers: authHeaders(),
+          body: JSON.stringify({ status: status })
+        });
+        if (res.ok) fetchLimitsAndLoadData();
+      } catch (e) { alert("Error al actualizar turno."); }
+    }
+
+    function openNewAppointmentGestion() {
+      if (gLimits && !gLimits.is_master_admin && !gLimits.allow_full_admin) {
+        if (gLimits.limits.today_appointments_count >= gLimits.limits.max_appointments_per_day) {
+          showLimitAlert(`⚠️ Límite de Turnos Alcanzado: El rol Encargado tiene un cupo máximo de ${gLimits.limits.max_appointments_per_day} turnos por día.`);
+          return;
+        }
+      }
+      window.open("/turnolive.html", "_blank");
+    }
+
+    // --- CLIENTES ---
+    async function loadGestionClients() {
+      try {
+        const res = await fetch("/api/admin/clients", { headers: authHeaders() });
+        if (!res.ok) return;
+        cachedClients = await res.json();
+        renderGestionClients(cachedClients);
+      } catch (e) { console.error("Error al cargar clientes", e); }
+    }
+
+    function renderGestionClients(list) {
+      const tbody = document.getElementById("clientesGestionTableBody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+
+      if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #9ca3af; padding: 40px;">No hay clientes registrados.</td></tr>`;
+        return;
+      }
+
+      list.forEach(c => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><strong>${escapeHtml(c.name)}</strong></td>
+          <td style="font-family: monospace;">${escapeHtml(c.phone || '-')}</td>
+          <td style="font-size: 0.8rem; color: #9ca3af;">${c.last_appointment_date || 'Reciente'}</td>
+          <td>${escapeHtml(c.last_service || 'Corte Tradicional')}</td>
+          <td><span class="badge badge-confirmed">ACTIVO</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterGestionClients(q) {
+      const query = q.trim().toLowerCase();
+      if (!query) { renderGestionClients(cachedClients); return; }
+      const filtered = cachedClients.filter(c => (c.name || '').toLowerCase().includes(query) || (c.phone || '').toLowerCase().includes(query));
+      renderGestionClients(filtered);
+    }
+
+    // --- SERVICIOS ---
+    async function loadGestionServices() {
+      try {
+        const res = await fetch("/api/admin/services", { headers: authHeaders() });
+        if (!res.ok) return;
+        cachedServices = await res.json();
+        renderGestionServices(cachedServices);
+      } catch (e) { console.error("Error al cargar servicios", e); }
+    }
+
+    function renderGestionServices(list) {
+      const tbody = document.getElementById("serviciosGestionTableBody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+
+      list.forEach(s => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><strong>${escapeHtml(s.name)}</strong></td>
+          <td>${s.duration_minutes} min.</td>
+          <td style="font-family: monospace; font-weight: bold; color: #d4ff00;">$${s.price.toLocaleString("es-AR")}</td>
+          <td style="font-size: 0.85rem; color: #9ca3af;">${escapeHtml(s.description || '-')}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openNewServiceGestion() {
+      if (gLimits && !gLimits.is_master_admin && !gLimits.allow_full_admin) {
+        if (gLimits.limits.current_services_count >= gLimits.limits.max_services) {
+          showLimitAlert(`⚠️ Límite de Servicios Alcanzado: El rol Encargado tiene un máximo de ${gLimits.limits.max_services} servicios configurables.`);
+          return;
+        }
+      }
+      alert("Para configurar nuevos servicios ingresá con credenciales de Administrador.");
+    }
+
+    // --- ESTILOS DE CORTE ---
+    async function loadGestionStyles() {
+      try {
+        const res = await fetch("/api/admin/styles", { headers: authHeaders() });
+        if (!res.ok) return;
+        cachedStyles = await res.json();
+        renderGestionStyles(cachedStyles);
+      } catch (e) { console.error("Error al cargar estilos", e); }
+    }
+
+    function renderGestionStyles(list) {
+      const grid = document.getElementById("estilosGestionGrid");
+      if (!grid) return;
+      grid.innerHTML = "";
+
+      list.forEach(s => {
+        const card = document.createElement("div");
+        card.className = "admin-card";
+        card.style.padding = "16px";
+        card.innerHTML = `
+          <img src="${s.image_url || '/static/products/cera.jpg'}" style="width: 100%; height: 160px; object-fit: cover; border-radius: 10px; margin-bottom: 10px; background: #1a1a22;">
+          <h4 style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 0 0 4px 0;">${escapeHtml(s.name)}</h4>
+          <p style="font-size: 0.78rem; color: #9ca3af; margin: 0;">${escapeHtml(s.description || 'Corte moderno barbería')}</p>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function openNewStyleGestion() {
+      if (gLimits && !gLimits.is_master_admin && !gLimits.allow_full_admin) {
+        if (gLimits.limits.current_styles_count >= gLimits.limits.max_styles) {
+          showLimitAlert(`⚠️ Límite de Estilos Alcanzado: El rol Encargado tiene un máximo de ${gLimits.limits.max_styles} estilos visuales configurables.`);
+          return;
+        }
+      }
+      alert("Para agregar nuevos estilos ingresá con credenciales de Administrador.");
+    }
+
+    // --- HORARIOS DE ATENCIÓN ---
+    async function loadGestionSchedules() {
+      const body = document.getElementById("horariosGestionBody");
+      if (!body) return;
+
+      try {
+        const res = await fetch("/api/public/settings");
+        if (!res.ok) throw new Error("Error al obtener horarios");
+        const settings = await res.json();
+        
+        let bh = null;
+        try {
+          bh = typeof settings.business_hours === "string" ? JSON.parse(settings.business_hours) : settings.business_hours;
+        } catch (e) { bh = null; }
+
+        if (!bh) {
+          bh = {
+            "Lunes": { active: true, open: "09:00", close: "20:00" },
+            "Martes": { active: true, open: "09:00", close: "20:00" },
+            "Miércoles": { active: true, open: "09:00", close: "20:00" },
+            "Jueves": { active: true, open: "09:00", close: "20:00" },
+            "Viernes": { active: true, open: "09:00", close: "20:00" },
+            "Sábado": { active: true, open: "09:00", close: "18:00" },
+            "Domingo": { active: false, open: "09:00", close: "14:00" }
+          };
+        }
+
+        const days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+        const rowsHtml = days.map(d => {
+          const item = bh[d];
+          let statusText = `<span style="color: #ef4444; font-weight: bold;">CERRADO</span>`;
+          if (item && item.active) {
+            let detail = `${item.open} a ${item.close} hs`;
+            if (item.pause_start && item.pause_end) detail += ` (Pausa ${item.pause_start} - ${item.pause_end})`;
+            statusText = `<span style="color: #10b981; font-weight: bold;">${detail}</span>`;
+          }
+
+          return `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #09090c; border: 1px solid #1a1a22; border-radius: 10px;">
+              <strong style="color: #fff; font-family: 'Space Grotesk', monospace;">${d}</strong>
+              <div style="font-size: 0.88rem; font-family: monospace;">${statusText}</div>
+            </div>
+          `;
+        }).join("");
+
+        body.innerHTML = `
+          <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; padding: 20px;">
+            <h4 style="font-family: 'Space Grotesk', monospace; color: #d4ff00; font-weight: bold; margin: 0 0 14px 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+              📅 HORARIOS DE ATENCIÓN DE LA BARBERÍA
+            </h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px;">
+              ${rowsHtml}
+            </div>
+          </div>
+        `;
+
+      } catch (e) {
+        body.innerHTML = `
+          <div style="background: #131318; border: 1px solid #23232c; border-radius: 12px; padding: 20px;">
+            <div style="font-family: 'Space Grotesk', monospace; color: #d4ff00; font-weight: bold; margin-bottom: 8px;">JORNADA DE ATENCIÓN GENERAL</div>
+            <div style="font-size: 0.9rem; color: #fff;">Lunes a Sábados: <strong>09:00 a 20:30 hs</strong></div>
+            <div style="font-size: 0.8rem; color: #9ca3af; margin-top: 4px;">Domingos y Feriados: Cerrado.</div>
+          </div>
+        `;
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    let currentShiftCalc = null;
+
+    async function openShiftClosureModal() {
+      const modal = document.getElementById("shiftClosureModal");
+      if (!modal) return;
+
+      modal.style.display = "flex";
+      
+      document.getElementById("sc_turnos_count").textContent = "Calculando...";
+      document.getElementById("sc_expected_cash").textContent = "...";
+      document.getElementById("sc_expected_transfer").textContent = "...";
+      document.getElementById("sc_expected_total").textContent = "...";
+
+      try {
+        const res = await fetch("/api/shift-closures/calculate?fondo_inicial=0.0", { headers: authHeaders() });
+        if (res.ok) {
+          currentShiftCalc = await res.json();
+          document.getElementById("sc_turnos_count").textContent = `${currentShiftCalc.total_turnos_atendidos} citas`;
+          document.getElementById("sc_expected_cash").textContent = `$${currentShiftCalc.total_efectivo.toLocaleString("es-AR")}`;
+          document.getElementById("sc_expected_transfer").textContent = `$${currentShiftCalc.total_transferencia.toLocaleString("es-AR")}`;
+          document.getElementById("sc_expected_total").textContent = `$${currentShiftCalc.total_calculado.toLocaleString("es-AR")}`;
+
+          document.getElementById("sc_cash_actual").value = currentShiftCalc.total_efectivo;
+          document.getElementById("sc_transfer_actual").value = currentShiftCalc.total_transferencia;
+          document.getElementById("sc_expenses").value = "0.00";
+          document.getElementById("sc_notes").value = "";
+
+          recalculateShiftDiff();
+        }
+      } catch (e) {
+        console.error("Error al calcular turno:", e);
+      }
+    }
+
+    function closeShiftClosureModal() {
+      const modal = document.getElementById("shiftClosureModal");
+      if (modal) modal.style.display = "none";
+    }
+
+    function recalculateShiftDiff() {
+      if (!currentShiftCalc) return;
+
+      const cashAct = parseFloat(document.getElementById("sc_cash_actual")?.value || "0") || 0;
+      const transAct = parseFloat(document.getElementById("sc_transfer_actual")?.value || "0") || 0;
+      const exp = parseFloat(document.getElementById("sc_expenses")?.value || "0") || 0;
+
+      const declaredTotal = cashAct + transAct + exp;
+      const expectedTotal = currentShiftCalc.total_calculado || 0;
+      const diff = declaredTotal - expectedTotal;
+
+      const statusEl = document.getElementById("sc_balance_status");
+      const diffEl = document.getElementById("sc_balance_diff");
+      const boxEl = document.getElementById("sc_balance_box");
+
+      if (diffEl) {
+        const formatDiff = (diff >= 0 ? "+" : "") + `$${diff.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
+        diffEl.textContent = formatDiff;
+      }
+
+      if (Math.abs(diff) < 0.01) {
+        if (statusEl) statusEl.innerHTML = `<span style="color: #10b981;">🟢 CAJA CUADRADA PERFECTA</span>`;
+        if (diffEl) diffEl.style.color = "#10b981";
+        if (boxEl) {
+          boxEl.style.background = "rgba(16, 185, 129, 0.1)";
+          boxEl.style.borderColor = "rgba(16, 185, 129, 0.3)";
+        }
+      } else if (diff > 0) {
+        if (statusEl) statusEl.innerHTML = `<span style="color: #60a5fa;">🔵 SOBRANTE DE CAJA</span>`;
+        if (diffEl) diffEl.style.color = "#60a5fa";
+        if (boxEl) {
+          boxEl.style.background = "rgba(59, 130, 246, 0.1)";
+          boxEl.style.borderColor = "rgba(59, 130, 246, 0.3)";
+        }
+      } else {
+        if (statusEl) statusEl.innerHTML = `<span style="color: #ef4444;">🔴 FALTANTE DE CAJA</span>`;
+        if (diffEl) diffEl.style.color = "#ef4444";
+        if (boxEl) {
+          boxEl.style.background = "rgba(239, 68, 68, 0.1)";
+          boxEl.style.borderColor = "rgba(239, 68, 68, 0.3)";
+        }
+      }
+    }
+
+    async function submitShiftClosure() {
+      if (!currentShiftCalc) return;
+
+      const cashAct = parseFloat(document.getElementById("sc_cash_actual")?.value || "0") || 0;
+      const transAct = parseFloat(document.getElementById("sc_transfer_actual")?.value || "0") || 0;
+      const exp = parseFloat(document.getElementById("sc_expenses")?.value || "0") || 0;
+      const notes = document.getElementById("sc_notes")?.value.trim() || "";
+
+      const declaredTotal = cashAct + transAct + exp;
+
+      const payload = {
+        fecha_inicio: currentShiftCalc.fecha_inicio,
+        fecha_cierre: new Date().toISOString(),
+        fondo_inicial: currentShiftCalc.fondo_inicial || 0.0,
+        total_efectivo: cashAct,
+        total_transferencia: transAct,
+        total_cortes: currentShiftCalc.total_cortes || 0.0,
+        total_productos: currentShiftCalc.total_productos || 0.0,
+        total_calculado: currentShiftCalc.total_calculado || 0.0,
+        balance_declarado: declaredTotal,
+        total_turnos_atendidos: currentShiftCalc.total_turnos_atendidos || 0,
+        notas: notes ? `[Gastos: $${exp}] ${notes}` : `[Gastos: $${exp}]`
+      };
+
+      try {
+        const res = await fetch("/api/shift-closures", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const closureData = await res.json();
+          closeShiftClosureModal();
+          openShiftClosureSuccessModal(closureData, exp);
+        } else {
+          alert("Error al registrar cierre de turno.");
+        }
+      } catch (e) {
+        alert("Error de conexión al enviar cierre de turno.");
+      }
+    }
+
+    function openShiftClosureSuccessModal(c, expAmount) {
+      const diffStr = (c.diferencia >= 0 ? "+" : "") + `$${c.diferencia.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
+      const statusLabel = Math.abs(c.diferencia) < 0.01 ? "🟢 CAJA CUADRADA" : (c.diferencia > 0 ? "🔵 SOBRANTE" : "🔴 FALTANTE");
+
+      const waMsg = `💈 *RENDICIÓN DE CIERRE DE TURNO* - Pereyras Barbers%0A` +
+        `📅 Fecha: ${new Date().toLocaleDateString("es-AR")} %0A` +
+        `👤 Encargado: @${c.encargado_name}%0A` +
+        `✂️ Turnos Atendidos: ${c.total_turnos_atendidos}%0A` +
+        `💵 Efectivo Físico: $${c.total_efectivo.toLocaleString("es-AR")}%0A` +
+        `💳 Transferencias: $${c.total_transferencia.toLocaleString("es-AR")}%0A` +
+        `🧾 Gastos Caja Chica: $${expAmount.toLocaleString("es-AR")}%0A` +
+        `💰 Total Declarado: $${c.balance_declarado.toLocaleString("es-AR")}%0A` +
+        `⚖️ Estado Caja: ${statusLabel} (${diffStr})%0A` +
+        `📝 Notas: ${encodeURIComponent(c.notas || 'Sin novedad')}`;
+
+      const modalDiv = document.createElement("div");
+      modalDiv.id = "shiftClosureSuccessModal";
+      modalDiv.className = "modal-overlay";
+      modalDiv.style.cssText = "display: flex; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 99999; justify-content: center; align-items: center; padding: 16px;";
+
+      modalDiv.innerHTML = `
+        <div class="modal-content" style="background: #111116; border: 1px solid #23232c; border-radius: 20px; width: 100%; max-width: 520px; padding: 28px; color: #fff; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif;">
+          <div style="font-size: 3rem; margin-bottom: 10px;">🔒✅</div>
+          <h3 style="font-family: 'Space Grotesk', sans-serif; color: #d4ff00; margin: 0 0 6px 0; font-size: 1.4rem;">RENDICIÓN REGISTRADA CON ÉXITO</h3>
+          <p style="color: #9ca3af; font-size: 0.85rem; margin-bottom: 20px;">El cierre de turno #${c.id} ha sido guardado y auditado en la base de datos.</p>
+
+          <div style="background: #09090c; border: 1px solid #23232c; border-radius: 12px; padding: 16px; margin-bottom: 20px; text-align: left; font-family: monospace; font-size: 0.85rem; line-height: 1.6;">
+            <div>📅 Fecha/Hora: <strong>${new Date().toLocaleTimeString("es-AR")} ART</strong></div>
+            <div>👤 Responsable: <strong>@${c.encargado_name}</strong></div>
+            <div>✂️ Turnos Atendidos: <strong>${c.total_turnos_atendidos} citas</strong></div>
+            <div>💵 Efectivo Declarado: <strong>$${c.total_efectivo.toLocaleString("es-AR")}</strong></div>
+            <div>💳 Transferencias: <strong>$${c.total_transferencia.toLocaleString("es-AR")}</strong></div>
+            <div>⚖️ Diferencia: <strong style="color: ${c.diferencia >= 0 ? '#10b981' : '#ef4444'};">${diffStr}</strong></div>
+          </div>
+
+          <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+            <button onclick="document.getElementById('shiftClosureSuccessModal').remove(); window.print();" class="btn-admin btn-admin-secondary">
+              🖨️ Imprimir Ticket
+            </button>
+            <a href="https://wa.me/?text=${waMsg}" target="_blank" onclick="document.getElementById('shiftClosureSuccessModal').remove();" class="btn-admin" style="background: #25D366; color: #000; font-weight: bold; text-decoration: none;">
+              💬 Enviar al Dueño por WhatsApp
+            </a>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modalDiv);
+    }
+  </script>
+
+  <!-- MODAL CIERRE DE TURNO Y RENDICIÓN DE CAJA -->
+  <div id="shiftClosureModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 9999; justify-content: center; align-items: center; padding: 16px;">
+    <div class="modal-content" style="background: #111116; border: 1px solid #23232c; border-radius: 20px; width: 100%; max-width: 680px; padding: 28px; color: #fff; box-shadow: 0 25px 60px rgba(0,0,0,0.9); font-family: 'Plus Jakarta Sans', sans-serif;">
+      
+      <!-- HEADER -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #23232c; padding-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(212, 255, 0, 0.15); border: 1px solid rgba(212, 255, 0, 0.4); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+            🔒
+          </div>
+          <div>
+            <h3 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 1.25rem; color: #fff; font-weight: 800;">CIERRE DE TURNO Y RENDICIÓN DE CAJA</h3>
+            <p style="margin: 2px 0 0 0; color: #9ca3af; font-size: 0.82rem;">Arqueo de caja, recuento de efectivo y balance final de la jornada</p>
+          </div>
+        </div>
+        <button onclick="closeShiftClosureModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.5rem; cursor: pointer; padding: 4px 8px; border-radius: 6px;">✕</button>
+      </div>
+
+      <!-- AUTO-CALCULATED REVENUE SUMMARY -->
+      <div style="background: #09090c; border: 1px solid #1a1a22; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px;">
+        <div>
+          <span style="color: #9ca3af; font-size: 0.7rem; font-family: monospace; text-transform: uppercase;">TURNOS ATENDIDOS:</span>
+          <strong id="sc_turnos_count" style="color: #d4ff00; font-size: 1.2rem; font-family: 'Space Grotesk', monospace; display: block;">0 citas</strong>
+        </div>
+        <div>
+          <span style="color: #9ca3af; font-size: 0.7rem; font-family: monospace; text-transform: uppercase;">ESPERADO EFECTIVO:</span>
+          <strong id="sc_expected_cash" style="color: #10b981; font-size: 1.15rem; font-family: monospace; display: block;">$0</strong>
+        </div>
+        <div>
+          <span style="color: #9ca3af; font-size: 0.7rem; font-family: monospace; text-transform: uppercase;">ESPERADO TRANSF.:</span>
+          <strong id="sc_expected_transfer" style="color: #00f2fe; font-size: 1.15rem; font-family: monospace; display: block;">$0</strong>
+        </div>
+        <div>
+          <span style="color: #9ca3af; font-size: 0.7rem; font-family: monospace; text-transform: uppercase;">TOTAL RECAUDADO:</span>
+          <strong id="sc_expected_total" style="color: #fff; font-size: 1.2rem; font-family: 'Space Grotesk', monospace; display: block;">$0</strong>
+        </div>
+      </div>
+
+      <!-- INPUT FORM -->
+      <form onsubmit="event.preventDefault(); submitShiftClosure();">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px;">
+          <div>
+            <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace; font-weight: 700; display: block; margin-bottom: 4px;">
+              💵 EFECTIVO FÍSICO EN CAJÓN ($):
+            </label>
+            <input type="number" step="0.01" id="sc_cash_actual" oninput="recalculateShiftDiff()" class="form-control" placeholder="0.00" required style="width: 100%; box-sizing: border-box; background: #09090c; color: #fff; border-color: #23232c;">
+          </div>
+          <div>
+            <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace; font-weight: 700; display: block; margin-bottom: 4px;">
+              💳 TRANSFERENCIAS VERIFICADAS ($):
+            </label>
+            <input type="number" step="0.01" id="sc_transfer_actual" oninput="recalculateShiftDiff()" class="form-control" placeholder="0.00" style="width: 100%; box-sizing: border-box; background: #09090c; color: #fff; border-color: #23232c;">
+          </div>
+          <div>
+            <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace; font-weight: 700; display: block; margin-bottom: 4px;">
+              🧾 GASTOS / SALIDAS CAJA CHICA ($):
+            </label>
+            <input type="number" step="0.01" id="sc_expenses" oninput="recalculateShiftDiff()" class="form-control" placeholder="0.00" value="0.00" style="width: 100%; box-sizing: border-box; background: #09090c; color: #fff; border-color: #23232c;">
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace; font-weight: 700; display: block; margin-bottom: 4px;">
+            📝 OBSERVACIONES / DETALLE DE GASTOS Y NOVEDADES:
+          </label>
+          <textarea id="sc_notes" rows="2" placeholder="Observaciones de caja, insumos comprados o notas del turno..." class="form-control" style="width: 100%; box-sizing: border-box; background: #09090c; color: #fff; border-color: #23232c;"></textarea>
+        </div>
+
+        <!-- BALANCE / ARQUEO BOX -->
+        <div id="sc_balance_box" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-size: 0.75rem; color: #9ca3af; font-family: monospace; text-transform: uppercase;">BALANCE DE CAJA:</span>
+            <div id="sc_balance_status" style="font-weight: 800; font-size: 1rem; color: #10b981;">🟢 CAJA CUADRADA</div>
+          </div>
+          <div style="text-align: right;">
+            <span style="font-size: 0.75rem; color: #9ca3af; font-family: monospace; text-transform: uppercase;">DIFERENCIA:</span>
+            <div id="sc_balance_diff" style="font-family: 'Courier New', monospace; font-weight: 900; font-size: 1.4rem; color: #10b981;">$0.00</div>
+          </div>
+        </div>
+
+        <!-- FOOTER ACTIONS -->
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" onclick="closeShiftClosureModal()" class="btn-admin btn-admin-secondary">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-admin" style="background: #d4ff00; color: #000; font-weight: 800; padding: 12px 24px;">
+            🔒 CONFIRMAR CIERRE & RENDICIÓN →
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</body>
+</html>

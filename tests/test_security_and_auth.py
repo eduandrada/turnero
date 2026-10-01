@@ -114,3 +114,18 @@ def test_token_tampering_and_revocation(client, admin_token):
     res_reuse = client.get("/api/admin/audit-logs", headers=headers)
     assert res_reuse.status_code == 401
     assert "revocado" in res_reuse.json()["detail"].lower()
+
+
+def test_token_expiration(client):
+    """Verifica que un token expirado en el tiempo sea rechazado con 401."""
+    from app.core.security import create_admin_token
+
+    expired_token = create_admin_token(
+        username="admin_test",
+        expires_delta_minutes=-10,
+        role="admin"
+    )
+    res = client.get("/api/admin/audit-logs", headers={"Authorization": f"Bearer {expired_token}"})
+    assert res.status_code == 401
+    assert "expirada" in res.json()["detail"].lower()
+

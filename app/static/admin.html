@@ -64,11 +64,8 @@
         <a class="admin-nav-item" data-section="appointments" onclick="switchSection('appointments')">
           <span class="icon">📅</span> Turnos
         </a>
-        <a class="admin-nav-item" href="/turnos.html" target="_blank" style="color: #d4ff00; font-weight: bold;">
-          <span class="icon">📋</span> Turnos en Vivo (Recepción) ↗
-        </a>
-        <a class="admin-nav-item" href="/live.html" target="_blank" style="color: #00f2fe;">
-          <span class="icon">📺</span> Pantalla en Vivo (TV) ↗
+        <a class="admin-nav-item" href="/turnolive.html" target="_blank" style="color: #d4ff00; font-weight: bold;">
+          <span class="icon">📋</span> Turno Live (Recepción & Moderador) ↗
         </a>
         <a class="admin-nav-item" data-section="clients" onclick="switchSection('clients')">
           <span class="icon">👥</span> Clientes
@@ -109,6 +106,10 @@
           <span class="icon">🎟️</span> Promociones
         </a>
 
+        <a class="admin-nav-item" data-section="barber_productivity" onclick="switchSection('barber_productivity')" style="color: #00f2fe; font-weight: bold;">
+          <span class="icon">📊</span> Productividad Barberos
+        </a>
+
         <div class="admin-menu-category">Comunicación</div>
         <a class="admin-nav-item" data-section="whatsapp" onclick="switchSection('whatsapp')">
           <span class="icon">💬</span> WhatsApp
@@ -116,8 +117,20 @@
         <a class="admin-nav-item" data-section="notifications" onclick="switchSection('notifications')">
           <span class="icon">🔔</span> Notificaciones
         </a>
+        <a class="admin-nav-item" data-section="push_pwa" onclick="switchSection('push_pwa')" style="color: #d4ff00; font-weight: bold;">
+          <span class="icon">📲</span> Push PWA (2hs Antes)
+        </a>
 
         <div class="admin-menu-category">Configuración</div>
+        <a class="admin-nav-item" data-section="shop_promos" onclick="switchSection('shop_promos')" style="color: #00f2fe; font-weight: bold;">
+          <span class="icon">🛍️</span> Banners & Vouchers Shop
+        </a>
+        <a class="admin-nav-item" data-section="payments_config" onclick="switchSection('payments_config')" style="color: #d4ff00; font-weight: bold;">
+          <span class="icon">💳</span> Pasarela Pagos & Señas
+        </a>
+        <a class="admin-nav-item" data-section="barber_club" onclick="switchSection('barber_club')" style="color: #f59e0b; font-weight: bold;">
+          <span class="icon">⭐</span> Barber Club & Puntos
+        </a>
         <a class="admin-nav-item" data-section="staff" onclick="switchSection('staff')">
           <span class="icon">👥</span> Gestión de Personal
         </a>
@@ -248,7 +261,7 @@
               <div class="kpi-value" id="kpiApptActivos" style="color: #d4ff00;">0</div>
               <div class="kpi-sub">Bandeja activa de atención</div>
             </div>
-            <div class="kpi-card" onclick="setApptFilterStatus('completados')" style="cursor: pointer;" title="Ver turnos finalizados">
+            <div class="kpi-card" onclick="clickKpiCompletados()" style="cursor: pointer;" title="Ver clientes ya atendidos (o ver histórico completo)">
               <div class="kpi-title">✅ Ya Atendidos</div>
               <div class="kpi-value" id="kpiApptCompletados" style="color: #10b981;">0</div>
               <div class="kpi-sub">Completados del día</div>
@@ -293,6 +306,9 @@
             <div class="appt-status-pills-bar">
               <button type="button" class="appt-pill active" data-status="activos" onclick="setApptFilterStatus('activos')">
                 ⚡ Por Atender <span class="pill-count" id="pillCountActivos">0</span>
+              </button>
+              <button type="button" class="appt-pill" data-status="en_sala" onclick="setApptFilterStatus('en_sala')" style="border-color: rgba(16, 185, 129, 0.4);" title="Ver clientes que anunciaron su llegada y están en sala de espera">
+                📍 En Sala <span class="pill-count" id="pillCountEnSala" style="background: rgba(16, 185, 129, 0.3); color: #10b981;">0</span>
               </button>
               <button type="button" class="appt-pill" data-status="completados" onclick="setApptFilterStatus('completados')">
                 ✅ Ya Atendidos <span class="pill-count" id="pillCountCompletados">0</span>
@@ -339,9 +355,14 @@
                 <p style="font-size: 0.85rem; color: #9ca3af; max-width: 440px; margin: 0 auto 16px auto;" id="emptyStateDesc">
                   No hay turnos pendientes por atender para la selección actual. Los turnos atendidos quedan archivados para tu comodidad.
                 </p>
-                <button type="button" class="btn-admin btn-admin-sm btn-admin-secondary" onclick="setApptFilterStatus('completados')">
-                  Ver clientes ya atendidos
-                </button>
+                <div id="emptyStateActions" style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                  <button type="button" class="btn-admin btn-admin-sm btn-admin-secondary" onclick="setApptFilterStatus('completados')">
+                    Ver clientes ya atendidos
+                  </button>
+                  <button type="button" class="btn-admin btn-admin-sm btn-admin-secondary" onclick="viewAttendedHistorical()">
+                    📜 Ver Historial Completo
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -350,8 +371,17 @@
         <!-- SECTION: CLIENTES -->
         <div id="section-clients" class="admin-section" style="display: none;">
           <div class="admin-card">
-            <div class="admin-card-header">
-              <h3 class="admin-card-title">Directorio de Clientes</h3>
+            <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center;">
+              <div>
+                <h3 class="admin-card-title">Directorio de Clientes</h3>
+                <p style="font-size: 0.75rem; color: #9ca3af; margin-top: 2px;">
+                  Gestión integral de clientes, fichas CRM y centro de comunicación directa por WhatsApp.
+                </p>
+              </div>
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <input type="text" id="searchClientDirectoryInput" class="admin-menu-search" placeholder="🔍 Buscar cliente o teléfono..." onkeyup="filterClientDirectory()" style="width: 260px;">
+                <button class="btn-admin btn-admin-secondary btn-admin-sm" onclick="loadAdminClients()">🔄 Refrescar</button>
+              </div>
             </div>
             <div class="admin-table-wrapper">
               <table class="admin-table">
@@ -360,9 +390,9 @@
                     <th>#ID</th>
                     <th>Nombre</th>
                     <th>WhatsApp</th>
-                    <th>Email</th>
-                    <th>Registrado</th>
-                    <th>Acciones</th>
+                    <th>Cortes Atendidos</th>
+                    <th>Última Visita</th>
+                    <th style="text-align: right;">Acciones WhatsApp & CRM</th>
                   </tr>
                 </thead>
                 <tbody id="clientsTableBody"></tbody>
@@ -460,25 +490,103 @@
           </div>
         </div>
 
-        <!-- SECTION: HISTORIAL & AUDITORÍA -->
+        <!-- SECTION: HISTORIAL DE CLIENTES ATENDIDOS & ESTADÍSTICAS -->
         <div id="section-stats" class="admin-section" style="display: none;">
-          <div class="admin-card">
-            <div class="admin-card-header">
-              <h3 class="admin-card-title">Historial de Auditoría & Cambios Administrative</h3>
+          <!-- KPI RESUMEN DE CLIENTES ATENDIDOS -->
+          <div class="kpi-grid" style="margin-bottom: 20px;">
+            <div class="kpi-card" style="border-left: 4px solid #10b981;">
+              <div class="kpi-title">🏆 Clientes Atendidos</div>
+              <div class="kpi-value" id="statsTotalAttended" style="color: #10b981;">0</div>
+              <div class="kpi-sub">Total en el período seleccionado</div>
             </div>
-            <div class="admin-table-wrapper">
-              <table class="admin-table">
+            <div class="kpi-card" style="border-left: 4px solid #d4ff00;">
+              <div class="kpi-title">💵 Facturación Servicios</div>
+              <div class="kpi-value" id="statsTotalRevenue" style="color: #d4ff00;">$0</div>
+              <div class="kpi-sub">Ingresos por cortes completados</div>
+            </div>
+            <div class="kpi-card" style="border-left: 4px solid #00f2fe;">
+              <div class="kpi-title">⏱️ Duración Promedio</div>
+              <div class="kpi-value" id="statsAvgDuration" style="color: #00f2fe;">0 min</div>
+              <div class="kpi-sub">Tiempo en sillón por cliente</div>
+            </div>
+            <div class="kpi-card" style="border-left: 4px solid #c084fc;">
+              <div class="kpi-title">💈 Barbero Líder</div>
+              <div class="kpi-value" id="statsTopBarber" style="color: #c084fc; font-size: 1.25rem;">-</div>
+              <div class="kpi-sub" id="statsTopBarberSub">Mayor volumen de atenciones</div>
+            </div>
+          </div>
+
+          <!-- TARJETA PRINCIPAL DEL HISTORIAL -->
+          <div class="admin-card">
+            <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center;">
+              <div>
+                <h3 class="admin-card-title">📜 Historial Completo de Clientes Atendidos</h3>
+                <p style="font-size: 0.75rem; color: #9ca3af; margin-top: 2px;">
+                  Registro detallado de atenciones, servicios realizados, facturación y trazabilidad de clientes.
+                </p>
+              </div>
+
+              <!-- CONTROLES Y FILTROS -->
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <div style="display: flex; background: #09090c; border: 1px solid var(--admin-border); border-radius: 8px; padding: 2px;">
+                  <button type="button" class="btn-date-filter" id="btnStatsPresetToday" onclick="setStatsDatePreset('today')">Hoy</button>
+                  <button type="button" class="btn-date-filter" id="btnStatsPreset7d" onclick="setStatsDatePreset('7d')">7 Días</button>
+                  <button type="button" class="btn-date-filter" id="btnStatsPresetMonth" onclick="setStatsDatePreset('month')">Este Mes</button>
+                  <button type="button" class="btn-date-filter active" id="btnStatsPresetAll" onclick="setStatsDatePreset('all')">Todo el Historial</button>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <label style="font-size: 0.7rem; color: #6b7280;">Desde:</label>
+                  <input type="date" id="statsFilterStart" class="form-control" onchange="onStatsCustomDateChange()" style="padding: 5px 8px; font-size: 0.75rem; width: 130px;">
+                  <label style="font-size: 0.7rem; color: #6b7280;">Hasta:</label>
+                  <input type="date" id="statsFilterEnd" class="form-control" onchange="onStatsCustomDateChange()" style="padding: 5px 8px; font-size: 0.75rem; width: 130px;">
+                </div>
+
+                <select id="statsFilterBarber" class="form-control" onchange="onStatsBarberChange()" style="padding: 5px 8px; font-size: 0.75rem;">
+                  <option value="">Todos los Barberos</option>
+                </select>
+
+                <button class="btn-admin btn-admin-secondary btn-admin-sm" onclick="exportAttendedClientsCSV()" title="Descargar planilla CSV">
+                  📥 Exportar CSV
+                </button>
+              </div>
+            </div>
+
+            <!-- BUSCADOR -->
+            <div style="padding: 12px 16px; border-bottom: 1px solid #1a1a24; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <input type="text" id="statsSearchInput" class="form-control" placeholder="🔍 Buscar por nombre de cliente, teléfono, barbero o servicio..." oninput="renderAttendedClientsTable()" style="max-width: 420px; font-size: 0.8rem; padding: 7px 12px;">
+              <span id="statsResultCount" style="font-family: monospace; font-size: 0.75rem; color: #10b981; font-weight: bold;">0 atenciones registradas</span>
+            </div>
+
+            <!-- TABLA DE ATENDIDOS -->
+            <div class="admin-table-wrapper" style="min-height: 280px;">
+              <table class="admin-table" id="statsTableElement">
                 <thead>
                   <tr>
-                    <th>Fecha / Hora</th>
-                    <th>Usuario</th>
-                    <th>Módulo</th>
-                    <th>Acción</th>
-                    <th>Detalles</th>
+                    <th>Fecha & Hora</th>
+                    <th>Cliente</th>
+                    <th>WhatsApp</th>
+                    <th>Barbero</th>
+                    <th>Servicio Prestado</th>
+                    <th>Importe</th>
+                    <th>Estado</th>
+                    <th style="text-align: right;">Acciones</th>
                   </tr>
                 </thead>
-                <tbody id="auditLogsBody"></tbody>
+                <tbody id="statsAttendedTableBody"></tbody>
               </table>
+
+              <!-- EMPTY STATE DE ATENDIDOS -->
+              <div id="statsEmptyState" style="display: none; padding: 48px 24px; text-align: center;">
+                <div style="font-size: 2.2rem; margin-bottom: 8px;">💈</div>
+                <h4 style="font-size: 1.1rem; color: #ffffff; margin-bottom: 4px;">No se encontraron registros de atención</h4>
+                <p style="font-size: 0.85rem; color: #9ca3af; max-width: 440px; margin: 0 auto 16px auto;">
+                  No hay turnos completados para los filtros seleccionados. Probá seleccionando "Todo el Historial" o limpiando el buscador.
+                </p>
+                <button type="button" class="btn-admin btn-admin-sm" onclick="setStatsDatePreset('all')" style="background: #10b981; color: #000; font-weight: bold;">
+                  📜 Ver Todo el Historial
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -560,13 +668,104 @@
 
         <!-- SECTION: PROMOCIONES -->
         <div id="section-promotions" class="admin-section" style="display: none;">
+          <!-- HEADER CARD -->
+          <div class="admin-card" style="margin-bottom: 24px;">
+            <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px;">
+              <div>
+                <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #d4ff00; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">FIDELIZACIÓN & MARKETING</span>
+                <h3 class="admin-card-title" style="margin-top: 2px;">Promociones, Descuentos & Vouchers QR</h3>
+              </div>
+              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn-admin" style="background: #d4ff00; color: #000; font-weight: 800;" onclick="openCreateVoucherModal()">
+                  + Crear Regla Promocional
+                </button>
+                <button class="btn-admin" style="background: #25D366; color: #000; font-weight: 800;" onclick="openGenerateClientVoucherModal()">
+                  📲 Generar Voucher Cliente (QR & WA)
+                </button>
+              </div>
+            </div>
+            <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 8px;">
+              Creá ofertas (Porcentaje, Monto Fijo, Pase Libre 100% Gratis), obtené códigos únicos al azar, enviálos por WhatsApp y generá Vouchers QR verificables en tiempo real en la vista pública <code>voucher.html</code>.
+            </p>
+          </div>
+
+          <!-- SUMMARY KPIS -->
+          <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px;">
+            <div class="admin-card" style="padding: 16px;">
+              <div style="font-size: 0.75rem; color: #9ca3af; font-weight: bold; text-transform: uppercase;">Promociones Activas</div>
+              <div id="kpiVouchersActiveCount" style="font-family: 'Space Grotesk', monospace; font-size: 1.8rem; font-weight: 800; color: #d4ff00; margin-top: 4px;">0</div>
+            </div>
+            <div class="admin-card" style="padding: 16px;">
+              <div style="font-size: 0.75rem; color: #9ca3af; font-weight: bold; text-transform: uppercase;">Total Canjes Realizados</div>
+              <div id="kpiVouchersRedemptionsCount" style="font-family: 'Space Grotesk', monospace; font-size: 1.8rem; font-weight: 800; color: #10b981; margin-top: 4px;">0</div>
+            </div>
+            <div class="admin-card" style="padding: 16px;">
+              <div style="font-size: 0.75rem; color: #9ca3af; font-weight: bold; text-transform: uppercase;">Monto Bonificado Total</div>
+              <div id="kpiVouchersDiscountTotal" style="font-family: 'Space Grotesk', monospace; font-size: 1.8rem; font-weight: 800; color: #00f2fe; margin-top: 4px;">$0</div>
+            </div>
+          </div>
+
+          <!-- TABLA DE PROMOCIONES Y CUPONES -->
+          <div class="admin-card" style="margin-bottom: 24px;">
+            <div class="admin-card-header">
+              <h3 class="admin-card-title">🎟️ Catálogo de Cupones & Promociones</h3>
+              <input type="text" class="form-control" placeholder="🔍 Buscar código..." onkeyup="filterVouchersTable(this.value)" style="width: 220px; padding: 6px 12px;">
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Código Único</th>
+                    <th>Tipo de Promoción</th>
+                    <th>Valor Descuento</th>
+                    <th>Alcance</th>
+                    <th>Usos / Límite</th>
+                    <th>Vigencia</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="vouchersTableBody">
+                  <tr>
+                    <td colspan="8" style="text-align: center; color: #9ca3af; padding: 30px;">
+                      Cargando promociones activas...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- HISTORIAL DE CANJES EN ATENCIÓN -->
           <div class="admin-card">
             <div class="admin-card-header">
-              <h3 class="admin-card-title">Promociones & Descuentos</h3>
+              <h3 class="admin-card-title">📜 Auditoría de Canjes & Descuentos Aplicados</h3>
             </div>
-            <p style="color: #9ca3af; font-size: 0.85rem;">Creá ofertas especiales y combos para destacar en el shop o turnero.</p>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Fecha & Hora</th>
+                    <th>Código Cupón</th>
+                    <th>Cliente (Tel)</th>
+                    <th>Operador / Staff</th>
+                    <th>Monto Original</th>
+                    <th>Descuento</th>
+                    <th>Monto Cobrado</th>
+                  </tr>
+                </thead>
+                <tbody id="voucherRedemptionsTableBody">
+                  <tr>
+                    <td colspan="7" style="text-align: center; color: #9ca3af; padding: 24px;">
+                      No hay registros de canjes recientes.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
+
 
         <!-- SECTION: WHATSAPP -->
         <div id="section-whatsapp" class="admin-section" style="display: none;">
@@ -633,31 +832,103 @@
 
         <!-- SECTION: NOTIFICACIONES LOGS -->
         <div id="section-notifications" class="admin-section" style="display: none;">
-          <div class="admin-card">
-            <div class="admin-card-header">
-              <h3 class="admin-card-title">🔔 Registro de Notificaciones de WhatsApp</h3>
-              <button class="btn-admin btn-admin-sm" onclick="loadAdminNotificationLogs()">🔄 Refrescar Logs</button>
+          <!-- HEADER CARD -->
+          <div class="admin-card" style="margin-bottom: 24px;">
+            <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px;">
+              <div>
+                <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #25D366; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">AUDITORÍA DE COMUNICACIONES</span>
+                <h3 class="admin-card-title" style="margin-top: 2px;">🔔 Registro & Auditoría General de WhatsApp</h3>
+              </div>
+              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button id="btnBulkDeleteWaLogs" class="btn-admin btn-admin-danger" onclick="deleteSelectedWaLogs()" disabled style="font-weight: bold;">
+                  🗑️ Eliminar Seleccionados (<span id="waSelectedCount">0</span>)
+                </button>
+                <button class="btn-admin btn-admin-secondary" onclick="loadAdminNotificationLogs()">
+                  🔄 Refrescar Logs
+                </button>
+              </div>
             </div>
-            <p style="color: #9ca3af; font-size: 0.85rem; margin-bottom: 16px;">
-              Historial de envíos automáticos de mensajes a clientes y barberos con estado y timestamp.
+            <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 6px;">
+              Historial completo y auditoría de notificaciones enviadas por WhatsApp a clientes y barberos. Filtrá por tipo o estado, consultá el mensaje completo y eliminá registros individualmente o por selección en lote.
             </p>
+          </div>
+
+          <!-- SUMMARY KPIS -->
+          <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px;">
+            <div class="admin-card" style="padding: 16px;">
+              <div style="font-size: 0.75rem; color: #9ca3af; font-weight: bold; text-transform: uppercase;">Total Registros</div>
+              <div id="kpiWaTotalCount" style="font-family: 'Space Grotesk', monospace; font-size: 1.8rem; font-weight: 800; color: #00f2fe; margin-top: 4px;">0</div>
+            </div>
+            <div class="admin-card" style="padding: 16px;">
+              <div style="font-size: 0.75rem; color: #9ca3af; font-weight: bold; text-transform: uppercase;">Envíos Exitosos</div>
+              <div id="kpiWaSuccessCount" style="font-family: 'Space Grotesk', monospace; font-size: 1.8rem; font-weight: 800; color: #10b981; margin-top: 4px;">0</div>
+            </div>
+            <div class="admin-card" style="padding: 16px;">
+              <div style="font-size: 0.75rem; color: #9ca3af; font-weight: bold; text-transform: uppercase;">Fallidos / Pendientes</div>
+              <div id="kpiWaFailedCount" style="font-family: 'Space Grotesk', monospace; font-size: 1.8rem; font-weight: 800; color: #ef4444; margin-top: 4px;">0</div>
+            </div>
+          </div>
+
+          <!-- TOOLBAR FILTROS Y BÚSQUEDA -->
+          <div class="admin-card" style="margin-bottom: 24px;">
+            <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); align-items: flex-end;">
+              <div class="form-group">
+                <label>BUSCAR REGISTRO</label>
+                <input type="text" id="waLogSearchInput" class="form-control" placeholder="🔍 Nombre, tel, ID o mensaje..." onkeyup="loadAdminNotificationLogs()">
+              </div>
+              <div class="form-group">
+                <label>FILTRAR POR ESTADO</label>
+                <select id="waLogStatusFilter" class="form-control" onchange="loadAdminNotificationLogs()">
+                  <option value="">Todos los Estados</option>
+                  <option value="ENVIADO">ENVIADO / DELIVERED</option>
+                  <option value="PENDIENTE">PENDIENTE</option>
+                  <option value="ERROR">ERROR / FALLIDO</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>FILTRAR POR TIPO DE MENSAJE</label>
+                <select id="waLogTypeFilter" class="form-control" onchange="loadAdminNotificationLogs()">
+                  <option value="">Todos los Tipos</option>
+                  <option value="WHATSAPP_CONFIRMACION">WHATSAPP CONFIRMACIóN</option>
+                  <option value="WHATSAPP_RECORDATORIO">WHATSAPP RECORDATORIO</option>
+                  <option value="WHATSAPP_CANCELACION">WHATSAPP CANCELACIóN</option>
+                  <option value="WHATSAPP_PROMO">WHATSAPP PROMOCIóN</option>
+                  <option value="WHATSAPP_PEDIDO">WHATSAPP PEDIDO SHOP</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- TABLA DE REGISTROS -->
+          <div class="admin-card" style="padding: 0; overflow: hidden;">
             <div class="admin-table-wrapper">
               <table class="admin-table">
                 <thead>
                   <tr>
+                    <th style="width: 40px;">
+                      <input type="checkbox" id="waSelectAllCheck" onchange="toggleSelectAllWaLogs(this.checked)" style="accent-color: #d4ff00; width: 18px; height: 18px; cursor: pointer;">
+                    </th>
                     <th>Fecha & Hora</th>
                     <th>Destinatario</th>
-                    <th>Teléfono</th>
-                    <th>Tipo</th>
-                    <th>Turno ID</th>
+                    <th>Tipo Mensaje</th>
+                    <th>Contenido del Mensaje</th>
+                    <th>ID Turno</th>
                     <th>Estado</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
-                <tbody id="notificationLogsBody"></tbody>
+                <tbody id="notificationLogsBody">
+                  <tr>
+                    <td colspan="8" style="text-align: center; padding: 40px; color: #9ca3af;">
+                      Cargando registros de notificaciones...
+                    </td>
+                  </tr>
+                </tbody>
               </table>
             </div>
           </div>
         </div>
+
 
         <!-- SECTION: IDENTIDAD & TEXTOS DE LA BARBERÍA -->
         <div id="section-identity" class="admin-section" style="display: none;">
@@ -671,9 +942,9 @@
             </p>
 
             <div style="display: flex; gap: 24px; flex-wrap: wrap; align-items: center;">
-              <div id="logoPreviewContainer" style="background: rgba(255,255,255,0.04); border: 2px dashed rgba(255,255,255,0.15); border-radius: 12px; padding: 16px; min-width: 160px; min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
-                <img id="logoPreviewImg" src="" alt="Vista previa de logo" style="max-height: 80px; max-width: 180px; object-fit: contain; display: none;">
-                <span id="logoPreviewPlaceholder" style="color: #64748b; font-size: 0.8rem; font-family: monospace;">Sin logo cargado</span>
+              <div id="logoPreviewContainer" style="background: rgba(10,10,12,0.9); border: 2px dashed rgba(212,255,0,0.4); border-radius: 20px; padding: 20px; min-width: 220px; min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 0 25px rgba(212,255,0,0.15);">
+                <img id="logoPreviewImg" src="" alt="Vista previa de logo" style="max-height: 120px; max-width: 240px; object-fit: contain; filter: drop-shadow(0 0 16px rgba(212, 255, 0, 0.45)); mix-blend-mode: screen; display: none;">
+                <span id="logoPreviewPlaceholder" style="color: #64748b; font-size: 0.85rem; font-family: monospace;">📷 Sin logo cargado</span>
               </div>
 
               <div style="display: flex; flex-direction: column; gap: 10px;">
@@ -891,6 +1162,20 @@
                 </div>
 
                 <div class="form-group" style="grid-column: 1 / -1;">
+                  <label>🖼️ FONDO DE PANTALLA DE LA APLICACIÓN (cover_image_url)</label>
+                  <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <input type="text" id="setting_cover_image_url" class="form-control" style="flex: 1; min-width: 220px;" value="/static/img/fondo.png" placeholder="Ej: /static/img/fondo.png">
+                    <button type="button" class="btn-admin btn-admin-secondary btn-admin-sm" onclick="document.getElementById('coverUploadInput').click()">
+                      📁 Subir Imagen de Fondo
+                    </button>
+                    <input type="file" id="coverUploadInput" accept="image/*" style="display: none;" onchange="handleCoverUpload(this)">
+                  </div>
+                  <span style="font-size: 0.75rem; color: #94a3b8; display: block; margin-top: 4px;">
+                    Imagen de ambiente de barbería aplicada con capa oscura protectora para mantener máxima legibilidad.
+                  </span>
+                </div>
+
+                <div class="form-group" style="grid-column: 1 / -1;">
                   <label>MÚSICA DE FONDO (URL MP3/MP4)</label>
                   <input type="text" id="setting_bg_music_url" class="form-control" value="/static/musica punchi/punchi.mp3">
                 </div>
@@ -924,7 +1209,7 @@
               <h3 class="admin-card-title">Configuración Pantalla TV & Agenda en Vivo</h3>
               <div style="display: flex; gap: 8px;">
                 <a href="/display.html" target="_blank" class="btn-admin btn-admin-sm btn-admin-secondary">📺 Ver Pantalla TV</a>
-                <a href="/live.html" target="_blank" class="btn-admin btn-admin-sm btn-admin-secondary">🎛️ Moderador</a>
+                <a href="/turnolive.html" target="_blank" class="btn-admin btn-admin-sm btn-admin-secondary">🎛️ Turno Live</a>
                 <button class="btn-admin btn-admin-sm" onclick="saveSettingsSection('live_settings')">Guardar Cambios</button>
               </div>
             </div>
@@ -1118,7 +1403,91 @@
               </table>
             </div>
           </div>
+
+          <!-- HISTORIAL DE FICHAJES Y HORARIOS DE ENCARGADOS -->
+          <div class="admin-card" style="margin-top: 24px;">
+            <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center;">
+              <div>
+                <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #ff3355; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">CONTROL DE ASISTENCIA // RELOJ FICHERO</span>
+                <h3 class="admin-card-title" style="margin-top: 2px;">⏱️ Horarios de Ingreso & Salida de Encargados (gestion.html)</h3>
+              </div>
+              <button class="btn-admin btn-admin-secondary btn-admin-sm" onclick="loadStaffFichajesData()">
+                🔄 Actualizar Fichajes
+              </button>
+            </div>
+            <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 6px; margin-bottom: 16px;">
+              Registro auditado de marcas horarias (Argentina ART) de los usuarios que ingresan o cierran sesión en el panel <code>/gestion.html</code>.
+            </p>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Hora (ART)</th>
+                    <th>Encargado / Usuario</th>
+                    <th>Marca</th>
+                    <th>Detalle de Auditoría</th>
+                    <th>IP Origen</th>
+                  </tr>
+                </thead>
+                <tbody id="staffFichajesTableBody">
+                  <tr>
+                    <td colspan="6" style="text-align: center; color: #9ca3af; padding: 24px;">
+                      Cargando historial de fichajes...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ENCARGADO LIMITS MANAGEMENT CARD (LLAVE MAESTRA) -->
+          <div class="admin-card" style="margin-top: 24px;">
+            <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px;">
+              <div>
+                <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #d4ff00; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">LLAVE MAESTRA // CONTROL DE RECURSOS</span>
+                <h3 class="admin-card-title" style="margin-top: 2px;">⚡ Configuración de Límites & Permisos para Encargados (gestion.html)</h3>
+              </div>
+              <button class="btn-admin" style="background: #d4ff00; color: #000; font-weight: bold;" onclick="saveEncargadoSettingsFromAdmin()">
+                💾 Guardar Configuración de Límites
+              </button>
+            </div>
+            <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 6px; margin-bottom: 20px;">
+              Establecé cuántos turnos diarios, clientes, servicios y estilos puede gestionar el rol <strong>Encargado</strong> en <code>/gestion.html</code>. Como Administrador (Llave Maestra), siempre contás con acceso ilimitado.
+            </p>
+
+            <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
+              <div class="form-group">
+                <label>LÍMITE DE TURNOS POR DÍA</label>
+                <input type="number" id="as_encargado_max_appts" class="form-control" value="6" required>
+              </div>
+              <div class="form-group">
+                <label>LÍMITE DE CLIENTES ATENDIDOS POR DÍA</label>
+                <input type="number" id="as_encargado_max_clients" class="form-control" value="6" required>
+              </div>
+              <div class="form-group">
+                <label>LÍMITE DE SERVICIOS CONFIGURABLES</label>
+                <input type="number" id="as_encargado_max_services" class="form-control" value="3" required>
+              </div>
+              <div class="form-group">
+                <label>LÍMITE DE ESTILOS DE CORTE</label>
+                <input type="number" id="as_encargado_max_styles" class="form-control" value="3" required>
+              </div>
+            </div>
+
+            <div style="background: #09090c; border: 1px solid #23232c; border-radius: 12px; padding: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <strong style="color: #fff; font-size: 0.9rem;">Habilitar Funciones Completas de Admin a Encargados</strong>
+                <p style="color: #9ca3af; font-size: 0.8rem; margin: 2px 0 0 0;">Si está activado, elimina todas las restricciones numéricas para los Encargados.</p>
+              </div>
+              <select id="as_encargado_allow_full" class="form-control" style="width: 220px;">
+                <option value="false">🔒 Modo Restringido (Con Límites)</option>
+                <option value="true">🔓 Modo Ilimitado (Acceso Admin)</option>
+              </select>
+            </div>
+          </div>
         </div>
+
 
         <!-- SECTION: AUDITORÍA DE CAJAS Y RENDICIÓN DE TURNO -->
         <div id="section-shift_closures" class="admin-section" style="display: none;">
@@ -1153,6 +1522,369 @@
                     <td colspan="12" style="text-align: center; padding: 40px; color: #9ca3af;">
                       Cargando histórico de cierres de caja...
                     </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: PASARELA DE PAGOS & SEÑAS PREVIA -->
+        <div id="section-payments_config" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <div>
+                <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #d4ff00; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">REDUCCIÓN DE NO-SHOWS A 0%</span>
+                <h3 class="admin-card-title" style="margin-top: 2px;">💳 Pasarela de Pagos & Señas Previa</h3>
+              </div>
+            </div>
+            <p style="color: #9ca3af; font-size: 0.85rem; margin-bottom: 20px;">
+              Configurá la exigencia de seña (30%, 50%, etc.) para la reserva de turnos online y cobros mediante Mercado Pago o Stripe.
+            </p>
+
+            <form onsubmit="event.preventDefault(); savePaymentSettings();">
+              <div class="form-group" style="background: rgba(255, 255, 255, 0.03); border: 1px solid #23232c; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+                <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-size: 0.95rem; font-weight: bold; color: #fff;">
+                  <span>⚡ Activar Pasarela de Pagos & Señas Previa</span>
+                  <input type="checkbox" id="cfg_payment_gateway_enabled" style="accent-color: #d4ff00; width: 22px; height: 22px;">
+                </label>
+                <small style="color: #9ca3af; display: block; margin-top: 6px;">
+                  Al activar esta opción, la reserva de turnos online exigirá la seña configurada. El encargado en <code>/gestion.html</code> también podrá gestionar o dispensar señas por cliente/turno.
+                </small>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                <div class="form-group">
+                  <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">PROVEEDOR DE PAGOS *</label>
+                  <select id="cfg_payment_provider" class="form-control" onchange="togglePaymentFields()">
+                    <option value="mercadopago" selected>Mercado Pago (Argentina / LATAM)</option>
+                    <option value="stripe">Stripe (Internacional / Tarjetas)</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">PORCENTAJE DE SEÑA DE RESERVA (%) *</label>
+                  <select id="cfg_deposit_percentage" class="form-control">
+                    <option value="30" selected>30% de Seña</option>
+                    <option value="50">50% de Seña</option>
+                    <option value="100">100% Pago Total por Adelantado</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">ALIAS MERCADO PAGO DE TRANSFERENCIA DIRECTA</label>
+                  <input type="text" id="cfg_deposit_mp_alias" class="form-control" placeholder="BARBERIA.PEREYRA.MP">
+                </div>
+              </div>
+
+              <!-- MERCADO PAGO KEYS BOX -->
+              <div id="mpConfigBox" style="background: rgba(0, 158, 229, 0.08); border: 1px solid rgba(0, 158, 229, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+                <h4 style="color: #009ee3; margin: 0 0 12px 0; font-family: 'Space Grotesk', monospace; font-size: 0.95rem;">🔵 Credenciales Mercado Pago Checkout Pro</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">ACCESS TOKEN (PRODUCCIÓN / TEST)</label>
+                    <input type="password" id="cfg_mp_access_token" class="form-control" placeholder="APP_USR-xxxxxxxxx-xxxxxx">
+                  </div>
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">PUBLIC KEY</label>
+                    <input type="text" id="cfg_mp_public_key" class="form-control" placeholder="APP_USR-xxxx-xxxx">
+                  </div>
+                </div>
+              </div>
+
+              <!-- STRIPE KEYS BOX -->
+              <div id="stripeConfigBox" style="background: rgba(99, 91, 255, 0.08); border: 1px solid rgba(99, 91, 255, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 20px; display: none;">
+                <h4 style="color: #635bff; margin: 0 0 12px 0; font-family: 'Space Grotesk', monospace; font-size: 0.95rem;">🟣 Credenciales Stripe API</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">STRIPE SECRET KEY</label>
+                    <input type="password" id="cfg_stripe_secret_key" class="form-control" placeholder="sk_test_xxxxxx">
+                  </div>
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">STRIPE PUBLISHABLE KEY</label>
+                    <input type="text" id="cfg_stripe_publishable_key" class="form-control" placeholder="pk_test_xxxxxx">
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" class="btn-admin" style="background: #d4ff00; color: #000; font-weight: bold; padding: 12px 24px;">
+                💾 Guardar Configuración de Señas & Pasarela
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- SECTION: BARBER CLUB & FIDELIZACIÓN -->
+        <div id="section-barber_club" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header" style="justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #f59e0b; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">FIDELIZACIÓN & RETENCIÓN DE CLIENTES</span>
+                <h3 class="admin-card-title" style="margin-top: 2px;">⭐ Programa Barber Club & Puntos</h3>
+              </div>
+              <button class="btn-admin" style="background: #f59e0b; color: #000; font-weight: bold;" onclick="createLoyaltyRewardModal()">
+                ➕ Crear Nuevo Premio / Beneficio
+              </button>
+            </div>
+            <p style="color: #9ca3af; font-size: 0.85rem; margin-bottom: 20px;">
+              Acumulación automática de puntos por cada servicio o producto comprado en el shop, canjeables por beneficios o cortes gratis.
+            </p>
+
+            <form onsubmit="event.preventDefault(); saveLoyaltySettings();" style="margin-bottom: 24px;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                <div class="form-group" style="background: rgba(255, 255, 255, 0.03); border: 1px solid #23232c; border-radius: 12px; padding: 16px;">
+                  <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-weight: bold; color: #fff;">
+                    <span>⭐ Activar Programa Barber Club</span>
+                    <input type="checkbox" id="cfg_enable_barber_club" checked style="accent-color: #f59e0b; width: 22px; height: 22px;">
+                  </label>
+                </div>
+                <div class="form-group">
+                  <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">MONTO EN $ PARA 1 PUNTO *</label>
+                  <input type="number" id="cfg_points_per_amount" class="form-control" value="100" placeholder="100">
+                  <small style="color: #9ca3af;">Ej. $100 = 1 punto acumulado automáticamente.</small>
+                </div>
+              </div>
+              <button type="submit" class="btn-admin btn-admin-secondary btn-admin-sm" style="margin-top: 8px;">💾 Guardar Reglas de Puntos</button>
+            </form>
+
+            <h4 style="color: #fff; font-size: 1rem; margin-bottom: 12px; font-family: 'Space Grotesk', monospace;">🎁 Catálogo de Premios & Canjes Activos</h4>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Premio / Beneficio</th>
+                    <th>Puntos Requeridos</th>
+                    <th>Tipo de Beneficio</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="loyaltyRewardsTbody">
+                  <tr>
+                    <td colspan="5" style="text-align: center; color: #9ca3af; padding: 24px;">Cargando catálogo Barber Club...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: PWA PUSH NOTIFICATIONS -->
+        <div id="section-push_pwa" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header" style="justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #d4ff00; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">RECORDATORIOS AUTOMATIZADOS SIN WHATSAPP</span>
+                <h3 class="admin-card-title" style="margin-top: 2px;">📲 Notificaciones Push PWA Automatizadas</h3>
+              </div>
+              <button class="btn-admin btn-admin-secondary" onclick="sendTestPushNotification()">
+                🚀 Enviar Notificación Push de Prueba
+              </button>
+            </div>
+            <p style="color: #9ca3af; font-size: 0.85rem; margin-bottom: 20px;">
+              Enviá avisos y recordatorios automáticos directamente a la pantalla de inicio / celular del cliente 2 horas antes de su turno.
+            </p>
+
+            <form onsubmit="event.preventDefault(); savePushSettings();">
+              <div class="form-group" style="background: rgba(255, 255, 255, 0.03); border: 1px solid #23232c; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+                <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-size: 0.95rem; font-weight: bold; color: #fff;">
+                  <span>🔔 Activar Recordatorios Automatizados Push PWA</span>
+                  <input type="checkbox" id="cfg_pwa_push_enabled" checked style="accent-color: #d4ff00; width: 22px; height: 22px;">
+                </label>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                <div class="form-group">
+                  <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">HORAS ANTES DEL TURNO PARA ENVIAR AVISO *</label>
+                  <select id="cfg_pwa_push_hours_before" class="form-control">
+                    <option value="1">1 hora antes</option>
+                    <option value="2" selected>2 horas antes (Recomendado)</option>
+                    <option value="3">3 horas antes</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">CLAVE VAPID PÚBLICA PWA</label>
+                  <input type="text" id="cfg_vapid_public_key" class="form-control" readonly style="font-family: monospace; font-size: 0.75rem;">
+                </div>
+              </div>
+
+              <button type="submit" class="btn-admin" style="background: #d4ff00; color: #000; font-weight: bold; padding: 12px 24px;">
+                💾 Guardar Configuración Push PWA
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- SECTION: SHOP BANNERS & PROMOS -->
+        <div id="section-shop_promos" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header" style="justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #00f2fe; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">GESTIÓN DE MARKETING & E-COMMERCE</span>
+                <h3 class="admin-card-title" style="margin-top: 2px;">🎨 Promociones, Banners & Vouchers Shop Barber</h3>
+              </div>
+              <button class="btn-admin btn-admin-secondary" onclick="saveShopPromoSettings()">
+                💾 Guardar Banners & Cupones
+              </button>
+            </div>
+            <p style="color: #9ca3af; font-size: 0.85rem; margin-bottom: 20px;">
+              Administrá los slides del carrusel promocional del Shop Barber y configurá códigos de descuento en tiempo real.
+            </p>
+
+            <!-- GUÍA DE FORMATO Y ESPECIFICACIONES DE IMAGEN -->
+            <div style="background: rgba(0, 242, 254, 0.05); border: 1px solid rgba(0, 242, 254, 0.25); border-radius: 16px; padding: 20px; margin-bottom: 24px;">
+              <h4 style="color: #00f2fe; font-family: 'Space Grotesk', monospace; font-size: 0.95rem; margin-bottom: 10px; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+                <span>📐</span> ESPECIFICACIONES DE IMAGEN Y FORMATO RECOMENDADO
+              </h4>
+              <ul style="color: #cbd5e1; font-size: 0.8rem; display: flex; flex-direction: column; gap: 8px; font-family: monospace; line-height: 1.6;">
+                <li>📷 <strong>Formato Admitido:</strong> <code>.JPG</code>, <code>.PNG</code> o <code>.WEBP</code> (Se recomienda compresión WebP de alta velocidad).</li>
+                <li>📏 <strong>Resolución Óptima:</strong> <code>1200 x 500 px</code> (Aspecto 16:9 o 21:9 panorámico para visualización móvil e integrada).</li>
+                <li>💡 <strong>Consejo de Diseño:</strong> Fondos oscuros con elementos de producto enfocados a la derecha y espacio despejado a la izquierda para contraste de texto.</li>
+                <li>🖼️ <strong>Rutas Locales o URLs:</strong> Podés usar imágenes del sistema como <code>/static/img/fondo.png</code> o subirlas desde Identidad.</li>
+              </ul>
+            </div>
+
+            <!-- MODELO / EJEMPLO EN VIVO EN EL ADMIN -->
+            <div style="margin-bottom: 28px;">
+              <h4 style="color: #fff; font-size: 0.9rem; margin-bottom: 10px; font-family: 'Space Grotesk', monospace;">👁️ Modelo / Ejemplo en Vivo del Banner Promocional</h4>
+              <div style="position: relative; border-radius: 20px; overflow: hidden; border: 1px solid #23232c; background: linear-gradient(to right, rgba(19,19,24,0.95), rgba(19,19,24,0.5)), url('/static/img/fondo.png'); background-size: cover; background-position: center; padding: 24px; min-height: 160px; display: flex; flex-direction: column; justify-content: center; gap: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);">
+                <span style="background: rgba(212,255,0,0.15); border: 1px solid rgba(212,255,0,0.3); color: #d4ff00; font-family: monospace; font-size: 0.65rem; font-weight: bold; padding: 2px 10px; border-radius: 99px; text-transform: uppercase; align-self: flex-start;">🔥 MODELO DE EJEMPLO // PROMO CLUB</span>
+                <h3 style="color: #fff; font-family: 'Space Grotesk', monospace; font-weight: 800; font-size: 1.2rem; margin: 0;">COMBO CUIDADO DE AUTOR</h3>
+                <p style="color: #e2e8f0; font-size: 0.75rem; margin: 0; max-width: 360px;">Pomada Mate + Aceite Esencial con 15% OFF usando el código de descuento BARBER15.</p>
+                <button type="button" style="background: #d4ff00; color: #000; font-family: monospace; font-weight: bold; font-size: 0.7rem; padding: 6px 14px; border-radius: 99px; border: none; align-self: flex-start; margin-top: 6px; cursor: pointer;">🎟️ USAR CUPÓN BARBER15</button>
+              </div>
+            </div>
+
+            <!-- FORMULARIO DE GESTIÓN DE SLIDES DEL CARRUSEL -->
+            <form id="formShopPromos" onsubmit="event.preventDefault(); saveShopPromoSettings();">
+              <h4 style="color: #fff; font-size: 0.95rem; margin-bottom: 14px; font-family: 'Space Grotesk', monospace;">🖼️ Slides del Carrusel Promocional (2 Diapositivas)</h4>
+              
+              <!-- SLIDE 1 -->
+              <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid #23232c; border-radius: 16px; padding: 16px; margin-bottom: 16px;">
+                <h5 style="color: #d4ff00; font-family: monospace; font-size: 0.8rem; margin-bottom: 12px; font-weight: bold;">Slide 1 (Destacado Principal)</h5>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">TÍTULO DEL BANNER *</label>
+                    <input type="text" id="promo_s1_title" class="form-control" value="COMBO CUIDADO DE AUTOR">
+                  </div>
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">SUBTÍTULO / DESCRIPCIÓN *</label>
+                    <input type="text" id="promo_s1_subtitle" class="form-control" value="Pomada Mate + Aceite Esencial con 15% OFF">
+                  </div>
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">ETIQUETA / BADGE *</label>
+                    <input type="text" id="promo_s1_badge" class="form-control" value="🔥 PROMO CLUB">
+                  </div>
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">CÓDIGO DE CUPÓN ASOCIADO</label>
+                    <input type="text" id="promo_s1_coupon" class="form-control" value="BARBER15" placeholder="BARBER15">
+                  </div>
+                  <div class="form-group" style="grid-column: 1 / -1;">
+                    <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">URL DE LA IMAGEN DE FONDO (1200x500 px)</label>
+                    <input type="text" id="promo_s1_image" class="form-control" value="/static/img/fondo.png">
+                  </div>
+                </div>
+              </div>
+
+              <!-- SLIDE 2 -->
+              <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid #23232c; border-radius: 16px; padding: 16px; margin-bottom: 24px;">
+                <h5 style="color: #00f2fe; font-family: monospace; font-size: 0.8rem; margin-bottom: 12px; font-weight: bold;">Slide 2 (Promoción Secundaria)</h5>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">TÍTULO DEL BANNER *</label>
+                    <input type="text" id="promo_s2_title" class="form-control" value="SERUMS & ACEITES ESENCIALES">
+                  </div>
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">SUBTÍTULO / DESCRIPCIÓN *</label>
+                    <input type="text" id="promo_s2_subtitle" class="form-control" value="Brillo natural e hidratación profunda 24 hs">
+                  </div>
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">ETIQUETA / BADGE *</label>
+                    <input type="text" id="promo_s2_badge" class="form-control" value="⭐ RECOMENDADO">
+                  </div>
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">CÓDIGO DE CUPÓN ASOCIADO</label>
+                    <input type="text" id="promo_s2_coupon" class="form-control" value="BARBER10" placeholder="BARBER10">
+                  </div>
+                  <div class="form-group" style="grid-column: 1 / -1;">
+                    <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">URL DE LA IMAGEN DE FONDO (1200x500 px)</label>
+                    <input type="text" id="promo_s2_image" class="form-control" value="/static/img/fondo3.png">
+                  </div>
+                </div>
+              </div>
+
+              <!-- GESTIÓN DE VOUCHERS / CUPONES -->
+              <h4 style="color: #fff; font-size: 0.95rem; margin-bottom: 14px; font-family: 'Space Grotesk', monospace;">🎟️ Cupones y Vouchers Activos</h4>
+              <p style="color: #9ca3af; font-size: 0.75rem; margin-bottom: 12px; font-family: monospace;">
+                Los clientes pueden ingresar estos códigos en el carrito para obtener descuentos automáticos.
+              </p>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 24px;">
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid #23232c; border-radius: 12px; padding: 12px;">
+                  <span style="color: #d4ff00; font-weight: bold; font-family: monospace; font-size: 0.85rem;">BARBER10</span>
+                  <p style="color: #9ca3af; font-size: 0.75rem; margin: 4px 0 0 0;">10% de descuento general</p>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid #23232c; border-radius: 12px; padding: 12px;">
+                  <span style="color: #00f2fe; font-weight: bold; font-family: monospace; font-size: 0.85rem;">BARBER15</span>
+                  <p style="color: #9ca3af; font-size: 0.75rem; margin: 4px 0 0 0;">15% de descuento exclusivo Club</p>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid #23232c; border-radius: 12px; padding: 12px;">
+                  <span style="color: #f59e0b; font-weight: bold; font-family: monospace; font-size: 0.85rem;">CLUB20</span>
+                  <p style="color: #9ca3af; font-size: 0.75rem; margin: 4px 0 0 0;">20% de descuento socio VIP</p>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid #23232c; border-radius: 12px; padding: 12px;">
+                  <span style="color: #10b981; font-weight: bold; font-family: monospace; font-size: 0.85rem;">VIP500</span>
+                  <p style="color: #9ca3af; font-size: 0.75rem; margin: 4px 0 0 0;">$500 de regalo directo</p>
+                </div>
+              </div>
+
+              <button type="submit" class="btn-admin" style="background: #00f2fe; color: #000; font-weight: bold; padding: 12px 24px; font-family: monospace; border-radius: 12px;">
+                💾 Guardar Banners & Cupones de Descuento
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- SECTION: BARBER PRODUCTIVITY -->
+        <div id="section-barber_productivity" class="admin-section" style="display: none;">
+          <div class="admin-card">
+            <div class="admin-card-header" style="justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #00f2fe; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">METRICAS DE RENDIMIENTO & COMISIONES</span>
+                <h3 class="admin-card-title" style="margin-top: 2px;">📊 Reporte de Productividad e Incentivos por Barbero</h3>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="date" id="prod_start_date" class="form-control" style="width: auto;" onchange="loadBarberProductivity()">
+                <span style="color: #9ca3af;">a</span>
+                <input type="date" id="prod_end_date" class="form-control" style="width: auto;" onchange="loadBarberProductivity()">
+                <button class="btn-admin btn-admin-secondary btn-admin-sm" onclick="loadBarberProductivity()">🔄 Filtrar</button>
+              </div>
+            </div>
+
+            <!-- KPI SUMMARY CARDS -->
+            <div class="stats-grid" id="productivityStatsGrid" style="margin: 20px 0;">
+              <!-- Dynamic stats -->
+            </div>
+
+            <!-- BARBERS METRICS TABLE -->
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Barbero</th>
+                    <th>Turnos Completados</th>
+                    <th>No-Shows / Ausentismo</th>
+                    <th>Prom. Min / Corte</th>
+                    <th>Fact. Servicios</th>
+                    <th>Venta Productos</th>
+                    <th>Propinas Recibidas</th>
+                    <th>Comisiones Ganadas</th>
+                    <th>Total Compensación</th>
+                  </tr>
+                </thead>
+                <tbody id="barberProductivityTbody">
+                  <tr>
+                    <td colspan="9" style="text-align: center; color: #9ca3af; padding: 24px;">Cargando métricas de productividad...</td>
                   </tr>
                 </tbody>
               </table>
@@ -1321,9 +2053,279 @@
         <button type="button" onclick="closeOrderDetailModal()" class="btn-admin btn-admin-secondary">Cerrar</button>
       </div>
     </div>
+  </div>
+
+  <!-- MODAL 1: CENTRO DE COMUNICACIÓN WHATSAPP INTELIGENTE PARA CLIENTES -->
+  <div id="clientWhatsappModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; width: 100%; max-width: 600px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.9); max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <div>
+          <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #25D366; letter-spacing: 2px; font-weight: 800;">CENTRO DE COMUNICACIÓN WHATSAPP</span>
+          <h3 id="waModalTitle" style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 2px 0 0 0; font-size: 1.25rem;">Enviar Mensaje a Cliente</h3>
+        </div>
+        <button onclick="closeClientWhatsappModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <!-- INFO DEL CLIENTE SELECCIONADO -->
+      <div style="background: rgba(37, 211, 102, 0.08); border: 1px solid rgba(37, 211, 102, 0.25); border-radius: 10px; padding: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+        <div>
+          <span style="color: #9ca3af; font-size: 0.75rem; font-family: monospace; display: block;">CLIENTE SELECCIONADO</span>
+          <strong id="waClientName" style="color: #ffffff; font-size: 0.95rem;">-</strong>
+        </div>
+        <div style="text-align: right;">
+          <span style="color: #9ca3af; font-size: 0.75rem; font-family: monospace; display: block;">NÚMERO WHATSAPP</span>
+          <span id="waClientPhone" style="color: #25D366; font-family: monospace; font-weight: bold; font-size: 0.95rem;">-</span>
+        </div>
+      </div>
+
+      <!-- SELECTOR DE PLANTILLA INTELIGENTE -->
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; color: #cbd5e1; font-size: 0.75rem; font-family: 'Space Grotesk', monospace; font-weight: 700; margin-bottom: 6px;">
+          ELEGIR MOTIVO / PLANTILLA DE MENSAJE:
+        </label>
+        <select id="waTemplateSelect" onchange="applyWaTemplate()" class="admin-menu-search" style="width: 100%; font-weight: bold; padding: 10px; border-color: rgba(37, 211, 102, 0.4);">
+          <option value="recordatorio">📅 Recordatorio de Turno (Confirmación habitual)</option>
+          <option value="demora">⏳ Aviso de Demora Estimada (15-20 min)</option>
+          <option value="ausente_barbero">⚠️ Barbero No Disponible (Reasignar o Cambiar Turno)</option>
+          <option value="reprogramar">🔄 Coordinar Cambio / Reprogramación de Turno</option>
+          <option value="personalizado">✍️ Mensaje Personalizado / Libre</option>
+        </select>
+      </div>
+
+      <!-- CAMPOS DE VARIABLES Y DATOS DINÁMICOS -->
+      <div id="waVariablesBox" style="background: #09090c; border: 1px solid #23232c; border-radius: 10px; padding: 14px; margin-bottom: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;">
+        <div>
+          <label style="color: #9ca3af; font-size: 0.7rem; font-family: monospace;">HORA / FECHA TURNO</label>
+          <input type="text" id="waVarTime" value="Hoy a las 17:30" oninput="buildWaDraftText()" class="admin-menu-search" style="margin-top: 2px;">
+        </div>
+        <div>
+          <label style="color: #9ca3af; font-size: 0.7rem; font-family: monospace;">BARBERO</label>
+          <input type="text" id="waVarBarber" value="Franco" oninput="buildWaDraftText()" class="admin-menu-search" style="margin-top: 2px;">
+        </div>
+        <div>
+          <label style="color: #9ca3af; font-size: 0.7rem; font-family: monospace;">DETALLE / DEMORA</label>
+          <input type="text" id="waVarDetail" value="15-20 minutos" oninput="buildWaDraftText()" class="admin-menu-search" style="margin-top: 2px;">
+        </div>
+      </div>
+
+      <!-- VISTA REDACTADA COMPLETA (VER Y EDITAR MENSAJE COMPLETO) -->
+      <div style="margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: 'Space Grotesk', monospace; font-weight: 700;">
+            VER MENSAJE REDACTADO COMPLETO (EDITABLE):
+          </label>
+          <span style="font-size: 0.7rem; color: #25D366; font-family: monospace;">Listo para enviar</span>
+        </div>
+        <textarea id="waFinalMessageText" rows="6" oninput="updateWaHrefFromTextarea()" class="admin-menu-search" style="width: 100%; box-sizing: border-box; font-family: sans-serif; font-size: 0.85rem; line-height: 1.45; resize: vertical; border-color: rgba(37, 211, 102, 0.4); background: #07130b; color: #f1f5f9; border-radius: 10px; padding: 12px;"></textarea>
+      </div>
+
+      <!-- BOTONES DE ACCIÓN PARA ENVIAR WHATSAPP O COPIAR -->
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <a id="btnSendWhatsappDirect" href="#" target="_blank" onclick="closeClientWhatsappModal()" class="btn-admin" style="background: #25D366; color: #000; font-weight: 800; font-size: 0.95rem; justify-content: center; width: 100%; padding: 12px 18px; box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3);">
+          📲 ABRIR EN WHATSAPP Y ENVIAR MENSAJE →
+        </a>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" onclick="copyWaTextToClipboard()" class="btn-admin btn-admin-secondary" style="flex: 1; justify-content: center;">
+            📋 Copiar Texto
+          </button>
+          <button type="button" onclick="closeClientWhatsappModal()" class="btn-admin btn-admin-secondary" style="flex: 1; justify-content: center;">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: FICHA DE PERFIL Y HISTORIAL CRM DEL CLIENTE -->
+  <div id="clientProfileModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; width: 100%; max-width: 680px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.9); max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <div>
+          <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #d4ff00; letter-spacing: 2px; font-weight: 800;">FICHA INTEGRAL CRM</span>
+          <h3 id="crmClientProfileTitle" style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 2px 0 0 0; font-size: 1.25rem;">Perfil de Cliente</h3>
+        </div>
+        <button onclick="closeClientProfileModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <div id="crmClientProfileBody">
+        <div style="text-align: center; color: #9ca3af; padding: 20px;" class="animate-pulse">Cargando ficha de cliente...</div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; border-top: 1px solid #23232c; padding-top: 16px;">
+        <button type="button" onclick="closeClientProfileModal()" class="btn-admin btn-admin-secondary">Cerrar Ficha</button>
+      </div>
+    </div>
+  </div>
+  <!-- MODAL: CREAR REGLA PROMOCIONAL -->
+  <div id="createVoucherModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; width: 100%; max-width: 520px; padding: 28px; box-shadow: 0 10px 40px rgba(0,0,0,0.9); max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <h3 style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 0; font-size: 1.2rem;">🎟️ Nueva Regla Promocional</h3>
+        <button onclick="closeCreateVoucherModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <form id="createVoucherForm" onsubmit="event.preventDefault(); submitCreateVoucherForm();">
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>CÓDIGO ÚNICO DE DESCUENTO</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="cv_code" class="form-control" placeholder="PROMO-2026" required style="text-transform: uppercase; font-family: monospace; font-weight: bold; color: #d4ff00;">
+              <button type="button" onclick="fillRandomCodeInCreateForm()" class="btn-admin btn-admin-secondary" style="white-space: nowrap;">🎲 Azar</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>TIPO DE PROMOCIÓN</label>
+            <select id="cv_type" class="form-control" onchange="fillRandomCodeInCreateForm()" required>
+              <option value="PERCENTAGE">🔥 Porcentaje (% OFF)</option>
+              <option value="FIXED_AMOUNT">💰 Monto Fijo ($ OFF)</option>
+              <option value="FREE_ITEM">🎁 Pase Libre (100% Gratis)</option>
+              <option value="FIXED_PRICE">🏷️ Precio Fijo Especial ($)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>VALOR / MONTO DESCUENTO</label>
+            <input type="number" step="0.01" id="cv_value" class="form-control" placeholder="20 (% o $)" value="20" required>
+          </div>
+
+          <div class="form-group">
+            <label>ALCANCE APLICABLE</label>
+            <select id="cv_scope" class="form-control">
+              <option value="TOTAL_TICKET">Ticket Total (Turnos & Productos)</option>
+              <option value="SERVICES_ONLY">Solo Servicios de Barbería</option>
+              <option value="PRODUCTS_ONLY">Solo Productos Shop</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>DÍAS DE VIGENCIA</label>
+            <input type="number" id="cv_valid_days" class="form-control" value="30" required>
+          </div>
+
+          <div class="form-group">
+            <label>LÍMITE TOTAL USOS</label>
+            <input type="number" id="cv_max_uses" class="form-control" value="100" required>
+          </div>
+
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>DESCRIPCIÓN DE LA OFERTA</label>
+            <input type="text" id="cv_desc" class="form-control" placeholder="Ej: 20% OFF por primer turno online en Pereyras Barbers">
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; border-top: 1px solid #23232c; padding-top: 16px;">
+          <button type="button" onclick="closeCreateVoucherModal()" class="btn-admin btn-admin-secondary">Cancelar</button>
+          <button type="submit" class="btn-admin" style="background: #d4ff00; color: #000; font-weight: bold;">Guardar Promoción →</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- MODAL: GENERADOR DE VOUCHER CLIENTE (QR + WHATSAPP) -->
+  <div id="generateClientVoucherModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 16px; width: 100%; max-width: 620px; padding: 28px; box-shadow: 0 10px 40px rgba(0,0,0,0.9); max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <div>
+          <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #25D366; letter-spacing: 2px; font-weight: 800;">VOUCHER DIGITAL CON QR</span>
+          <h3 style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 2px 0 0 0; font-size: 1.25rem;">📲 Enviar Voucher de Descuento a Cliente</h3>
+        </div>
+        <button onclick="closeGenerateClientVoucherModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <!-- BOTONES PRESET RÁPIDOS -->
+      <div style="margin-bottom: 18px;">
+        <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace; display: block; margin-bottom: 6px;">ELEGIR BENEFICIO RÁPIDO:</label>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" class="btn-admin btn-admin-sm btn-admin-secondary" onclick="setPresetVoucherType('PERCENTAGE', 100, '🎁 PASE LIBRE - 100% CORTE GRATIS')">🎁 Pase Libre (100% Gratis)</button>
+          <button type="button" class="btn-admin btn-admin-sm btn-admin-secondary" onclick="setPresetVoucherType('PERCENTAGE', 30, '🔥 30% OFF EN TU CORTE')">🔥 30% OFF</button>
+          <button type="button" class="btn-admin btn-admin-sm btn-admin-secondary" onclick="setPresetVoucherType('FIXED_AMOUNT', 2000, '💰 $2.000 OFF EN TU SERVICIO')">💰 $2.000 OFF</button>
+          <button type="button" class="btn-admin btn-admin-sm btn-admin-secondary" onclick="setPresetVoucherType('PERCENTAGE', 50, '🏷️ 50% OFF SEGUNDO CLIENTE')">🏷️ 50% OFF</button>
+        </div>
+      </div>
+
+      <div class="form-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 16px;">
+        <div class="form-group">
+          <label>NOMBRE DEL CLIENTE</label>
+          <input type="text" id="gc_client_name" class="form-control" placeholder="Ej: Juan Pérez" oninput="updateClientVoucherPreview()">
+        </div>
+
+        <div class="form-group">
+          <label>TELÉFONO WHATSAPP</label>
+          <input type="text" id="gc_phone" class="form-control" placeholder="5493834123456" oninput="updateClientVoucherPreview()">
+        </div>
+
+        <div class="form-group">
+          <label>CÓDIGO ÚNICO</label>
+          <div style="display: flex; gap: 6px;">
+            <input type="text" id="gc_code" class="form-control" placeholder="FREEPASS-9X21" style="text-transform: uppercase; font-family: monospace; font-weight: bold; color: #d4ff00;" oninput="updateClientVoucherPreview()">
+            <button type="button" class="btn-admin btn-admin-secondary" onclick="document.getElementById('gc_code').value=generateRandomPromoCode('FREEPASS'); updateClientVoucherPreview();">🎲</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>TIPO & VALOR</label>
+          <div style="display: flex; gap: 6px;">
+            <select id="gc_type" class="form-control" style="width: 55%;" onchange="updateClientVoucherPreview()">
+              <option value="PERCENTAGE">% OFF</option>
+              <option value="FIXED_AMOUNT">$ OFF</option>
+              <option value="FREE_ITEM">100% Gratis</option>
+            </select>
+            <input type="number" id="gc_value" class="form-control" value="100" style="width: 45%;" oninput="updateClientVoucherPreview()">
+          </div>
+        </div>
+
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>DESCRIPCIÓN DEL BENEFICIO</label>
+          <input type="text" id="gc_desc" class="form-control" value="🎁 PASE LIBRE - 100% CORTE GRATIS DE BIENVENIDA" oninput="updateClientVoucherPreview()">
+        </div>
+      </div>
+
+      <!-- PREVIEW CARD CON QR -->
+      <div style="background: #09090c; border: 1px dashed #23232c; border-radius: 12px; padding: 16px; margin-bottom: 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+        <div style="background: #fff; padding: 8px; border-radius: 10px; text-align: center;">
+          <img id="gc_qr_img" src="" alt="QR Voucher Preview" style="width: 140px; height: 140px; display: block;">
+        </div>
+        <div style="flex: 1; min-width: 200px;">
+          <span style="font-size: 0.65rem; color: #10b981; font-weight: bold; letter-spacing: 1px; text-transform: uppercase;">PÁGINA DIGITAL DE VERIFICACIÓN (VOUCHER.HTML)</span>
+          <div style="font-size: 0.75rem; color: #9ca3af; margin: 4px 0 8px 0; word-break: break-all;">
+            Link: <a id="gc_voucher_url" href="#" target="_blank" style="color: #00f2fe; text-decoration: none;">http://127.0.0.1:8000/voucher.html?code=...</a>
+          </div>
+          <label style="font-size: 0.7rem; color: #6b7280;">VISTA PREVIA DEL MENSAJE WHATSAPP:</label>
+          <textarea id="gc_wa_preview" class="form-control" rows="4" style="font-family: monospace; font-size: 0.75rem; margin-top: 2px;" readonly></textarea>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 12px;">
+        <button type="button" onclick="closeGenerateClientVoucherModal()" class="btn-admin btn-admin-secondary">Cancelar</button>
+        <button type="button" onclick="createAndSendClientVoucherWA()" class="btn-admin" style="background: #25D366; color: #000; font-weight: bold; padding: 12px 20px;">
+          💬 Enviar Voucher por WhatsApp →
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST NOTIFICATIONS CONTAINER -->
   <div id="adminToastContainer" class="admin-toast-container"></div>
 
-  <script src="/static/admin.js"></script>
+  <!-- MODULAR ADMIN SCRIPTS -->
+  <script src="/static/js/admin/core.js?v=20261001_1"></script>
+  <script src="/static/js/admin/dashboard.js?v=20261001_1"></script>
+  <script src="/static/js/admin/appointments.js?v=20261001_1"></script>
+  <script src="/static/js/admin/staff.js?v=20261001_1"></script>
+  <script src="/static/js/admin/services.js?v=20261001_1"></script>
+  <script src="/static/js/admin/clients.js?v=20261001_1"></script>
+  <script src="/static/js/admin/stats.js?v=20261001_1"></script>
+  <script src="/static/js/admin/shop.js?v=20261001_1"></script>
+  <script src="/static/js/admin/inventory.js?v=20261001_1"></script>
+  <script src="/static/js/admin/finance.js?v=20261001_1"></script>
+  <script src="/static/js/admin/users.js?v=20261001_1"></script>
+  <script src="/static/js/admin/vouchers.js?v=20261001_1"></script>
+  <script src="/static/js/admin/settings.js?v=20261001_1"></script>
+  <script src="/static/js/admin/backups.js?v=20261001_1"></script>
+  <script src="/static/js/admin/roadmap_features.js?v=20261001_1"></script>
+  <script src="/static/admin.js?v=20261001_1"></script>
 </body>
 </html>
+

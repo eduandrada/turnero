@@ -38,7 +38,7 @@ def test_production_secret_key_aborts_if_missing_or_default(monkeypatch):
     assert "CRÍTICO DE SEGURIDAD" in str(exc_info.value)
 
     # Clave por defecto / plantilla
-    monkeypatch.setenv("APP_SECRET_KEY", "bladesync_secret_key_barberia_2026_x99")
+    monkeypatch.setenv("APP_SECRET_KEY", "hiddensync_secret_key_barberia_2026_x99")
     with pytest.raises(RuntimeError) as exc_info:
         verify_production_secrets()
     assert "CRÍTICO DE SEGURIDAD" in str(exc_info.value)
@@ -63,7 +63,7 @@ def test_development_environment_allows_fallback_secret(monkeypatch):
 
     # No debe lanzar excepción
     verify_production_secrets()
-    assert get_secret_key() == "bladesync_secret_key_barberia_2026_x99"
+    assert get_secret_key() == "hiddensync_secret_key_barberia_2026_x99"
 
 
 # ==============================================================================

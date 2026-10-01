@@ -5,7 +5,7 @@ import logging
 from typing import Optional, Dict, Any, Tuple
 from PIL import Image, ImageOps
 
-logger = logging.getLogger("bladesync.images")
+logger = logging.getLogger("hiddensync.images")
 
 # Configuración del motor de subida
 MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB

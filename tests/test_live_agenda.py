@@ -99,3 +99,27 @@ def test_live_agenda_operational_endpoints_require_auth(client):
 
     res_walkin = client.post("/api/live-agenda/walk-in", json={"client_name": "Hack"})
     assert res_walkin.status_code == 401
+
+def test_live_agenda_finish_and_next_flow(client, encargado_token):
+    """Prueba el cierre ágil de corte 'Sigue el próximo' en un solo click."""
+    headers = {"Authorization": f"Bearer {encargado_token}"}
+
+    # 1. Crear Turno 1 (en silla) y Turno 2 (pendiente)
+    w1 = client.post("/api/live-agenda/walk-in", json={"client_name": "Cliente Uno", "barber_id": 1}, headers=headers).json()
+    w2 = client.post("/api/live-agenda/walk-in", json={"client_name": "Cliente Dos", "barber_id": 1}, headers=headers).json()
+
+    id1, id2 = w1["appointment_id"], w2["appointment_id"]
+
+    # Poner Turno 1 en silla
+    client.post(f"/api/live-agenda/{id1}/status", json={"status": "EN_SILLA"}, headers=headers)
+
+    # 2. Ejecutar 1-click finish and next
+    res_fn = client.post("/api/live-agenda/finish-and-next", json={"appointment_id": id1, "barber_id": 1}, headers=headers)
+    assert res_fn.status_code == 200
+    data = res_fn.json()
+    assert data["status"] == "success"
+    assert data["completed_appointment"]["id"] == id1
+    assert data["next_appointment"]["id"] == id2
+    assert data["speech_text"] is not None
+
+

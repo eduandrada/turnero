@@ -2,7 +2,7 @@
  * Master Multi-Screen Booking Engine & Public App Controller - 2026
  */
 
-// Web Audio API Micro-Sound Synthesizer
+// Web Audio API Micro-Sound Synthesizer (Access Granted & UI Feedback)
 const UISound = {
   ctx: null,
   enabled: true,
@@ -15,9 +15,70 @@ const UISound = {
       this.ctx.resume();
     }
   },
+  _synthGrantedSound(now) {
+    if (!this.ctx) return;
+    try {
+      // Tono 1: Fundamental (G5 = 783.99 Hz)
+      const osc1 = this.ctx.createOscillator();
+      const gain1 = this.ctx.createGain();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(783.99, now);
+      osc1.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+      gain1.gain.setValueAtTime(0.18, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc1.connect(gain1);
+      gain1.connect(this.ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.15);
+
+      // Tono 2: Chime armónico superior Access Granted (E6 = 1318.51 Hz) - entra 0.04s después
+      const osc2 = this.ctx.createOscillator();
+      const gain2 = this.ctx.createGain();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(1318.51, now + 0.04);
+      osc2.frequency.exponentialRampToValueAtTime(1479.98, now + 0.16);
+      gain2.gain.setValueAtTime(0.001, now);
+      gain2.gain.setValueAtTime(0.22, now + 0.04);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+      osc2.connect(gain2);
+      gain2.connect(this.ctx.destination);
+      osc2.start(now + 0.04);
+      osc2.stop(now + 0.28);
+
+      // Sub-click táctil al inicio
+      const clickOsc = this.ctx.createOscillator();
+      const clickGain = this.ctx.createGain();
+      clickOsc.type = "triangle";
+      clickOsc.frequency.setValueAtTime(1200, now);
+      clickOsc.frequency.exponentialRampToValueAtTime(120, now + 0.015);
+      clickGain.gain.setValueAtTime(0.12, now);
+      clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
+      clickOsc.connect(clickGain);
+      clickGain.connect(this.ctx.destination);
+      clickOsc.start(now);
+      clickOsc.stop(now + 0.015);
+    } catch (e) {}
+  },
   play(type = "click") {
     if (!this.enabled) return;
     this.init();
+
+    // Sonido "Notification Access Granted" para selección de opciones
+    if (type === "granted" || type === "select" || type === "access_granted") {
+      const audioEl = document.getElementById("optionSelectAudio");
+      if (audioEl && audioEl.src) {
+        audioEl.currentTime = 0;
+        audioEl.play().catch(() => {
+          if (this.ctx) this._synthGrantedSound(this.ctx.currentTime);
+        });
+        return;
+      }
+      if (this.ctx) {
+        this._synthGrantedSound(this.ctx.currentTime);
+      }
+      return;
+    }
+
     if (!this.ctx) return;
     try {
       const now = this.ctx.currentTime;
@@ -289,9 +350,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function initClock() {
   const clockEl = document.getElementById("liveClock");
+  const dateEl = document.getElementById("liveDate");
   function update() {
     const now = new Date();
-    if (clockEl) clockEl.textContent = now.toTimeString().split(" ")[0] + " ART";
+    if (clockEl) {
+      clockEl.textContent = now.toLocaleTimeString("es-AR", { hour12: false }) + " hs";
+    }
+    if (dateEl) {
+      const options = { weekday: 'short', day: 'numeric', month: 'short' };
+      let dateStr = now.toLocaleDateString('es-AR', options);
+      dateStr = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+      dateEl.textContent = dateStr;
+    }
   }
   update();
   setInterval(update, 1000);
@@ -313,7 +383,16 @@ function applySettingsToUI() {
   const s = state.settings;
   if (!s) return;
 
-  // 1. CSS Theme Variables
+  // 1. CSS Theme Variables & Background Cover
+  const bgUrl = s.cover_image_url || "/static/img/fondo.png";
+  if (bgUrl) {
+    document.body.style.backgroundImage = `linear-gradient(to bottom, rgba(10, 10, 12, 0.82), rgba(10, 10, 12, 0.92)), url('${bgUrl}')`;
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundPosition = 'center center';
+    document.body.style.backgroundAttachment = 'fixed';
+    document.body.style.backgroundRepeat = 'no-repeat';
+  }
+
   const root = document.documentElement;
   if (s.color_primary) {
     root.style.setProperty('--color-primary', s.color_primary);
@@ -345,23 +424,27 @@ function applySettingsToUI() {
 
   const brand = document.getElementById("appBrandTitle");
   if (brand) {
-    if (s.logo_url) {
-      brand.innerHTML = `<img src="${s.logo_url}" alt="${escapeHtml(bName)}" class="h-8 md:h-10 object-contain inline-block mr-2" /> <span class="hidden md:inline">${escapeHtml(bName.toUpperCase())}</span>`;
-    } else {
-      brand.innerHTML = `${escapeHtml(bName.toUpperCase())}<span class="text-neonVolt animate-pulse">_</span>`;
-    }
+    brand.innerHTML = `${escapeHtml(bName.toUpperCase())}<span class="text-neonVolt animate-pulse">_</span>`;
   }
 
-  // Splash Logo
+
+  // Splash Logo Consolidado
   const splashImg = document.getElementById("splashLogoImg");
   const splashIcon = document.getElementById("splashDefaultIcon");
-  if (s.logo_url && splashImg) {
-    splashImg.src = s.logo_url;
+  if (splashImg) {
+    const targetLogo = s.logo_url || "/static/img/logo.png";
+    splashImg.src = targetLogo;
     splashImg.classList.remove("hidden");
     if (splashIcon) splashIcon.classList.add("hidden");
-  } else if (splashImg && splashIcon) {
-    splashImg.classList.add("hidden");
-    splashIcon.classList.remove("hidden");
+
+    splashImg.onerror = () => {
+      if (!splashImg.src.endsWith("/static/img/logo.png")) {
+        splashImg.src = "/static/img/logo.png";
+      } else if (splashIcon) {
+        splashImg.classList.add("hidden");
+        splashIcon.classList.remove("hidden");
+      }
+    };
   }
 
   const st = document.getElementById("splashTitleText");
@@ -394,6 +477,150 @@ function applySettingsToUI() {
     const bd = document.getElementById("textBarbersDesc");
     if (bd) bd.textContent = s.text_barbers;
   }
+
+  // Renderizar estado Abierto/Cerrado y Horarios de atención en la portada
+  renderShopStatusAndHours(s.business_hours);
+}
+
+function renderShopStatusAndHours(businessHoursRaw) {
+  const container = document.getElementById("shopStatusBanner");
+  if (!container) return;
+
+  let hoursObj = null;
+  try {
+    hoursObj = typeof businessHoursRaw === "string" ? JSON.parse(businessHoursRaw) : businessHoursRaw;
+  } catch (e) {
+    hoursObj = null;
+  }
+
+  if (!hoursObj) {
+    hoursObj = {
+      "Lunes": { active: true, open: "09:00", close: "20:00" },
+      "Martes": { active: true, open: "09:00", close: "20:00" },
+      "Miércoles": { active: true, open: "09:00", close: "20:00" },
+      "Jueves": { active: true, open: "09:00", close: "20:00" },
+      "Viernes": { active: true, open: "09:00", close: "20:00" },
+      "Sábado": { active: true, open: "09:00", close: "18:00" },
+      "Domingo": { active: false, open: "09:00", close: "14:00" }
+    };
+  }
+
+  const dayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  const now = new Date();
+
+  // Obtener nombre de día y hora según Argentina (ART)
+  const argDateStr = now.toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", weekday: "long" });
+  const dayNameCap = argDateStr.charAt(0).toUpperCase() + argDateStr.slice(1).toLowerCase();
+  
+  // Normalizar acento de Miércoles / Sábado si difiere
+  let currentDayKey = dayNames.find(d => d.toLowerCase() === dayNameCap.toLowerCase()) || dayNames[now.getDay()];
+
+  const argTimeStr = now.toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hour12: false });
+
+  const todayData = hoursObj[currentDayKey];
+
+  const statusTextEl = document.getElementById("shopStatusText");
+  const todaySchedEl = document.getElementById("shopTodaySchedule");
+  const badgeDotEl = document.getElementById("shopStatusBadgeDot");
+  const pingEl = document.getElementById("shopStatusPing");
+
+  let statusLabel = "";
+  let statusColorClass = "text-emerald-400";
+  let dotBgClass = "bg-emerald-500";
+  let pingBgClass = "bg-emerald-400";
+  let todayText = "";
+
+  if (!todayData || !todayData.active) {
+    statusLabel = "CERRADO HOY";
+    statusColorClass = "text-rose-400";
+    dotBgClass = "bg-rose-500";
+    pingBgClass = "bg-rose-400";
+    todayText = "Hoy: Cerrado";
+  } else {
+    const openTime = todayData.open || "09:00";
+    const closeTime = todayData.close || "20:00";
+    const pauseStart = todayData.pause_start || "";
+    const pauseEnd = todayData.pause_end || "";
+
+    todayText = `Hoy: ${openTime} - ${closeTime} hs`;
+
+    const inPause = pauseStart && pauseEnd && (argTimeStr >= pauseStart && argTimeStr < pauseEnd);
+
+    if (inPause) {
+      statusLabel = "RECESO / PAUSA";
+      statusColorClass = "text-amber-400";
+      dotBgClass = "bg-amber-500";
+      pingBgClass = "bg-amber-400";
+      todayText = `Receso. Reabre a las ${pauseEnd} hs`;
+    } else if (argTimeStr >= openTime && argTimeStr < closeTime) {
+      statusLabel = "ABIERTO AHORA";
+      statusColorClass = "text-emerald-400";
+      dotBgClass = "bg-emerald-500";
+      pingBgClass = "bg-emerald-400";
+    } else if (argTimeStr < openTime) {
+      statusLabel = "CERRADO AHORA";
+      statusColorClass = "text-amber-400";
+      dotBgClass = "bg-amber-500";
+      pingBgClass = "bg-amber-400";
+      todayText = `Abre hoy a las ${openTime} hs`;
+    } else {
+      statusLabel = "CERRADO AHORA";
+      statusColorClass = "text-amber-400";
+      dotBgClass = "bg-amber-500";
+      pingBgClass = "bg-amber-400";
+      todayText = `Cerró a las ${closeTime} hs`;
+    }
+  }
+
+  if (statusTextEl) {
+    statusTextEl.textContent = statusLabel;
+    statusTextEl.className = `text-xs font-mono font-bold tracking-wide ${statusColorClass} uppercase`;
+  }
+  if (todaySchedEl) todaySchedEl.textContent = todayText;
+  if (badgeDotEl) badgeDotEl.className = `relative inline-flex rounded-full h-3 w-3 ${dotBgClass}`;
+  if (pingEl) pingEl.className = `animate-ping absolute inline-flex h-full w-full rounded-full ${pingBgClass} opacity-75`;
+
+  // Renderizar la lista desplegable de horarios semanales
+  const dropdown = document.getElementById("fullHoursDropdown");
+  if (dropdown) {
+    const listDays = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+    dropdown.innerHTML = listDays.map(d => {
+      const item = hoursObj[d];
+      const isToday = (d === currentDayKey);
+      const todayHighlight = isToday ? "text-neonVolt font-bold bg-neonVolt/10 border border-neonVolt/30 px-2 py-1 rounded-lg" : "text-gray-300 py-1";
+      
+      let schedText = "Cerrado";
+      if (item && item.active) {
+        schedText = `${item.open} - ${item.close} hs`;
+        if (item.pause_start && item.pause_end) {
+          schedText += ` (Pausa ${item.pause_start}-${item.pause_end})`;
+        }
+      }
+
+      return `
+        <div class="flex justify-between items-center border-b border-surfaceBorder/40 last:border-none ${todayHighlight}">
+          <span>${d}${isToday ? " (Hoy)" : ""}</span>
+          <span class="${item && item.active ? (isToday ? 'text-neonVolt' : 'text-gray-200') : 'text-rose-400/80'}">${schedText}</span>
+        </div>
+      `;
+    }).join("");
+  }
+}
+
+function toggleFullHoursDropdown() {
+  if (window.UISound) UISound.play("click");
+  const dropdown = document.getElementById("fullHoursDropdown");
+  const arrow = document.getElementById("arrowHoursDropdown");
+  if (!dropdown) return;
+
+  const isHidden = dropdown.classList.contains("hidden");
+  if (isHidden) {
+    dropdown.classList.remove("hidden");
+    if (arrow) arrow.style.transform = "rotate(180deg)";
+  } else {
+    dropdown.classList.add("hidden");
+    if (arrow) arrow.style.transform = "rotate(0deg)";
+  }
 }
 
 function getLocalDateString(d = new Date()) {
@@ -415,6 +642,7 @@ function initDatePicker() {
 }
 
 function setQuickDate(offsetDays) {
+  UISound.play("granted");
   const target = new Date();
   target.setDate(target.getDate() + offsetDays);
   const dateStr = getLocalDateString(target);
@@ -541,6 +769,7 @@ function selectBarber(barberId, isUserClick = false) {
   updateNavigationUI(state.currentScreen);
 
   if (isUserClick) {
+    UISound.play("granted");
     setTimeout(() => { continueToServices(); }, 180);
   }
 }
@@ -614,6 +843,7 @@ function selectService(serviceId, isUserClick = false) {
   updateNavigationUI(state.currentScreen);
 
   if (isUserClick) {
+    UISound.play("granted");
     setTimeout(() => { continueToAgenda(); }, 180);
   }
 }
@@ -663,6 +893,7 @@ function renderSlots(slots) {
     if (slot.available) {
       btn.className = "py-2.5 rounded-xl text-xs font-mono font-bold border border-surfaceBorder bg-surface text-gray-200 hover:border-neonVolt hover:text-white transition active:scale-95 cursor-pointer";
       btn.onclick = () => {
+        UISound.play("granted");
         document.querySelectorAll("#slotsContainer button").forEach(b => {
           if (!b.disabled) b.className = "py-2.5 rounded-xl text-xs font-mono font-bold border border-surfaceBorder bg-surface text-gray-200 hover:border-neonVolt hover:text-white transition active:scale-95 cursor-pointer";
         });
@@ -799,6 +1030,37 @@ async function submitBooking() {
 
     const data = await res.json();
     if (res.ok) {
+      // Registrar Push PWA en el navegador del cliente para recordatorios 2hs antes
+      registerPWAWebPush(phone);
+
+      // Verificación de Señas & Pasarela de Pagos
+      try {
+        const resPayCfg = await fetch("/api/payments/config");
+        const payCfg = await resPayCfg.json();
+        if (payCfg.enabled && data.appointment) {
+          const depositAmount = (data.appointment.service_price_snapshot || state.selectedService.price) * (payCfg.deposit_percentage / 100.0);
+          const prefRes = await fetch("/api/payments/create-preference", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              appointment_id: data.appointment.id,
+              amount: depositAmount,
+              description: `Seña ${payCfg.deposit_percentage}%: ${state.selectedService.name}`,
+              client_name: name,
+              client_phone: phone
+            })
+          });
+          const prefData = await prefRes.json();
+          if (prefData.init_point) {
+            data.appointment.payment_link = prefData.init_point;
+            data.appointment.deposit_amount = depositAmount;
+            data.appointment.deposit_percentage = payCfg.deposit_percentage;
+          }
+        }
+      } catch (ex) {
+        console.warn("Pasarela señas flow:", ex);
+      }
+
       showSuccessModal(data.appointment);
       state.selectedSlot = null;
     } else {
@@ -812,6 +1074,48 @@ async function submitBooking() {
   }
 }
 
+async function registerPWAWebPush(clientPhone) {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      const resCfg = await fetch("/api/push/config");
+      const cfg = await resCfg.json();
+      if (!cfg.enabled || !cfg.vapid_public_key) return;
+
+      const convertedVapidKey = urlBase64ToUint8Array(cfg.vapid_public_key);
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: convertedVapidKey
+      });
+    }
+
+    const subJson = sub.toJSON();
+    await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        endpoint: subJson.endpoint,
+        p256dh: subJson.keys.p256dh,
+        auth: subJson.keys.auth,
+        client_phone: clientPhone
+      })
+    });
+  } catch (e) {}
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 function showSuccessModal(appt) {
   UISound.play("success");
   const modal = document.getElementById("successModal");
@@ -823,8 +1127,39 @@ function showSuccessModal(appt) {
   const timeFormatted = timePart.substring(0, 5);
 
   title.textContent = `¡Turno Asignado #${appt.id}!`;
+  let depositInfoHTML = "";
+  if (appt.payment_link) {
+    depositInfoHTML = `
+      <div style="background: rgba(212, 255, 0, 0.12); border: 1px solid #d4ff00; border-radius: 12px; padding: 14px; margin: 14px 0; text-align: center;">
+        <span style="color: #d4ff00; font-family: monospace; font-size: 0.75rem; font-weight: bold; text-transform: uppercase;">💳 SEÑA PREVIA REQUERIDA (${appt.deposit_percentage}%)</span>
+        <div style="font-size: 1.2rem; font-weight: bold; color: #fff; margin: 4px 0;">Monto Seña: $${appt.deposit_amount.toLocaleString('es-AR')}</div>
+        <a href="${appt.payment_link}" target="_blank" class="block w-full py-3 mt-2 bg-neonVolt text-obsidian font-mono font-bold rounded-xl text-center shadow-volt">
+          ⚡ PAGAR SEÑA AHORA (MERCADO PAGO / STRIPE) →
+        </a>
+      </div>
+    `;
+  }
+
+  const pinCode = appt.checkin_pin || appt.checkin_token || String(appt.id).padStart(4, '0');
+
+  const checkinPinHTML = `
+    <div style="background: rgba(0, 242, 254, 0.08); border: 1px dashed rgba(0, 242, 254, 0.4); border-radius: 14px; padding: 14px; margin: 14px 0; text-align: center;">
+      <span style="color: #00f2fe; font-family: monospace; font-size: 0.75rem; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase;">
+        📍 TU PIN DE LLEGADA / TOTEM DE ENTRADA
+      </span>
+      <div style="font-size: 2.2rem; font-weight: 900; color: #ffffff; font-family: 'Space Grotesk', monospace; letter-spacing: 6px; margin: 6px 0; text-shadow: 0 0 20px rgba(0, 242, 254, 0.4);">
+        ${pinCode}
+      </div>
+      <p style="font-size: 0.8rem; color: #94a3b8; margin: 0; line-height: 1.4;">
+        Al llegar a la barbería, ingresá este <strong>PIN de 4 dígitos</strong> o tu <strong>teléfono</strong> en el Totem de recepción para anunciar tu llegada y sentarte en la sala de espera.
+      </p>
+    </div>
+  `;
+
   msg.innerHTML = `
     <strong>${escapeHtml(appt.client_name)}</strong>, tu cita para <strong>${escapeHtml(appt.service)}</strong> con <strong>${escapeHtml(appt.barber_name)}</strong> ha sido agendada para el <strong>${d}/${m}/${y} a las ${timeFormatted} hs</strong>.
+    ${checkinPinHTML}
+    ${depositInfoHTML}
   `;
 
   // Configurar enlace directo de WhatsApp para el cliente
@@ -837,7 +1172,8 @@ function showSuccessModal(appt) {
       `👤 Cliente: ${appt.client_name}\n` +
       `✂️ Servicio: ${appt.service}\n` +
       `💈 Barbero: ${appt.barber_name}\n` +
-      `📅 Fecha: ${d}/${m}/${y} a las ${timeFormatted} hs\n\n` +
+      `📅 Fecha: ${d}/${m}/${y} a las ${timeFormatted} hs\n` +
+      `🔑 PIN de Check-in: ${pinCode}\n\n` +
       `¡Muchas gracias!`
     );
     if (shopPhone) {
@@ -849,7 +1185,6 @@ function showSuccessModal(appt) {
   }
 
   modal.classList.remove("hidden");
-
 }
 
 function closeModal() {

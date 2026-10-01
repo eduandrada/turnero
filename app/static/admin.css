@@ -370,14 +370,16 @@ body {
 }
 
 /* Cards & Grid */
-.stats-grid {
+.stats-grid,
+.kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
 }
 
-.stat-card {
+.stat-card,
+.kpi-card {
   background: var(--admin-surface);
   border: 1px solid var(--admin-border);
   border-radius: var(--admin-radius);
@@ -385,26 +387,38 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.stat-card-label {
+.kpi-card:hover,
+.stat-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(212, 255, 0, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.stat-card-label,
+.kpi-title {
   font-size: 0.75rem;
   font-family: 'Space Grotesk', monospace;
   color: var(--admin-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  font-weight: 700;
 }
 
-.stat-card-value {
+.stat-card-value,
+.kpi-value {
   font-size: 1.6rem;
   font-family: 'Space Grotesk', monospace;
   font-weight: 800;
   color: #ffffff;
 }
 
-.stat-card-sub {
+.stat-card-sub,
+.kpi-sub {
   font-size: 0.75rem;
-  color: var(--admin-primary);
+  color: var(--admin-text-muted);
 }
 
 .admin-dashboard-widgets {
@@ -845,18 +859,21 @@ button:active, a:active, .btn-admin:active {
     padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   }
 
-  .stats-grid {
+  .stats-grid,
+  .kpi-grid {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 10px;
     margin-bottom: 16px;
   }
 
-  .stat-card {
+  .stat-card,
+  .kpi-card {
     padding: 12px 14px;
     gap: 3px;
   }
 
-  .stat-card-value {
+  .stat-card-value,
+  .kpi-value {
     font-size: 1.35rem;
   }
 
@@ -926,7 +943,8 @@ button:active, a:active, .btn-admin:active {
 }
 
 @media (max-width: 360px) {
-  .stats-grid {
+  .stats-grid,
+  .kpi-grid {
     grid-template-columns: 1fr !important;
   }
 

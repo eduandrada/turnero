@@ -1,6 +1,6 @@
 """
 app/rate_limiter.py - Rate Limiter Liviano y Eficiente en Memoria
-BladeSync AI 2026
+HiddenSYNC AI 2026
 
 Protege la API contra ataques de fuerza bruta, abuso y scraping:
 - /api/admin/login: máximo 6 intentos por minuto por IP.

@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0c">
   <meta name="description" content="Turnero - Sistema de reservas de alta gama para barberías de autor y shop de productos profesionales.">
-  <title id="headTitle">Turnero // Reservas & Shop</title>
+  <link rel="icon" type="image/png" href="/static/img/icono2.png">
+  <link rel="apple-touch-icon" href="/static/img/icono.png">
   <link rel="manifest" href="/manifest.json">
 
   <!-- Tailwind CSS CDN -->
@@ -54,8 +55,12 @@
     body {
       background-color: var(--color-background, #0a0a0c);
       background-image: 
-        radial-gradient(at 15% 10%, rgba(212, 255, 0, 0.05) 0px, transparent 40%),
-        radial-gradient(at 85% 90%, rgba(0, 242, 254, 0.04) 0px, transparent 45%);
+        linear-gradient(to bottom, rgba(10, 10, 12, 0.82), rgba(10, 10, 12, 0.92)),
+        url('/static/img/fondo.png');
+      background-size: cover;
+      background-position: center center;
+      background-attachment: fixed;
+      background-repeat: no-repeat;
       color: var(--color-text, #f3f4f6);
       min-height: 100vh;
       -webkit-tap-highlight-color: transparent;
@@ -102,46 +107,34 @@
 
   <!-- REPRODUCTOR DE MÚSICA DE FONDO (AUDIO ONLY, SIN VIDEO VISIBLE) -->
   <audio id="bgMusicPlayer" loop preload="metadata" src="/static/musica%20punchi/punchi.mp3"></audio>
+  <!-- SONIDO DE CONFIRMACIÓN / SELECCIÓN DE OPCIÓN (NOTIFICATION ACCESS GRANTED) -->
+  <audio id="optionSelectAudio" preload="auto" src="/static/sounds/notification-access-granted.mp3"></audio>
 
   <!-- Main Container Mobile First -->
   <div class="w-full max-w-lg flex flex-col gap-4 pb-20">
     
-    <!-- Top Bar & Brand Identity (Siempre Visible) -->
-    <header class="flex justify-between items-center pt-2 px-1">
-      <div onclick="navigateTo('screen-intro')" class="cursor-pointer group">
+    <!-- Top Bar & Brand Identity (Centrado de Alta Gama - Sin Logo de Arriba) -->
+    <header class="w-full flex flex-col items-center justify-center text-center pt-3 pb-2 px-2 gap-2">
+      <div onclick="navigateTo('screen-intro')" class="cursor-pointer group flex flex-col items-center gap-1">
         <div class="flex items-center gap-2">
-          <span class="text-[10px] font-mono tracking-widest text-neonVolt uppercase font-bold px-2 py-0.5 rounded bg-neonVolt/10 border border-neonVolt/20" id="badgeEst">EST. 2026</span>
-          <span class="text-[10px] font-mono tracking-widest text-neonCyan uppercase font-bold" id="badgeSub">ATELIER DE AUTOR</span>
+          <img src="/static/img/icono2.png" alt="Emblema 2026" class="w-6 h-6 object-contain drop-shadow-[0_0_8px_rgba(212,255,0,0.4)] transition-transform group-hover:scale-110" />
+          <span class="text-[10px] font-mono tracking-widest text-neonVolt uppercase font-black px-2.5 py-0.5 rounded-full bg-neonVolt/10 border border-neonVolt/30 shadow-sm" id="badgeEst">EST. 2026</span>
+          <span class="text-[10px] font-mono tracking-widest text-neonCyan uppercase font-extrabold" id="badgeSub">ATELIER DE AUTOR</span>
         </div>
-        <h1 class="text-xl sm:text-2xl font-extrabold font-mono tracking-tight text-white mt-0.5 flex items-center group-hover:text-neonVolt transition" id="appBrandTitle">
-          BARBERÍA<span class="text-neonVolt animate-pulse">_</span>
+        <h1 class="text-2xl sm:text-3xl font-black font-mono tracking-tight text-white group-hover:text-neonVolt transition-colors flex items-center justify-center gap-0.5 mt-0.5" id="appBrandTitle">
+          PEREYRAS BARBERS<span class="text-neonVolt animate-pulse">_</span>
         </h1>
       </div>
 
-      <div class="flex flex-col items-end gap-1.5">
-        <!-- BOTÓN MUTE / DESMUTE MÚSICA DE FONDO -->
-        <div class="flex items-center gap-2">
-          <button type="button" id="btnAudioToggle" onclick="toggleBgMusic()" class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface border border-surfaceBorder text-[11px] font-mono font-bold text-neonVolt hover:border-neonVolt/50 transition">
-            <span id="audioIcon">🔇</span>
-            <span id="audioText">Música</span>
-          </button>
-          
-          <button type="button" onclick="openAgendaLoginModal()" title="Abrir Pantalla Sala de Espera en Vivo" class="flex items-center gap-1.5 bg-surface hover:bg-white/5 hover:border-neonVolt/50 transition px-2.5 py-1 rounded-full border border-surfaceBorder shadow-sm text-gray-200 hover:text-white">
-            <span class="relative flex h-2 w-2">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-neonVolt opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-neonVolt"></span>
-            </span>
-            <span class="text-[11px] font-mono font-medium">AGENDA EN VIVO →</span>
-          </button>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <button type="button" onclick="openAgendaLoginModal()" class="text-[11px] font-mono text-[#d4ff00] hover:underline font-bold bg-transparent border-none p-0 cursor-pointer">📋 Turnos en Vivo</button>
-          <span class="text-gray-600">•</span>
-          <a href="/shop.html" class="text-[11px] font-mono text-neonCyan hover:underline">🛍️ Shop Barber</a>
-          <span class="text-gray-600">•</span>
-          <span class="text-[10px] font-mono text-gray-400" id="liveClock">00:00:00</span>
-        </div>
+      <!-- Pastilla Integrada con Fecha y Hora en Tiempo Real -->
+      <div class="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surfaceElevated/90 border border-surfaceBorder shadow-md text-xs font-mono">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-neonVolt opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-neonVolt"></span>
+        </span>
+        <span id="liveDate" class="text-gray-300 font-semibold tracking-wide">Miércoles, 30 Sep</span>
+        <span class="text-gray-600 font-bold">•</span>
+        <span id="liveClock" class="text-neonVolt font-extrabold tracking-wider">19:05:00 hs</span>
       </div>
     </header>
 
@@ -172,63 +165,97 @@
 
 
     <!-- PANTALLA 0: INTRO / SPLASH CON LOGO -->
-    <section id="screen-intro" class="screen-view glass-card rounded-3xl p-6 sm:p-8 flex flex-col items-center text-center gap-6 shadow-cyber border border-surfaceBorder relative overflow-hidden animate-fade-in">
+    <section id="screen-intro" class="screen-view glass-card rounded-3xl p-6 sm:p-8 flex flex-col items-center text-center gap-5 shadow-cyber border border-surfaceBorder relative overflow-hidden animate-fade-in">
       <div class="absolute -right-20 -top-20 w-48 h-48 bg-neonVolt/10 rounded-full blur-3xl pointer-events-none"></div>
       <div class="absolute -left-20 -bottom-20 w-48 h-48 bg-neonCyan/10 rounded-full blur-3xl pointer-events-none"></div>
 
-      <!-- Logo Badge -->
-      <div class="relative w-28 h-28 rounded-full bg-gradient-to-tr from-surfaceElevated to-surface flex items-center justify-center border-2 border-neonVolt/40 shadow-volt-md">
-        <img id="splashLogoImg" class="w-20 h-20 object-contain hidden" alt="Logo" />
-        <svg id="splashDefaultIcon" class="w-16 h-16 text-neonVolt" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Logo Badge Integrado y Flotante (Sin Fondo) -->
+      <div class="relative w-40 h-40 sm:w-48 sm:h-48 flex items-center justify-center hover:scale-105 transition-all duration-300 group">
+        <img id="splashLogoImg" src="/static/img/logo.png" class="w-full h-full object-contain transition-all duration-300 group-hover:scale-110 drop-shadow-[0_0_24px_rgba(212,255,0,0.45)]" alt="Logo Barbería" />
+        <svg id="splashDefaultIcon" class="w-20 h-20 text-neonVolt hidden" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="32" cy="32" r="30" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.3"/>
           <path d="M20 18L44 46M24 16C21 16 18 19 18 22C18 25 21 28 24 28C27 28 30 25 30 22C30 19 27 16 24 16Z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
           <path d="M44 18L20 46M40 16C43 16 46 19 46 22C46 25 43 28 40 28C37 28 34 25 34 22C34 19 37 16 40 16Z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
           <line x1="32" y1="28" x2="32" y2="48" stroke="#00f2fe" stroke-width="2.5" stroke-linecap="round"/>
           <circle cx="32" cy="28" r="2.5" fill="#00f2fe"/>
         </svg>
-        <span class="absolute -bottom-2 bg-obsidian text-neonVolt text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border border-neonVolt/40 tracking-widest uppercase" id="splashBadgeText">
+        <span class="absolute -bottom-2 bg-obsidian/90 text-neonVolt text-[10px] font-mono font-bold px-3 py-0.5 rounded-full border border-neonVolt/60 tracking-widest uppercase shadow-md backdrop-blur-md" id="splashBadgeText">
           BARBERÍA
         </span>
       </div>
 
-      <div class="flex flex-col gap-1.5 max-w-sm">
+      <div class="flex flex-col gap-1 max-w-sm">
         <h2 class="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-white" id="splashTitleText">
-          BARBERÍA & SHOP
+          PEREYRAS BARBERS
         </h2>
         <p class="text-xs sm:text-sm text-gray-300 leading-relaxed" id="splashSubText">
-          Tu estilo comienza acá. Reservá tu turno en 60 segundos o visitá nuestra tienda Shop Barber.
+          Tu estilo comienza acá.
         </p>
       </div>
 
-      <!-- Highlights Pills -->
-      <div class="grid grid-cols-3 gap-2 w-full max-w-xs text-[10px] font-mono text-gray-300">
-        <div class="bg-surfaceElevated border border-surfaceBorder rounded-xl p-2 flex flex-col items-center">
-          <span class="text-neonVolt text-sm mb-0.5">💈</span>
-          <span>Barberos Top</span>
+      <!-- ESTADO DE LA BARBERÍA Y HORARIOS DE ATENCIÓN EN TIEMPO REAL -->
+      <div id="shopStatusBanner" class="w-full max-w-xs bg-surfaceElevated/90 border border-surfaceBorder rounded-2xl p-3 flex flex-col gap-2 transition-all shadow-sm text-left">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="relative flex h-3 w-3" id="shopStatusDotContainer">
+              <span id="shopStatusPing" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span id="shopStatusBadgeDot" class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            </span>
+            <span id="shopStatusText" class="text-xs font-mono font-bold tracking-wide text-emerald-400 uppercase">
+              ABIERTO AHORA
+            </span>
+          </div>
+          <span id="shopTodaySchedule" class="text-[11px] font-mono text-gray-300 font-semibold">
+            Hoy: 09:00 - 20:00 hs
+          </span>
         </div>
-        <div class="bg-surfaceElevated border border-surfaceBorder rounded-xl p-2 flex flex-col items-center">
-          <span class="text-neonVolt text-sm mb-0.5">⚡</span>
-          <span>Visagismo IA</span>
+
+        <!-- Botón desplegable para ver la grilla completa de horarios -->
+        <button type="button" onclick="toggleFullHoursDropdown()" class="text-[10px] font-mono text-gray-400 hover:text-neonVolt flex items-center justify-between w-full pt-1.5 border-t border-surfaceBorder/60 transition">
+          <span>📅 Ver Horarios Semanales de Atención</span>
+          <span id="arrowHoursDropdown" class="transition-transform duration-200">▼</span>
+        </button>
+
+        <!-- Grilla de Horarios desplegable -->
+        <div id="fullHoursDropdown" class="hidden flex-col gap-1 pt-2 border-t border-surfaceBorder text-[11px] font-mono">
+          <!-- Renderizado dinámico desde app.js -->
         </div>
-        <a href="/shop.html" class="bg-surfaceElevated border border-surfaceBorder rounded-xl p-2 flex flex-col items-center hover:border-neonCyan transition">
-          <span class="text-neonCyan text-sm mb-0.5">🛍️</span>
-          <span>Shop Barber</span>
-        </a>
       </div>
 
-      <!-- Action Button -->
-      <div class="flex flex-col gap-2 w-full max-w-xs">
-        <button type="button" onclick="navigateTo('screen-barber')" class="w-full py-4 px-6 rounded-2xl bg-neonVolt text-obsidian font-mono font-bold text-sm hover:bg-neonVolt/90 active:scale-[0.98] transition shadow-volt-md flex items-center justify-center gap-2">
+      <!-- Botones de Acción Integrados con Iconos 3D Premium -->
+      <div class="grid grid-cols-3 gap-2 w-full max-w-xs font-mono">
+        <button type="button" id="btnAudioToggle" onclick="toggleBgMusic()" class="bg-surfaceElevated hover:bg-white/5 border border-surfaceBorder hover:border-neonVolt/40 rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 transition active:scale-95 shadow-sm text-neonVolt group">
+          <span id="audioIcon" class="text-base group-hover:scale-110 transition-transform">🔊</span>
+          <span id="audioText" class="text-[10px] font-bold text-gray-200 tracking-tight">Música ON</span>
+        </button>
+
+        <button type="button" onclick="openAgendaLoginModal()" class="bg-surfaceElevated hover:bg-white/5 border border-surfaceBorder hover:border-neonVolt/40 rounded-xl p-2 flex flex-col items-center justify-center gap-0.5 transition active:scale-95 shadow-sm text-gray-200 hover:text-white group" title="Acceso restringido para Staff">
+          <img src="/static/img/icono.png" class="w-6 h-6 object-contain group-hover:scale-110 transition-transform drop-shadow-[0_0_8px_rgba(0,242,254,0.6)]" alt="Icono Agenda" />
+          <span class="text-[10px] font-bold tracking-tight text-white uppercase group-hover:text-neonVolt transition">AGENDA TV</span>
+          <span class="text-[9px] font-mono text-neonCyan font-bold flex items-center gap-0.5 leading-none">🔒 Staff</span>
+        </button>
+
+        <button type="button" onclick="openAgendaLoginModal()" class="bg-surfaceElevated hover:bg-white/5 border border-surfaceBorder hover:border-neonVolt/40 rounded-xl p-2 flex flex-col items-center justify-center gap-0.5 transition active:scale-95 shadow-sm text-neonVolt group" title="Acceso restringido para Staff">
+          <img src="/static/img/icono2.png" class="w-6 h-6 object-contain group-hover:scale-110 transition-transform drop-shadow-[0_0_8px_rgba(212,255,0,0.6)]" alt="Icono Turnos" />
+          <span class="text-[10px] font-bold text-gray-200 tracking-tight group-hover:text-neonVolt transition">Turnos Vivo</span>
+          <span class="text-[9px] font-mono text-neonVolt font-bold flex items-center gap-0.5 leading-none">🔒 Staff</span>
+        </button>
+      </div>
+
+      <!-- Action Buttons Main -->
+      <div class="flex flex-col gap-2.5 w-full max-w-xs mt-1">
+        <button type="button" onclick="navigateTo('screen-barber')" class="w-full py-4 px-6 rounded-2xl bg-neonVolt text-obsidian font-mono font-extrabold text-sm hover:bg-neonVolt/90 active:scale-[0.98] transition shadow-volt-md flex items-center justify-center gap-2 tracking-wide">
           <span>RESERVAR TURNO</span>
           <span class="text-base font-extrabold">→</span>
         </button>
 
-        <a href="/shop.html" class="w-full py-3 px-6 rounded-2xl bg-surfaceElevated border border-surfaceBorder text-neonCyan font-mono font-bold text-xs hover:border-neonCyan transition flex items-center justify-center gap-2">
-          <span>VER SHOP DE PRODUCTOS</span>
-          <span>🛍️</span>
+        <a href="/shop.html" class="w-full py-3 px-6 rounded-2xl bg-surfaceElevated border border-surfaceBorder text-neonCyan font-mono font-bold text-xs hover:border-neonCyan hover:bg-neonCyan/5 transition flex items-center justify-center gap-2 shadow-sm">
+          <span>🛍️ SHOP BARBER</span>
+          <span>→</span>
         </a>
       </div>
     </section>
+
 
 
     <!-- PANTALLA 1: ELEGIR BARBERO/A -->
@@ -478,9 +505,9 @@
   <script src="/static/app.js"></script>
   <script>
     function openAgendaLoginModal() {
-      const token = localStorage.getItem("bladesync_admin_token");
+      const token = localStorage.getItem("hiddensync_admin_token") || localStorage.getItem("bladesync_admin_token");
       if (token) {
-        window.location.href = "/turnos.html";
+        window.location.href = "/turnolive.html";
       } else {
         document.getElementById("unifiedLoginModal").classList.remove("hidden");
       }
@@ -498,9 +525,11 @@
           body: JSON.stringify({ username: u, password: p })
         });
         const data = await res.json();
-        if (res.ok && data.token) {
-          localStorage.setItem("bladesync_admin_token", data.token);
-          window.location.href = "/turnos.html";
+        const token = data.access_token || data.token;
+        if (res.ok && token) {
+          localStorage.setItem("hiddensync_admin_token", token);
+          localStorage.setItem("bladesync_admin_token", token);
+          window.location.href = "/turnolive.html";
         } else {
           alert(data.detail || "Credenciales incorrectas.");
         }

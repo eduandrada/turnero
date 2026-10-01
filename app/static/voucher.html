@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Vóucher Digital // Pereyras Barbers</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0c;
+      color: #f3f4f6;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      position: relative;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: '';
+      position: absolute;
+      top: -20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(210, 255, 0, 0.08) 0%, rgba(0, 0, 0, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .voucher-card {
+      background: #131318;
+      border: 1px solid #23232c;
+      border-radius: 24px;
+      width: 100%;
+      max-width: 440px;
+      padding: 32px 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9), 0 0 30px rgba(210, 255, 0, 0.05);
+      position: relative;
+      z-index: 10;
+      text-align: center;
+      backdrop-filter: blur(16px);
+    }
+    .brand {
+      font-family: 'Space Grotesk', monospace;
+      font-size: 1.3rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      color: #fff;
+      margin-bottom: 20px;
+    }
+    .brand span { color: #d2ff00; }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-family: 'Space Grotesk', monospace;
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .badge-valid {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+    }
+    .badge-invalid {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+    .promo-title {
+      font-family: 'Space Grotesk', monospace;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1.25;
+      margin-bottom: 12px;
+    }
+    .promo-desc {
+      font-size: 0.88rem;
+      color: #9ca3af;
+      margin-bottom: 24px;
+      line-height: 1.4;
+    }
+    .qr-container {
+      background: #ffffff;
+      padding: 16px;
+      border-radius: 18px;
+      display: inline-block;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    .qr-container img {
+      width: 190px;
+      height: 190px;
+      display: block;
+    }
+    .code-box {
+      background: #09090c;
+      border: 1px dashed #333340;
+      border-radius: 14px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .code-text {
+      font-family: 'Space Grotesk', monospace;
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #d2ff00;
+    }
+    .btn-copy {
+      background: #23232c;
+      color: #fff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-copy:hover { background: #333340; }
+    .btn-action {
+      background: #d2ff00;
+      color: #0a0a0c;
+      font-family: 'Space Grotesk', monospace;
+      font-weight: 800;
+      font-size: 0.95rem;
+      border: none;
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      text-decoration: none;
+      display: block;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-bottom: 10px;
+    }
+    .btn-action:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(210, 255, 0, 0.3);
+    }
+    .btn-sec {
+      background: transparent;
+      color: #9ca3af;
+      border: 1px solid #23232c;
+      font-size: 0.85rem;
+      padding: 10px;
+      border-radius: 10px;
+      width: 100%;
+      cursor: pointer;
+      text-decoration: none;
+      display: block;
+    }
+    .btn-sec:hover { color: #fff; border-color: #444; }
+  </style>
+</head>
+<body>
+
+  <div class="voucher-card">
+    <div class="brand">PEREYRAS <span>//</span> BARBERS</div>
+
+    <div id="voucherContent">
+      <p style="color: #9ca3af; font-size: 0.9rem;">Verificando voucher promocional...</p>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code") || "";
+      if (code) {
+        verifyVoucher(code);
+      } else {
+        renderError("No se especificó un código de voucher en la URL.");
+      }
+    });
+
+    async function verifyVoucher(code) {
+      try {
+        const res = await fetch(`/api/vouchers/verify/${encodeURIComponent(code)}`);
+        const data = await res.json();
+        
+        if (data.valid) {
+          renderValidVoucher(data);
+        } else {
+          renderError(data.error || "El voucher ingresado ha expirado o ya no está disponible.");
+        }
+      } catch (e) {
+        renderError("Error al conectar con el servidor de vouchers.");
+      }
+    }
+
+    function renderValidVoucher(v) {
+      const pageUrl = window.location.href;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(pageUrl)}`;
+
+      document.getElementById("voucherContent").innerHTML = `
+        <div class="status-badge badge-valid">
+          ✅ VÓUCHER OFICIAL VÁLIDO
+        </div>
+
+        <h1 class="promo-title">${escapeHtml(v.title)}</h1>
+        <p class="promo-desc">${escapeHtml(v.description)}</p>
+
+        <div class="qr-container">
+          <img src="${qrUrl}" alt="QR Voucher ${v.code}">
+        </div>
+
+        <div class="code-box">
+          <div>
+            <div style="font-size: 0.65rem; color: #6b7280; text-transform: uppercase;">CÓDIGO ÚNICO</div>
+            <div class="code-text">${escapeHtml(v.code)}</div>
+          </div>
+          <button class="btn-copy" onclick="copyVoucherCode('${v.code}')">📋 COPIAR</button>
+        </div>
+
+        ${v.valid_to ? `<p style="font-size: 0.75rem; color: #9ca3af; margin-bottom: 20px;">⌛ Válido hasta el: <strong>${v.valid_to}</strong></p>` : ''}
+
+        <button onclick="redeemAndBook('${v.code}')" class="btn-action">
+          💈 RESERVAR TURNO CON ESTE DESCUENTO →
+        </button>
+
+        <a href="/" class="btn-sec">← Ir al Inicio / Ver Barbería</a>
+      `;
+    }
+
+    function renderError(msg) {
+      document.getElementById("voucherContent").innerHTML = `
+        <div class="status-badge badge-invalid">
+          ⚠️ VÓUCHER NO DISPONIBLE
+        </div>
+        <h2 style="font-family: 'Space Grotesk', monospace; color: #fff; margin-bottom: 12px;">Vóucher Inválido o Expirado</h2>
+        <p class="promo-desc">${escapeHtml(msg)}</p>
+        <a href="/" class="btn-action" style="margin-top: 20px;">💈 Ir a la Barbería →</a>
+      `;
+    }
+
+    function copyVoucherCode(code) {
+      navigator.clipboard.writeText(code);
+      alert("¡Código '" + code + "' copiado al portapapeles!");
+    }
+
+    function redeemAndBook(code) {
+      localStorage.setItem("pending_voucher_code", code);
+      window.location.href = `/?promo=${encodeURIComponent(code)}`;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>

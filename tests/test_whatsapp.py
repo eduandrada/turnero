@@ -48,7 +48,7 @@ def test_webhook_endpoint_rejects_invalid_signature(client):
 
 def test_webhook_endpoint_accepts_valid_signature_and_confirms_appointment(client, db_session):
     """Verifica que un webhook con firma válida y remitente coincidente procese la confirmación del turno."""
-    from datetime import datetime, timedelta
+    from datetime import datetime, timezone, timedelta
     
     secret = "test_whatsapp_secret_key_12345"
     
@@ -58,7 +58,7 @@ def test_webhook_endpoint_accepts_valid_signature_and_confirms_appointment(clien
         client_phone="+5491177778888",
         barber_id=1,
         service_id=1,
-        appointment_time=datetime.utcnow() + timedelta(days=2),
+        appointment_time=datetime.now(timezone.utc) + timedelta(days=2),
         status="PENDIENTE"
     )
     db_session.add(appt)
@@ -104,14 +104,14 @@ def test_barber_private_phone_is_hidden_from_public_api(client):
 
 def test_whatsapp_notification_non_blocking_on_api_error(db_session):
     """Verifica que un fallo de la API externa de WhatsApp no rompa el flujo y registre estado ERROR."""
-    from datetime import datetime, timedelta
+    from datetime import datetime, timezone, timedelta
     
     appt = Appointment(
         client_name="Test Error WhatsApp",
         client_phone="+5491155554444",
         barber_id=1,
         service_id=1,
-        appointment_time=datetime.utcnow() + timedelta(days=1),
+        appointment_time=datetime.now(timezone.utc) + timedelta(days=1),
         status="CONFIRMADO"
     )
     db_session.add(appt)

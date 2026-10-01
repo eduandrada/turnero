@@ -1,6 +1,6 @@
 /**
  * ==============================================================================
- * BLADESYNC 2026 - COMPONENTE UNIVERSAL DE SUBIDA DE IMÁGENES (UI/UX)
+ * HiddenSYNC 2026 - COMPONENTE UNIVERSAL DE SUBIDA DE IMÁGENES (UI/UX)
  * Soporta Drag & Drop, Previsualización Instantánea, Barra de Progreso y WebP Pipeline.
  * ==============================================================================
  */
@@ -211,7 +211,7 @@ class UniversalImageUploader {
       formData.append("previous_url", this.currentImageUrl);
     }
 
-    const token = localStorage.getItem("bladesync_admin_token");
+    const token = localStorage.getItem("hiddensync_admin_token") || localStorage.getItem("bladesync_admin_token");
 
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();

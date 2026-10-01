@@ -11,9 +11,17 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     token: str
+    access_token: Optional[str] = None
     username: str
     role: Optional[str] = "admin"
     message: str
+
+    def __init__(self, **data):
+        if "token" in data and "access_token" not in data:
+            data["access_token"] = data["token"]
+        elif "access_token" in data and "token" not in data:
+            data["token"] = data["access_token"]
+        super().__init__(**data)
 
 class PasswordChangeRequest(BaseModel):
     current_password: str
@@ -158,6 +166,9 @@ class ClientUpdate(BaseModel):
 class ClientRead(ClientBase):
     id: int
     created_at: Optional[datetime] = None
+    total_turnos: Optional[int] = 0
+    turnos_completados: Optional[int] = 0
+    ultima_visita: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 # ==========================================
@@ -203,6 +214,9 @@ class AppointmentRead(BaseModel):
     confirmed: bool = False
     canceled: bool = False
     reminder_sent: bool = False
+    is_checked_in: bool = False
+    checked_in_at: Optional[datetime] = None
+    checkin_token: Optional[str] = None
     notes: Optional[str] = None
     created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)

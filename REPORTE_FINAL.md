@@ -1,6 +1,6 @@
 # REPORTE FINAL DE AUDITORÍA, REFACTORIZACIÓN Y ESTABILIZACIÓN
 
-**Proyecto:** BladeSync AI / Turnero & Shop Barber  
+**Proyecto:** HiddenSYNC AI / Turnero & Shop Barber  
 **Versión:** 2.0.0-STABLE  
 **Fecha:** 2026-09-26  
 **Resultado Global:** LISTO PARA DESPLIEGUE Y PRODUCCIÓN  

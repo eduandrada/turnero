@@ -1,7 +1,16 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Float, Text
 from sqlalchemy.orm import relationship, synonym
-from app.database import Base
+from app.database import Base, get_argentina_now
+
+def get_now() -> datetime:
+    """Retorna la fecha y hora oficial del negocio (Catamarca UTC-3) para persistencia consistente."""
+    try:
+        return get_argentina_now().replace(tzinfo=None)
+    except Exception:
+        return datetime.now(timezone.utc).replace(tzinfo=None)
+
+get_utc_now = get_now
 
 class AdminUser(Base):
     __tablename__ = "admin_users"
@@ -15,7 +24,7 @@ class AdminUser(Base):
     can_cancel_appointments = Column(Boolean, default=True)
     can_manage_shop = Column(Boolean, default=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
 
 class ShopSetting(Base):
@@ -24,7 +33,7 @@ class ShopSetting(Base):
     id = Column(Integer, primary_key=True, index=True)
     key = Column(String(100), unique=True, nullable=False, index=True)
     value = Column(Text, nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
 
 
 class Barber(Base):
@@ -41,6 +50,8 @@ class Barber(Base):
     facebook = Column(String(100), nullable=True)
     featured_styles = Column(String(250), nullable=True) # e.g. "Skin Fade, Visagismo, Ritual de Barba"
     working_days = Column(String(100), default="Lunes,Martes,Miércoles,Jueves,Viernes,Sábado")
+    commission_services_percent = Column(Float, default=50.0)
+    commission_products_percent = Column(Float, default=10.0)
     is_active = Column(Boolean, default=True)
     display_order = Column(Integer, default=0)
 
@@ -88,11 +99,15 @@ class Client(Base):
     phone = Column(String(40), unique=True, nullable=False, index=True)
     email = Column(String(120), nullable=True)
     notes = Column(Text, nullable=True)
+    points = Column(Integer, default=0)
+    total_spent = Column(Float, default=0.0)
+    tier = Column(String(30), default="BRONCE")
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
     appointments = relationship("Appointment", back_populates="client_rel")
     orders = relationship("Order", back_populates="client_rel")
+    loyalty_transactions = relationship("LoyaltyTransaction", back_populates="client_rel", cascade="all, delete-orphan")
 
 
 class Appointment(Base):
@@ -107,18 +122,36 @@ class Appointment(Base):
     
     barber_name = Column(String(100), nullable=True)
     service = Column(String(120), nullable=True)
+    service_price_snapshot = Column(Float, nullable=True)
+
+    barber_name_snapshot = synonym("barber_name")
+    service_name_snapshot = synonym("service")
 
     appointment_time = Column(DateTime, nullable=False, index=True)
     end_time = Column(DateTime, nullable=True)
     duration_min = Column(Integer, default=45)
+    actual_duration_min = Column(Integer, nullable=True)
     
     status = Column(String(20), default="PENDIENTE") # PENDIENTE, CONFIRMADO, CANCELADO, COMPLETADO, NO_SHOW
     confirmed = Column(Boolean, default=False)
     canceled = Column(Boolean, default=False)
     reminder_sent = Column(Boolean, default=False)
+    push_reminder_sent = Column(Boolean, default=False)
+
+    # Señas & Pasarela de pago
+    deposit_required = Column(Boolean, default=False)
+    deposit_amount = Column(Float, default=0.0)
+    deposit_paid = Column(Boolean, default=False)
+    deposit_payment_id = Column(String(100), nullable=True, index=True)
+    payment_status = Column(String(30), default="SIN_SEÑA") # SIN_SEÑA, PENDIENTE_PAGO, SEÑA_PAGADA, TOTAL_PAGADO
+
+    tip_amount = Column(Float, default=0.0)
     notes = Column(Text, nullable=True)
     idempotency_key = Column(String(100), nullable=True, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    is_checked_in = Column(Boolean, default=False)
+    checked_in_at = Column(DateTime, nullable=True)
+    checkin_token = Column(String(50), nullable=True, index=True)
+    created_at = Column(DateTime, default=get_utc_now)
 
     barber = relationship("Barber", back_populates="appointments")
     service_rel = relationship("Service", back_populates="appointments", foreign_keys=[service_id])
@@ -157,7 +190,7 @@ class Product(Base):
     is_featured = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
     display_order = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
     category_rel = relationship("Category", back_populates="products")
     order_items = relationship("OrderItem", back_populates="product")
@@ -171,7 +204,7 @@ class StockMovement(Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     movement_type = Column(String(50), nullable=False) # "venta", "ingreso_compra", "uso_interno", "ajuste"
     quantity = Column(Integer, nullable=False) # Cantidad (+ o -)
-    date = Column(DateTime, default=datetime.utcnow)
+    date = Column(DateTime, default=get_utc_now)
     notes = Column(Text, nullable=True)
     registered_by = Column(String(80), default="Admin")
 
@@ -210,7 +243,7 @@ class Order(Base):
     payment_method = Column(String(50), default="Efectivo") # Efectivo, Transferencia, Mercado Pago, Pago al retirar
     status = Column(String(30), default="NUEVO") # NUEVO, CONFIRMADO, PREPARANDO, LISTO, EN_CAMINO, ENTREGADO, CANCELADO
     idempotency_key = Column(String(100), nullable=True, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
     client_rel = relationship("Client", back_populates="orders")
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
@@ -256,7 +289,7 @@ class AppNotification(Base):
     start_time = Column(DateTime, nullable=True)
     end_time = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
 
 class AuditLog(Base):
@@ -272,7 +305,7 @@ class AuditLog(Base):
     old_value = Column(Text, nullable=True)
     new_value = Column(Text, nullable=True)
     ip_address = Column(String(50), nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=get_utc_now)
 
 
 class NotificationLog(Base):
@@ -289,7 +322,7 @@ class NotificationLog(Base):
     retry_count = Column(Integer, default=0)
     response_payload = Column(Text, nullable=True)
     error_details = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
 
 class ShiftClosure(Base):
@@ -299,7 +332,7 @@ class ShiftClosure(Base):
     encargado_id = Column(Integer, ForeignKey("admin_users.id"), nullable=True)
     encargado_name = Column(String(80), nullable=False)
     fecha_inicio = Column(DateTime, nullable=False)
-    fecha_cierre = Column(DateTime, default=datetime.utcnow)
+    fecha_cierre = Column(DateTime, default=get_utc_now)
     fondo_inicial = Column(Float, default=0.0)
     total_efectivo = Column(Float, default=0.0)
     total_transferencia = Column(Float, default=0.0)
@@ -321,7 +354,7 @@ class IdempotencyRecord(Base):
     response_code = Column(Integer, default=200)
     response_body = Column(Text, nullable=True)
     expires_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
     idempotency_key = synonym("key")
     request_path = synonym("scope")
@@ -332,6 +365,8 @@ class IdempotencyRecord(Base):
             kwargs["key"] = kwargs.pop("idempotency_key")
         if "request_path" in kwargs and "scope" not in kwargs:
             kwargs["scope"] = kwargs.pop("request_path")
+        elif "endpoint" in kwargs and "scope" not in kwargs:
+            kwargs["scope"] = kwargs.pop("endpoint")
         if "response_json" in kwargs and "response_body" not in kwargs:
             kwargs["response_body"] = kwargs.pop("response_json")
         super().__init__(*args, **kwargs)
@@ -342,7 +377,7 @@ class RevokedToken(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     token_str = Column(String(255), unique=True, nullable=False, index=True)
-    revoked_at = Column(DateTime, default=datetime.utcnow)
+    revoked_at = Column(DateTime, default=get_utc_now)
     expires_at = Column(DateTime, nullable=True)
 
 
@@ -357,7 +392,7 @@ class AppointmentHistory(Base):
     change_reason = Column(Text, nullable=True)
     previous_time = Column(DateTime, nullable=True)
     new_time = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
     def __init__(self, *args, **kwargs):
         if "old_status" in kwargs and "previous_status" not in kwargs:
@@ -397,7 +432,7 @@ class ScheduleException(Base):
     exception_type = Column(String(50), default="bloqueo_manual") # feriado, vacaciones, licencia, bloqueo_manual, horario_especial
     reason = Column(String(250), nullable=True)
     created_by = Column(String(80), default="Admin")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
 
 class WaitlistEntry(Base):
@@ -413,7 +448,7 @@ class WaitlistEntry(Base):
     time_range_end = Column(String(10), default="21:00")
     status = Column(String(30), default="WAITING") # WAITING, NOTIFIED, BOOKED, EXPIRED, CANCELLED
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
     preferred_date = synonym("date")
     preferred_time_range = synonym("time_range_start")
@@ -450,7 +485,7 @@ class Voucher(Base):
     max_uses_per_client = Column(Integer, default=1)
     min_role = Column(String(20), default="admin") # "admin", "encargado", "public"
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
     commission_impact = synonym("discount_absorption")
     start_date = synonym("valid_from")
@@ -486,7 +521,7 @@ class VoucherRedemption(Base):
     discount_amount = Column(Float, nullable=False)
     final_amount = Column(Float, nullable=False)
     barber_commission_impact = Column(String(100), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
     voucher = relationship("Voucher", back_populates="redemptions")
 
@@ -510,8 +545,10 @@ class SalesRecord(Base):
     voucher_code = Column(String(50), nullable=True)
     items_detail = Column(Text, nullable=True)
     registered_by = Column(String(80), default="Encargado")
+    tip_amount = Column(Float, default=0.0)
+    commission_amount = Column(Float, default=0.0)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
     final_amount = synonym("total_amount")
     cashier_name = synonym("registered_by")
@@ -522,4 +559,47 @@ class SalesRecord(Base):
         if "cashier_name" in kwargs and "registered_by" not in kwargs:
             kwargs["registered_by"] = kwargs.pop("cashier_name")
         super().__init__(*args, **kwargs)
+
+
+class LoyaltyTransaction(Base):
+    __tablename__ = "loyalty_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False, index=True)
+    points = Column(Integer, nullable=False) # Positivos (acumulados) o Negativos (canjeados)
+    reason = Column(String(120), nullable=False) # "Corte de pelo", "Compra en Shop", "Canje de premio"
+    reference_id = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=get_utc_now)
+
+    client_rel = relationship("Client", back_populates="loyalty_transactions")
+
+
+class LoyaltyReward(Base):
+    __tablename__ = "loyalty_rewards"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(150), nullable=False)
+    description = Column(Text, nullable=True)
+    points_required = Column(Integer, nullable=False)
+    reward_type = Column(String(50), default="DISCOUNT_FIXED") # DISCOUNT_FIXED, DISCOUNT_PERCENT, FREE_SERVICE, FREE_PRODUCT
+    reward_value = Column(Float, default=0.0)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=get_utc_now)
+
+
+class PushSubscription(Base):
+    __tablename__ = "push_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=True)
+    client_phone = Column(String(40), nullable=True, index=True)
+    endpoint = Column(Text, nullable=False, unique=True)
+    p256dh = Column(Text, nullable=False)
+    auth = Column(Text, nullable=False)
+    user_agent = Column(String(250), nullable=True)
+    created_at = Column(DateTime, default=get_utc_now)
+
+
+
+
 

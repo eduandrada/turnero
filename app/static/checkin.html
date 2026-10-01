@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Check-In Totem • Barbería</title>
+  <link rel="icon" href="/static/img/icono.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- HTML5 QR Code Scanner Library -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #0a0d14;
+      --bg-card: rgba(18, 24, 38, 0.85);
+      --border-card: rgba(255, 255, 255, 0.08);
+      --primary: #d4af37;
+      --primary-glow: rgba(212, 175, 55, 0.35);
+      --accent-green: #10b981;
+      --green-glow: rgba(16, 185, 129, 0.4);
+      --text-bright: #ffffff;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: radial-gradient(circle at 50% 10%, #171e2e 0%, #080b11 100%);
+      color: var(--text-bright);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem;
+      overflow: hidden;
+    }
+
+    /* Ambient Background Effects */
+    .bg-glow-1 {
+      position: absolute;
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(212, 175, 55, 0.12) 0%, rgba(0,0,0,0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .bg-glow-2 {
+      position: absolute;
+      bottom: -150px;
+      right: 10%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, rgba(0,0,0,0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Header */
+    header {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    .shop-logo-img {
+      height: 75px;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+      margin-bottom: 0.5rem;
+      transition: transform 0.3s ease;
+    }
+
+    .totem-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(212, 175, 55, 0.12);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      color: var(--primary);
+      padding: 0.35rem 1rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .clock-display {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-top: 0.35rem;
+    }
+
+    /* Main Container */
+    main {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 650px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .welcome-card {
+      width: 100%;
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-card);
+      border-radius: 24px;
+      padding: 2.5rem 2rem;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .welcome-card h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2.2rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #ffffff 30%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .welcome-card p {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      margin-bottom: 2rem;
+    }
+
+    /* Mode Selection Buttons */
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+      width: 100%;
+    }
+
+    @media (max-width: 600px) {
+      .action-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .btn-action-mode {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 1.8rem 1.2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      color: #fff;
+    }
+
+    .btn-action-mode:hover, .btn-action-mode:active {
+      background: rgba(212, 175, 55, 0.1);
+      border-color: var(--primary);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 30px var(--primary-glow);
+    }
+
+    .btn-action-mode i {
+      font-size: 2.8rem;
+      color: var(--primary);
+      filter: drop-shadow(0 2px 8px var(--primary-glow));
+    }
+
+    .btn-action-mode span {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-action-mode small {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    /* Scanner View Modal / Box */
+    .scanner-view {
+      display: none;
+      width: 100%;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #reader {
+      width: 100%;
+      max-width: 400px;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 2px solid var(--primary);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      background: #000;
+    }
+
+    /* Keypad View */
+    .keypad-view {
+      display: none;
+      width: 100%;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .phone-display {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      border: 2px solid rgba(212, 175, 55, 0.3);
+      border-radius: 16px;
+      padding: 1rem;
+      font-family: 'Outfit', monospace;
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--primary);
+      text-align: center;
+      letter-spacing: 4px;
+      margin-bottom: 1.2rem;
+      min-height: 62px;
+    }
+
+    .keypad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.8rem;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .btn-key {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      height: 64px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-key:active {
+      background: rgba(212, 175, 55, 0.3);
+      border-color: var(--primary);
+      transform: scale(0.95);
+    }
+
+    .btn-key.delete {
+      color: #f43f5e;
+      background: rgba(244, 63, 94, 0.1);
+    }
+
+    .btn-key.submit {
+      background: linear-gradient(135deg, var(--primary) 0%, #b89228 100%);
+      color: #0a0d14;
+      font-size: 1.2rem;
+      font-weight: 800;
+    }
+
+    .btn-back-mode {
+      margin-top: 1.2rem;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+    }
+
+    .btn-back-mode:hover {
+      color: #fff;
+    }
+
+    /* Overlay Modal Results */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(5, 7, 12, 0.92);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal-success-card {
+      width: 100%;
+      max-width: 520px;
+      background: linear-gradient(180deg, rgba(20, 30, 48, 0.95) 0%, rgba(10, 15, 25, 0.98) 100%);
+      border: 2px solid var(--accent-green);
+      border-radius: 32px;
+      padding: 3rem 2rem;
+      text-align: center;
+      box-shadow: 0 0 60px var(--green-glow);
+      transform: scale(0.85);
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .modal-overlay.active .modal-success-card {
+      transform: scale(1);
+    }
+
+    .icon-circle-success {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.15);
+      border: 3px solid var(--accent-green);
+      color: var(--accent-green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      margin: 0 auto 1.5rem auto;
+      box-shadow: 0 0 30px var(--green-glow);
+      animation: pulseGreen 2s infinite;
+    }
+
+    @keyframes pulseGreen {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+      70% { box-shadow: 0 0 0 25px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    .modal-success-card h2 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 0.5rem;
+    }
+
+    .client-name-highlight {
+      color: var(--primary);
+    }
+
+    .turn-badge-pill {
+      display: inline-block;
+      background: rgba(212, 175, 55, 0.15);
+      border: 1px solid var(--primary);
+      color: var(--primary);
+      font-family: 'Outfit', monospace;
+      font-size: 1.4rem;
+      font-weight: 800;
+      padding: 0.5rem 1.5rem;
+      border-radius: 14px;
+      margin: 1rem 0 1.5rem 0;
+    }
+
+    .barber-notice-box {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px dashed rgba(16, 185, 129, 0.3);
+      border-radius: 16px;
+      padding: 1rem;
+      color: #6ee7b7;
+      font-size: 1.05rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .auto-reset-bar {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .auto-reset-progress {
+      height: 100%;
+      background: var(--accent-green);
+      width: 100%;
+      transition: width 5s linear;
+    }
+
+    /* Footer */
+    footer {
+      position: relative;
+      z-index: 10;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      text-align: center;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-glow-1"></div>
+  <div class="bg-glow-2"></div>
+
+  <!-- Header -->
+  <header>
+    <img src="/static/img/barbershop.png" alt="Barber Shop Logo" class="shop-logo-img" onerror="this.src='/static/img/logo.png'">
+    <div class="totem-badge">
+      <i class="fa-solid fa-location-dot"></i> TOTEM DE CHECK-IN EN SALA DE ESPERA
+    </div>
+    <div class="clock-display" id="clock">00:00:00</div>
+  </header>
+
+  <!-- Main Content Card -->
+  <main>
+    <div class="welcome-card" id="welcomeCard">
+      
+      <!-- MODE 1: Selection Buttons -->
+      <div id="selectionMode">
+        <h1>¡Hola! Bienvenido/a 💈</h1>
+        <p>Avisale a tu barbero que ya llegaste escaneando tu código o ingresando tu teléfono.</p>
+
+        <div class="action-grid">
+          <button class="btn-action-mode" onclick="showQrScanner()">
+            <i class="fa-solid fa-qrcode"></i>
+            <span>ESCANEAR QR</span>
+            <small>Usar código de confirmación</small>
+          </button>
+          
+          <button class="btn-action-mode" onclick="showKeypad()">
+            <i class="fa-solid fa-calculator"></i>
+            <span>INGRESAR PIN / TEL</span>
+            <small>Número de celular o Turno ID</small>
+          </button>
+        </div>
+      </div>
+
+      <!-- MODE 2: QR Scanner -->
+      <div class="scanner-view" id="scannerMode">
+        <h2 style="font-family:'Outfit'; margin-bottom: 0.5rem;">Apunta tu QR a la Cámara 📷</h2>
+        <p style="color:var(--text-muted); margin-bottom: 1rem; font-size:0.95rem;">Acercá el código desde la pantalla de tu teléfono.</p>
+
+        <div id="reader"></div>
+
+        <button class="btn-back-mode" onclick="resetToSelection()">
+          <i class="fa-solid fa-arrow-left"></i> Volver a opciones
+        </button>
+      </div>
+
+      <!-- MODE 3: Keypad Input -->
+      <div class="keypad-view" id="keypadMode">
+        <h2 style="font-family:'Outfit'; margin-bottom: 0.3rem;">Ingresá tu PIN o Celular 🔢</h2>
+        <p style="color:var(--text-muted); margin-bottom: 1rem; font-size:0.9rem;">Escribí tu <strong>PIN de 4 dígitos</strong> o tu <strong>número de celular</strong>.</p>
+
+        <div class="phone-display" id="phoneInput"></div>
+
+        <div class="keypad-grid">
+          <button class="btn-key" onclick="appendDigit('1')">1</button>
+          <button class="btn-key" onclick="appendDigit('2')">2</button>
+          <button class="btn-key" onclick="appendDigit('3')">3</button>
+          <button class="btn-key" onclick="appendDigit('4')">4</button>
+          <button class="btn-key" onclick="appendDigit('5')">5</button>
+          <button class="btn-key" onclick="appendDigit('6')">6</button>
+          <button class="btn-key" onclick="appendDigit('7')">7</button>
+          <button class="btn-key" onclick="appendDigit('8')">8</button>
+          <button class="btn-key" onclick="appendDigit('9')">9</button>
+          <button class="btn-key delete" onclick="deleteDigit()"><i class="fa-solid fa-backspace"></i></button>
+          <button class="btn-key" onclick="appendDigit('0')">0</button>
+          <button class="btn-key submit" onclick="submitCheckin()"><i class="fa-solid fa-check"></i> OK</button>
+        </div>
+
+        <button class="btn-back-mode" onclick="resetToSelection()">
+          <i class="fa-solid fa-arrow-left"></i> Volver a opciones
+        </button>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- SUCCESS MODAL OVERLAY -->
+  <div class="modal-overlay" id="successModal">
+    <div class="modal-success-card">
+      <div class="icon-circle-success">
+        <i class="fa-solid fa-check"></i>
+      </div>
+
+      <h2>¡CHECK-IN CONFIRMADO!</h2>
+      <p style="font-size:1.3rem; margin-top:0.3rem;">Bienvenido/a, <strong class="client-name-highlight" id="modalClientName">Cliente</strong></p>
+
+      <div class="turn-badge-pill" id="modalTurnCode">TURNO T-000</div>
+
+      <div style="color:var(--text-muted); font-size:1.05rem; margin-bottom:1rem;">
+        <i class="fa-solid fa-user-scissors" style="color:var(--primary); margin-right:5px;"></i>
+        Te atiende: <strong style="color:#fff;" id="modalBarberName">General</strong> 
+        • Horario: <strong style="color:#fff;" id="modalTimeStr">17:00 hs</strong>
+      </div>
+
+      <div class="barber-notice-box">
+        <i class="fa-solid fa-bell fa-bounce"></i>
+        <span>📍 ¡Tu barbero ya recibió la notificación y sabe que estás acá!</span>
+      </div>
+
+      <div class="auto-reset-bar">
+        <div class="auto-reset-progress" id="resetProgressBar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    💈 Sistema de Gestión & Live Queue Check-In • Catamarca UTC-3
+  </footer>
+
+  <script>
+    // Live Clock
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').innerText = now.toLocaleTimeString('es-AR');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Keypad Logic
+    let currentInput = "";
+
+    function appendDigit(digit) {
+      if (currentInput.length < 12) {
+        currentInput += digit;
+        updateDisplay();
+      }
+    }
+
+    function deleteDigit() {
+      currentInput = currentInput.slice(0, -1);
+      updateDisplay();
+    }
+
+    function updateDisplay() {
+      const el = document.getElementById('phoneInput');
+      el.innerText = currentInput || "• • • •";
+    }
+    updateDisplay();
+
+    // Sound Synthesizer (Chime without external audio asset dependency)
+    function playSuccessChime() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        
+        const now = ctx.currentTime;
+        
+        // Note 1 (E5)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(659.25, now);
+        gain1.gain.setValueAtTime(0.3, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.4);
+
+        // Note 2 (B5)
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(987.77, now + 0.15);
+        gain2.gain.setValueAtTime(0.35, now + 0.15);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.15);
+        osc2.stop(now + 0.8);
+      } catch(e) {
+        console.log("Audio not allowed yet:", e);
+      }
+    }
+
+    // Modes navigation
+    function resetToSelection() {
+      stopScanner();
+      document.getElementById('selectionMode').style.display = 'block';
+      document.getElementById('scannerMode').style.display = 'none';
+      document.getElementById('keypadMode').style.display = 'none';
+      currentInput = "";
+      updateDisplay();
+    }
+
+    function showKeypad() {
+      document.getElementById('selectionMode').style.display = 'none';
+      document.getElementById('scannerMode').style.display = 'none';
+      document.getElementById('keypadMode').style.display = 'flex';
+      currentInput = "";
+      updateDisplay();
+    }
+
+    // QR Scanner
+    let html5QrcodeScanner = null;
+
+    function showQrScanner() {
+      document.getElementById('selectionMode').style.display = 'none';
+      document.getElementById('keypadMode').style.display = 'none';
+      document.getElementById('scannerMode').style.display = 'flex';
+
+      if (!html5QrcodeScanner) {
+        html5QrcodeScanner = new Html5Qrcode("reader");
+      }
+
+      const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+      html5QrcodeScanner.start(
+        { facingMode: "environment" },
+        config,
+        onScanSuccess,
+        onScanFailure
+      ).catch(err => {
+        console.warn("Camera start failed, falling back to keypad", err);
+        alert("No se pudo acceder a la cámara. Por favor ingresá tu número mediante el teclado.");
+        showKeypad();
+      });
+    }
+
+    function stopScanner() {
+      if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+        html5QrcodeScanner.stop().catch(err => console.error(err));
+      }
+    }
+
+    function onScanSuccess(decodedText, decodedResult) {
+      stopScanner();
+      sendCheckinPayload({ code: decodedText });
+    }
+
+    function onScanFailure(error) {
+      // Intentionally silent while waiting for QR
+    }
+
+    function submitCheckin() {
+      if (!currentInput) {
+        alert("Por favor ingresá tu PIN de 4 dígitos o tu número de celular.");
+        return;
+      }
+      sendCheckinPayload({ pin: currentInput, phone: currentInput, code: currentInput });
+    }
+
+    async function sendCheckinPayload(payload) {
+      try {
+        const res = await fetch('/api/public/checkin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          showSuccessModal(data.appointment);
+        } else {
+          alert(data.detail || data.message || "No encontramos ningún turno registrado para hoy con esos datos.");
+          if (document.getElementById('scannerMode').style.display === 'flex') {
+            showQrScanner();
+          }
+        }
+      } catch (err) {
+        alert("Error de conexión al procesar el check-in.");
+      }
+    }
+
+    function speakWelcomeVoice(clientName, barberName) {
+      if ('speechSynthesis' in window) {
+        try {
+          const synth = window.speechSynthesis;
+          const text = `¡Bienvenido ${clientName}! Tu barbero ${barberName || ''} ya sabe que estás aquí. Tomá asiento en la sala de espera.`;
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'es-AR';
+          utterance.rate = 0.95;
+          synth.speak(utterance);
+        } catch (_) {}
+      }
+    }
+
+    let modalTimeout = null;
+
+    function showSuccessModal(appt) {
+      playSuccessChime();
+      speakWelcomeVoice(appt.client_name, appt.barber_name);
+
+      document.getElementById('modalClientName').innerText = appt.client_name;
+      document.getElementById('modalTurnCode').innerText = appt.turn_code || (`TURNO T-${appt.id}`);
+      document.getElementById('modalBarberName').innerText = appt.barber_name || "General";
+      document.getElementById('modalTimeStr').innerText = (appt.appointment_time || "") + " hs";
+
+      const bar = document.getElementById('resetProgressBar');
+      bar.style.transition = 'none';
+      bar.style.width = '100%';
+
+      const modal = document.getElementById('successModal');
+      modal.classList.add('active');
+
+      setTimeout(() => {
+        bar.style.transition = 'width 6s linear';
+        bar.style.width = '0%';
+      }, 50);
+
+      clearTimeout(modalTimeout);
+      modalTimeout = setTimeout(() => {
+        modal.classList.remove('active');
+        resetToSelection();
+      }, 6000);
+    }
+
+    // Auto Check-in si se abre mediante link o QR móvil con parámetros
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlPin = urlParams.get('pin') || urlParams.get('token') || urlParams.get('code');
+      const urlPhone = urlParams.get('phone') || urlParams.get('tel');
+      if (urlPin || urlPhone) {
+        sendCheckinPayload({ pin: urlPin || urlPhone, phone: urlPhone || urlPin, code: urlPin || urlPhone });
+      }
+    });
+  </script>
+</body>
+</html>

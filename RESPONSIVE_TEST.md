@@ -1,6 +1,6 @@
 # MATRIZ DE PRUEBAS RESPONSIVE Y MULTIDISPOSITIVO (RESPONSIVE_TEST.md)
 
-**Proyecto:** BladeSync AI / Turnero & Shop Barber  
+**Proyecto:** HiddenSYNC AI / Turnero & Shop Barber  
 **Fecha de Validación:** 2026-09-26  
 **Estado:** COMPROBADO Y VALIDADO EN TODAS LAS PANTALLAS Y NAVEGADORES  
 

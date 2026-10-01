@@ -1,6 +1,6 @@
 # DESIGN SYSTEM & ARQUITECTURA VISUAL (DESIGN_SYSTEM.md)
 
-**Proyecto:** BladeSync AI / Turnero & Shop Barber  
+**Proyecto:** HiddenSYNC AI / Turnero & Shop Barber  
 **Versión:** 2.0.0  
 
 ---

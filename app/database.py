@@ -1,229 +1,34 @@
-import os
-from datetime import datetime, timezone, timedelta
-from zoneinfo import ZoneInfo
-from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.orm import declarative_base, sessionmaker
-from dotenv import load_dotenv
-
-load_dotenv()
-
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./barberia.db")
-if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-TIMEZONE_NAME = os.getenv("TIMEZONE", "America/Argentina/Catamarca")
-
-ARGENTINA_OFFSET = timezone(timedelta(hours=-3))
-
-try:
-    APP_TIMEZONE = ZoneInfo(TIMEZONE_NAME)
-except Exception:
-    APP_TIMEZONE = ARGENTINA_OFFSET
-
-def get_argentina_now() -> datetime:
-    """Retorna la fecha y hora actual en la zona horaria oficial del negocio (Catamarca UTC-3)."""
-    try:
-        return datetime.now(APP_TIMEZONE)
-    except Exception:
-        return datetime.now(ARGENTINA_OFFSET)
-
-def get_catamarca_now() -> datetime:
-    """Alias explícito para la zona horaria de Catamarca (UTC-3)."""
-    return get_argentina_now()
-
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-
-engine = create_engine(
+"""
+app/database.py - Backward compatibility facade. Re-exports database components from app.core.database.
+"""
+from app.core.database import (
     DATABASE_URL,
-    connect_args=connect_args,
-    echo=False
+    TIMEZONE_NAME,
+    ARGENTINA_OFFSET,
+    APP_TIMEZONE,
+    get_argentina_now,
+    get_catamarca_now,
+    get_utc_now,
+    connect_args,
+    engine,
+    SessionLocal,
+    Base,
+    init_db_and_migrate,
+    get_db,
 )
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
-
-def init_db_and_migrate():
-    """Crea las tablas y realiza migraciones no destructivas si faltan columnas."""
-    Base.metadata.create_all(bind=engine)
-    with engine.connect() as conn:
-        inspector = inspect(engine)
-        tables = inspector.get_table_names()
-
-        # 1. Migration for appointments
-        if "appointments" in tables:
-            columns = [c["name"] for c in inspector.get_columns("appointments")]
-            if "duration_min" not in columns:
-                conn.execute(text("ALTER TABLE appointments ADD COLUMN duration_min INTEGER DEFAULT 45"))
-                conn.commit()
-            if "status" not in columns:
-                conn.execute(text("ALTER TABLE appointments ADD COLUMN status VARCHAR(20) DEFAULT 'PENDIENTE'"))
-                conn.commit()
-            if "end_time" not in columns:
-                conn.execute(text("ALTER TABLE appointments ADD COLUMN end_time DATETIME"))
-                conn.commit()
-            if "client_id" not in columns:
-                conn.execute(text("ALTER TABLE appointments ADD COLUMN client_id INTEGER"))
-                conn.commit()
-            if "notes" not in columns:
-                conn.execute(text("ALTER TABLE appointments ADD COLUMN notes TEXT"))
-                conn.commit()
-            if "idempotency_key" not in columns:
-                conn.execute(text("ALTER TABLE appointments ADD COLUMN idempotency_key VARCHAR(100)"))
-                conn.commit()
-
-        # 2. Migration for barbers
-        if "barbers" in tables:
-            columns = [c["name"] for c in inspector.get_columns("barbers")]
-            if "phone" not in columns:
-                conn.execute(text("ALTER TABLE barbers ADD COLUMN phone VARCHAR(50)"))
-                conn.commit()
-            if "experience" not in columns:
-                conn.execute(text("ALTER TABLE barbers ADD COLUMN experience VARCHAR(200)"))
-                conn.commit()
-            if "instagram" not in columns:
-                conn.execute(text("ALTER TABLE barbers ADD COLUMN instagram VARCHAR(100)"))
-                conn.commit()
-            if "facebook" not in columns:
-                conn.execute(text("ALTER TABLE barbers ADD COLUMN facebook VARCHAR(100)"))
-                conn.commit()
-            if "featured_styles" not in columns:
-                conn.execute(text("ALTER TABLE barbers ADD COLUMN featured_styles VARCHAR(200)"))
-                conn.commit()
-            if "description" not in columns:
-                conn.execute(text("ALTER TABLE barbers ADD COLUMN description TEXT"))
-                conn.commit()
-            if "working_days" not in columns:
-                conn.execute(text("ALTER TABLE barbers ADD COLUMN working_days VARCHAR(100) DEFAULT 'Lunes,Martes,Miércoles,Jueves,Viernes,Sábado'"))
-                conn.commit()
-            if "display_order" not in columns:
-                conn.execute(text("ALTER TABLE barbers ADD COLUMN display_order INTEGER DEFAULT 0"))
-                conn.commit()
-
-        # 3. Migration for services
-        if "services" in tables:
-            columns = [c["name"] for c in inspector.get_columns("services")]
-            if "previous_price" not in columns:
-                conn.execute(text("ALTER TABLE services ADD COLUMN previous_price FLOAT"))
-                conn.commit()
-            if "prep_buffer_min" not in columns:
-                conn.execute(text("ALTER TABLE services ADD COLUMN prep_buffer_min INTEGER DEFAULT 0"))
-                conn.commit()
-            if "clean_buffer_min" not in columns:
-                conn.execute(text("ALTER TABLE services ADD COLUMN clean_buffer_min INTEGER DEFAULT 5"))
-                conn.commit()
-            if "category" not in columns:
-                conn.execute(text("ALTER TABLE services ADD COLUMN category VARCHAR(50) DEFAULT 'Cortes'"))
-                conn.commit()
-            if "image_url" not in columns:
-                conn.execute(text("ALTER TABLE services ADD COLUMN image_url VARCHAR(500)"))
-                conn.commit()
-            if "display_order" not in columns:
-                conn.execute(text("ALTER TABLE services ADD COLUMN display_order INTEGER DEFAULT 0"))
-                conn.commit()
-
-        # 3.1 Migration for orders
-        if "orders" in tables:
-            columns = [c["name"] for c in inspector.get_columns("orders")]
-            if "idempotency_key" not in columns:
-                conn.execute(text("ALTER TABLE orders ADD COLUMN idempotency_key VARCHAR(100)"))
-                conn.commit()
-
-        # 4. Migration for products
-        if "products" in tables:
-            columns = [c["name"] for c in inspector.get_columns("products")]
-            if "cost_price" not in columns:
-                conn.execute(text("ALTER TABLE products ADD COLUMN cost_price FLOAT DEFAULT 0.0"))
-                conn.commit()
-            if "category" not in columns:
-                conn.execute(text("ALTER TABLE products ADD COLUMN category VARCHAR(50) DEFAULT 'reventa'"))
-                conn.commit()
-            if "created_at" not in columns:
-                conn.execute(text("ALTER TABLE products ADD COLUMN created_at DATETIME"))
-                conn.commit()
-
-        # 5. Migration for audit_logs
-        if "audit_logs" in tables:
-            columns = [c["name"] for c in inspector.get_columns("audit_logs")]
-            if "actor" not in columns:
-                conn.execute(text("ALTER TABLE audit_logs ADD COLUMN actor VARCHAR(80) DEFAULT 'Encargado / Recepción'"))
-                conn.commit()
-            if "description" not in columns:
-                conn.execute(text("ALTER TABLE audit_logs ADD COLUMN description TEXT"))
-                conn.commit()
-            if "ip_address" not in columns:
-                conn.execute(text("ALTER TABLE audit_logs ADD COLUMN ip_address VARCHAR(50)"))
-                conn.commit()
-
-        # 6. Migration for admin_users
-        if "admin_users" in tables:
-            columns = [c["name"] for c in inspector.get_columns("admin_users")]
-            if "role" not in columns:
-                conn.execute(text("ALTER TABLE admin_users ADD COLUMN role VARCHAR(30) DEFAULT 'admin'"))
-                conn.commit()
-            if "can_edit_stock" not in columns:
-                conn.execute(text("ALTER TABLE admin_users ADD COLUMN can_edit_stock BOOLEAN DEFAULT 1"))
-                conn.commit()
-            if "can_view_finances" not in columns:
-                conn.execute(text("ALTER TABLE admin_users ADD COLUMN can_view_finances BOOLEAN DEFAULT 0"))
-                conn.commit()
-            if "can_cancel_appointments" not in columns:
-                conn.execute(text("ALTER TABLE admin_users ADD COLUMN can_cancel_appointments BOOLEAN DEFAULT 1"))
-                conn.commit()
-            if "can_manage_shop" not in columns:
-                conn.execute(text("ALTER TABLE admin_users ADD COLUMN can_manage_shop BOOLEAN DEFAULT 1"))
-                conn.commit()
-
-        # 7. Migration for notification_logs
-        if "notification_logs" in tables:
-            columns = [c["name"] for c in inspector.get_columns("notification_logs")]
-            if "whatsapp_message_id" not in columns:
-                conn.execute(text("ALTER TABLE notification_logs ADD COLUMN whatsapp_message_id VARCHAR(100)"))
-                conn.commit()
-            if "retry_count" not in columns:
-                conn.execute(text("ALTER TABLE notification_logs ADD COLUMN retry_count INTEGER DEFAULT 0"))
-                conn.commit()
-            if "response_payload" not in columns:
-                conn.execute(text("ALTER TABLE notification_logs ADD COLUMN response_payload TEXT"))
-                conn.commit()
-
-        # 8. Migration for idempotency_records
-        if "idempotency_records" in tables:
-            columns = [c["name"] for c in inspector.get_columns("idempotency_records")]
-            if "expires_at" not in columns:
-                conn.execute(text("ALTER TABLE idempotency_records ADD COLUMN expires_at DATETIME"))
-                conn.commit()
-
-        # 9. Migration for vouchers
-        if "vouchers" in tables:
-            columns = [c["name"] for c in inspector.get_columns("vouchers")]
-            if "allowed_start_time" not in columns:
-                conn.execute(text("ALTER TABLE vouchers ADD COLUMN allowed_start_time VARCHAR(10)"))
-                conn.commit()
-            if "allowed_end_time" not in columns:
-                conn.execute(text("ALTER TABLE vouchers ADD COLUMN allowed_end_time VARCHAR(10)"))
-                conn.commit()
-
-        # 10. Migration for sales_records
-        if "sales_records" in tables:
-            columns = [c["name"] for c in inspector.get_columns("sales_records")]
-            if "items_detail" not in columns:
-                conn.execute(text("ALTER TABLE sales_records ADD COLUMN items_detail TEXT"))
-                conn.commit()
-            if "client_id" not in columns:
-                conn.execute(text("ALTER TABLE sales_records ADD COLUMN client_id INTEGER"))
-                conn.commit()
-            if "voucher_code" not in columns:
-                conn.execute(text("ALTER TABLE sales_records ADD COLUMN voucher_code VARCHAR(50)"))
-                conn.commit()
-            if "original_amount" not in columns:
-                conn.execute(text("ALTER TABLE sales_records ADD COLUMN original_amount FLOAT DEFAULT 0.0"))
-                conn.commit()
-
-def get_db():
-    """Dependency for obtaining a database session per request."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+__all__ = [
+    "DATABASE_URL",
+    "TIMEZONE_NAME",
+    "ARGENTINA_OFFSET",
+    "APP_TIMEZONE",
+    "get_argentina_now",
+    "get_catamarca_now",
+    "get_utc_now",
+    "connect_args",
+    "engine",
+    "SessionLocal",
+    "Base",
+    "init_db_and_migrate",
+    "get_db",
+]

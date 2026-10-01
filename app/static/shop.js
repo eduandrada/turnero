@@ -1,5 +1,5 @@
 /**
- * Shop Barber Controller - BladeSync E-Commerce Engine 2026
+ * Shop Barber Controller - HiddenSYNC E-Commerce Engine 2026
  */
 
 // Web Audio API Micro-Sound Synthesizer
@@ -101,7 +101,11 @@ let shopState = {
   deliveryZones: [],
   cart: [], // [{ product, quantity }]
   selectedCategory: null,
-  shopSettings: {}
+  shopSettings: {},
+  activeCoupon: null, // { code, type, value, description }
+  bannerSlides: [],
+  currentSlideIndex: 0,
+  carouselTimer: null
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -114,7 +118,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   ]);
   updateCartUI();
 
-
   // Bind UI sounds on button clicks
   document.body.addEventListener("click", (e) => {
     const btn = e.target.closest("button, a, select, input[type='submit']");
@@ -126,15 +129,22 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function loadCartFromStorage() {
   try {
-    const stored = localStorage.getItem("bladesync_shop_cart");
+    const stored = localStorage.getItem("hiddensync_shop_cart") || localStorage.getItem("bladesync_shop_cart");
     if (stored) shopState.cart = JSON.parse(stored);
+    const savedCoupon = localStorage.getItem("hiddensync_shop_coupon");
+    if (savedCoupon) shopState.activeCoupon = JSON.parse(savedCoupon);
   } catch (e) {
     shopState.cart = [];
   }
 }
 
 function saveCartToStorage() {
-  localStorage.setItem("bladesync_shop_cart", JSON.stringify(shopState.cart));
+  localStorage.setItem("hiddensync_shop_cart", JSON.stringify(shopState.cart));
+  if (shopState.activeCoupon) {
+    localStorage.setItem("hiddensync_shop_coupon", JSON.stringify(shopState.activeCoupon));
+  } else {
+    localStorage.removeItem("hiddensync_shop_coupon");
+  }
   updateCartUI();
 }
 
@@ -144,6 +154,17 @@ async function loadShopSettings() {
     if (res.ok) {
       const s = await res.json();
       shopState.shopSettings = s;
+
+      // Cargar slides del carrusel de banners
+      if (s.shop_banner_slides) {
+        try {
+          shopState.bannerSlides = typeof s.shop_banner_slides === "string" ? JSON.parse(s.shop_banner_slides) : s.shop_banner_slides;
+        } catch (e) {
+          shopState.bannerSlides = [];
+        }
+      }
+
+      renderPromoCarousel();
 
       // CSS Theme Variables
       const root = document.documentElement;
@@ -169,16 +190,17 @@ async function loadShopSettings() {
         root.style.setProperty('--surface-border', s.color_border);
       }
 
-      const bName = s.barber_name || s.app_name || "Turnero";
+      const bName = s.barber_name || s.app_name || "SHOP BARBER";
       document.title = `${bName} // Shop Barber`;
+
+      const shopBrandImg = document.getElementById("shopHeaderLogoImg");
+      if (shopBrandImg) {
+        shopBrandImg.src = "/static/img/barbershop.png";
+      }
 
       const shopBrand = document.getElementById("shopHeaderBrandTitle");
       if (shopBrand) {
-        if (s.logo_url) {
-          shopBrand.innerHTML = `<img src="${s.logo_url}" alt="${escapeHtml(bName)}" class="h-8 md:h-10 object-contain inline-block mr-2" /> <span class="hidden md:inline">${escapeHtml(bName.toUpperCase())}</span>`;
-        } else {
-          shopBrand.innerHTML = `${escapeHtml(bName.toUpperCase())}<span class="text-[#d4ff00]">_</span>`;
-        }
+        shopBrand.innerHTML = `SHOP BARBER<span class="text-[#d4ff00]">_</span>`;
       }
 
       const title = document.getElementById("shopTitle");
@@ -191,6 +213,115 @@ async function loadShopSettings() {
       }
     }
   } catch (e) {}
+}
+
+// CARRUSEL DE BANNERS PROMOCIONALES DINÁMICO
+function renderPromoCarousel() {
+  const slidesContainer = document.getElementById("promoCarouselSlides");
+  const dotsContainer = document.getElementById("promoCarouselDots");
+  if (!slidesContainer) return;
+
+  slidesContainer.innerHTML = "";
+  if (dotsContainer) dotsContainer.innerHTML = "";
+
+  const slides = shopState.bannerSlides && shopState.bannerSlides.length > 0 ? shopState.bannerSlides : [
+    {
+      id: 1,
+      title: "COMBO CUIDADO DE AUTOR",
+      subtitle: "Pomada Mate + Aceite Esencial con 15% OFF",
+      badge: "🔥 PROMO CLUB",
+      image_url: "/static/img/fondo.png",
+      coupon: "BARBER15"
+    },
+    {
+      id: 2,
+      title: "SERUMS & ACEITES ESENCIALES",
+      subtitle: "Brillo natural e hidratación profunda 24 hs",
+      badge: "⭐ RECOMENDADO",
+      image_url: "/static/img/fondo3.png",
+      coupon: "BARBER10"
+    }
+  ];
+
+  shopState.bannerSlides = slides;
+
+  slides.forEach((slide, idx) => {
+    const slideDiv = document.createElement("div");
+    slideDiv.className = "w-full shrink-0 p-6 flex flex-col justify-center relative overflow-hidden bg-cover bg-center min-h-[170px] sm:min-h-[200px]";
+    slideDiv.style.backgroundImage = `linear-gradient(to right, rgba(19, 19, 24, 0.92) 35%, rgba(19, 19, 24, 0.45)), url('${slide.image_url || '/static/img/fondo.png'}')`;
+
+    slideDiv.innerHTML = `
+      <div class="relative z-10 flex flex-col items-start gap-1.5 max-w-sm">
+        <span class="text-[10px] font-mono font-extrabold uppercase tracking-widest text-[#d4ff00] px-2.5 py-0.5 rounded-full bg-[#d4ff00]/15 border border-[#d4ff00]/30 shadow-sm">
+          ${escapeHtml(slide.badge || 'OFERTA DESTACADA')}
+        </span>
+        <h2 class="text-lg sm:text-xl font-extrabold font-mono text-white tracking-tight leading-tight">${escapeHtml(slide.title)}</h2>
+        <p class="text-xs text-gray-200 line-clamp-2">${escapeHtml(slide.subtitle || '')}</p>
+        ${slide.coupon ? `
+          <button type="button" onclick="applyCouponFromSlide('${escapeHtml(slide.coupon)}')" class="mt-1 px-3.5 py-1.5 rounded-full bg-[#d4ff00] text-black font-mono font-bold text-xs hover:bg-[#d4ff00]/90 transition shadow flex items-center gap-1.5">
+            <span>🎟️ USAR CUPÓN ${escapeHtml(slide.coupon)}</span>
+          </button>
+        ` : ''}
+      </div>
+    `;
+    slidesContainer.appendChild(slideDiv);
+
+    if (dotsContainer) {
+      const dot = document.createElement("button");
+      dot.type = "button";
+      dot.className = `w-2.5 h-2.5 rounded-full transition-all ${idx === 0 ? 'bg-[#d4ff00] w-6' : 'bg-white/30 hover:bg-white/60'}`;
+      dot.onclick = () => goToPromoSlide(idx);
+      dotsContainer.appendChild(dot);
+    }
+  });
+
+  goToPromoSlide(0);
+  startPromoCarouselAutoPlay();
+}
+
+function goToPromoSlide(index) {
+  const slidesContainer = document.getElementById("promoCarouselSlides");
+  const dotsContainer = document.getElementById("promoCarouselDots");
+  if (!slidesContainer) return;
+
+  const total = shopState.bannerSlides.length;
+  if (total === 0) return;
+
+  shopState.currentSlideIndex = (index + total) % total;
+  slidesContainer.style.transform = `translateX(-${shopState.currentSlideIndex * 100}%)`;
+
+  if (dotsContainer) {
+    const dots = dotsContainer.querySelectorAll("button");
+    dots.forEach((dot, idx) => {
+      if (idx === shopState.currentSlideIndex) {
+        dot.className = "w-6 h-2.5 rounded-full bg-[#d4ff00] transition-all";
+      } else {
+        dot.className = "w-2.5 h-2.5 rounded-full bg-white/30 hover:bg-white/60 transition-all";
+      }
+    });
+  }
+}
+
+function nextPromoSlide() {
+  goToPromoSlide(shopState.currentSlideIndex + 1);
+}
+
+function prevPromoSlide() {
+  goToPromoSlide(shopState.currentSlideIndex - 1);
+}
+
+function startPromoCarouselAutoPlay() {
+  if (shopState.carouselTimer) clearInterval(shopState.carouselTimer);
+  shopState.carouselTimer = setInterval(() => {
+    nextPromoSlide();
+  }, 6000);
+}
+
+function applyCouponFromSlide(code) {
+  const input = document.getElementById("cartCouponInput");
+  if (input) input.value = code;
+  applyCartCoupon(code);
+  toggleCartDrawer();
 }
 
 async function loadShopCategories() {
@@ -334,6 +465,48 @@ function changeCartQty(prodId, delta) {
   }
 }
 
+function applyCartCoupon(explicitCode = null) {
+  const input = document.getElementById("cartCouponInput");
+  const code = (explicitCode || (input ? input.value : "")).trim().toUpperCase();
+  const msgEl = document.getElementById("couponMsg");
+
+  if (!code) {
+    shopState.activeCoupon = null;
+    saveCartToStorage();
+    if (msgEl) msgEl.textContent = "Ingresá un código de descuento arriba.";
+    return;
+  }
+
+  // Cargar cupones disponibles
+  let availableCoupons = [];
+  if (shopState.shopSettings.shop_coupons) {
+    try {
+      availableCoupons = typeof shopState.shopSettings.shop_coupons === "string" ? JSON.parse(shopState.shopSettings.shop_coupons) : shopState.shopSettings.shop_coupons;
+    } catch(e) {}
+  }
+  if (availableCoupons.length === 0) {
+    availableCoupons = [
+      { code: "BARBER10", type: "percent", value: 10, active: true, description: "10% de descuento en tu compra" },
+      { code: "BARBER15", type: "percent", value: 15, active: true, description: "15% de descuento exclusivo Club" },
+      { code: "CLUB20", type: "percent", value: 20, active: true, description: "20% de descuento socio VIP" },
+      { code: "VIP500", type: "fixed", value: 500, active: true, description: "$500 de regalo en tu compra" }
+    ];
+  }
+
+  const match = availableCoupons.find(c => c.code.toUpperCase() === code && (c.active === undefined || c.active === true));
+
+  if (match) {
+    shopState.activeCoupon = match;
+    saveCartToStorage();
+    if (msgEl) msgEl.textContent = `✅ ${match.description || '¡Descuento aplicado!'}`;
+    UISound.play("success");
+  } else {
+    shopState.activeCoupon = null;
+    saveCartToStorage();
+    if (msgEl) msgEl.textContent = "❌ Código de descuento no válido o vencido.";
+  }
+}
+
 function updateCartUI() {
   const badge = document.getElementById("cartCountBadge");
   const totalCount = shopState.cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -341,6 +514,11 @@ function updateCartUI() {
 
   const container = document.getElementById("cartItemsContainer");
   const subtotalEl = document.getElementById("cartSubtotal");
+  const discountRow = document.getElementById("cartDiscountRow");
+  const discountAmountEl = document.getElementById("cartDiscountAmount");
+  const totalEl = document.getElementById("cartTotal");
+  const badgeCoupon = document.getElementById("couponStatusBadge");
+
   if (!container) return;
 
   container.innerHTML = "";
@@ -349,6 +527,12 @@ function updateCartUI() {
   if (shopState.cart.length === 0) {
     container.innerHTML = '<div class="text-center text-xs text-gray-500 py-12 font-mono">Tu carrito está vacío.</div>';
     if (subtotalEl) subtotalEl.textContent = "$0";
+    if (totalEl) totalEl.textContent = "$0";
+    if (discountRow) discountRow.classList.add("hidden");
+    if (badgeCoupon) {
+      badgeCoupon.textContent = "🏷️ Precio de Lista";
+      badgeCoupon.className = "text-[10px] font-mono text-gray-400 font-bold px-2 py-0.5 rounded-full bg-black/60 border border-[#23232c]";
+    }
     return;
   }
 
@@ -360,7 +544,7 @@ function updateCartUI() {
     div.className = "flex items-center justify-between p-3 rounded-xl bg-[#1a1a22] border border-[#23232c]";
     div.innerHTML = `
       <div class="flex items-center gap-3">
-        <img src="${item.product.image_url || ''}" class="w-10 h-10 object-cover rounded-lg">
+        <img src="${item.product.image_url || 'https://images.unsplash.com/photo-1597852074816-d933c7d2b988?auto=format&fit=crop&w=100&q=80'}" class="w-12 h-12 object-cover rounded-xl border border-[#23232c]">
         <div>
           <h4 class="text-xs font-bold text-white max-w-[140px] truncate">${escapeHtml(item.product.name)}</h4>
           <span class="text-[11px] font-mono text-[#d4ff00] font-bold">$${item.product.price.toLocaleString("es-AR")}</span>
@@ -377,7 +561,37 @@ function updateCartUI() {
     container.appendChild(div);
   });
 
+  // Cálculo de Descuento
+  let discountVal = 0;
+  if (shopState.activeCoupon) {
+    const c = shopState.activeCoupon;
+    if (c.type === "percent") {
+      discountVal = Math.round(subtotal * (c.value / 100));
+    } else if (c.type === "fixed") {
+      discountVal = Math.min(subtotal, c.value);
+    }
+  }
+
+  const finalTotal = Math.max(0, subtotal - discountVal);
+
   if (subtotalEl) subtotalEl.textContent = `$${subtotal.toLocaleString("es-AR")}`;
+
+  if (discountVal > 0 && shopState.activeCoupon) {
+    if (discountRow) discountRow.classList.remove("hidden");
+    if (discountAmountEl) discountAmountEl.textContent = `-$${discountVal.toLocaleString("es-AR")}`;
+    if (badgeCoupon) {
+      badgeCoupon.textContent = `🎟️ ${shopState.activeCoupon.code} (-${shopState.activeCoupon.type === 'percent' ? shopState.activeCoupon.value + '%' : '$' + shopState.activeCoupon.value})`;
+      badgeCoupon.className = "text-[10px] font-mono text-emerald-400 font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30";
+    }
+  } else {
+    if (discountRow) discountRow.classList.add("hidden");
+    if (badgeCoupon) {
+      badgeCoupon.textContent = "🏷️ Precio de Lista";
+      badgeCoupon.className = "text-[10px] font-mono text-gray-400 font-bold px-2 py-0.5 rounded-full bg-black/60 border border-[#23232c]";
+    }
+  }
+
+  if (totalEl) totalEl.textContent = `$${finalTotal.toLocaleString("es-AR")}`;
 }
 
 function toggleCartDrawer() {
@@ -451,7 +665,17 @@ function updateCheckoutTotal() {
     if (zone) deliveryCost = zone.cost;
   }
 
-  const total = subtotal + deliveryCost;
+  let discountVal = 0;
+  if (shopState.activeCoupon) {
+    const c = shopState.activeCoupon;
+    if (c.type === "percent") {
+      discountVal = Math.round(subtotal * (c.value / 100));
+    } else if (c.type === "fixed") {
+      discountVal = Math.min(subtotal, c.value);
+    }
+  }
+
+  const total = Math.max(0, subtotal - discountVal + deliveryCost);
 
   document.getElementById("chkSubtotal").textContent = `$${subtotal.toLocaleString("es-AR")}`;
   document.getElementById("chkDeliveryCost").textContent = `$${deliveryCost.toLocaleString("es-AR")}`;
@@ -499,13 +723,15 @@ async function submitShopOrder() {
 
     const data = await res.json();
     if (res.ok) {
-      // Vaciar carrito
+      // Vaciar carrito y cupón
+      const appliedCoupon = shopState.activeCoupon;
       shopState.cart = [];
+      shopState.activeCoupon = null;
       saveCartToStorage();
       closeCheckoutModal();
 
       // Coordinar por WhatsApp
-      coordinatingWhatsAppOrder(data);
+      coordinatingWhatsAppOrder(data, appliedCoupon);
     } else {
       alert(data.detail || "Error al generar pedido.");
     }
@@ -517,7 +743,7 @@ async function submitShopOrder() {
   }
 }
 
-function coordinatingWhatsAppOrder(order) {
+function coordinatingWhatsAppOrder(order, coupon = null) {
   const barberPhone = shopState.shopSettings.whatsapp || "5493834123456";
   const cleanPhone = barberPhone.replace(/\D/g, "");
 
@@ -534,9 +760,12 @@ function coordinatingWhatsAppOrder(order) {
   });
 
   msg += `\n💰 *Subtotal:* $${order.subtotal.toLocaleString("es-AR")}\n`;
+  if (coupon) {
+    msg += `🎟️ *Voucher Aplicado:* ${coupon.code} (${coupon.description || ''})\n`;
+  }
   msg += `🚚 *Delivery:* $${order.delivery_cost.toLocaleString("es-AR")}\n`;
-  msg += `⭐ *TOTAL:* $${order.total.toLocaleString("es-AR")}\n\n`;
-  msg += `¡Hola! Acabo de realizar este pedido desde el Shop. ¿Cómo coordinamos el pago/entrega?`;
+  msg += `⭐ *TOTAL FINAL:* $${order.total.toLocaleString("es-AR")}\n\n`;
+  msg += `¡Hola! Acabo de realizar este pedido desde el Shop Barber. ¿Cómo coordinamos el pago/entrega?`;
 
   const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
   window.open(waUrl, "_blank");
@@ -551,7 +780,7 @@ function escapeHtml(str) {
 // STAFF GATEKEEPER - CONTROL DE ACCESO A INVENTARIO
 // ==============================================================================
 async function openStaffGatekeeperModal() {
-  const token = localStorage.getItem("bladesync_admin_token");
+  const token = localStorage.getItem("hiddensync_admin_token") || localStorage.getItem("bladesync_admin_token");
   if (token) {
     try {
       const res = await fetch("/api/admin/me", {
@@ -565,6 +794,7 @@ async function openStaffGatekeeperModal() {
           return;
         }
       } else {
+        localStorage.removeItem("hiddensync_admin_token");
         localStorage.removeItem("bladesync_admin_token");
       }
     } catch (e) {
@@ -627,10 +857,12 @@ async function handleGatekeeperSubmit(event) {
 
     const data = await res.json();
 
-    if (res.ok && data.token) {
+    const token = data.access_token || data.token;
+    if (res.ok && token) {
       const role = (data.role || "").toLowerCase();
       if (role === "admin" || role === "encargado") {
-        localStorage.setItem("bladesync_admin_token", data.token);
+        localStorage.setItem("hiddensync_admin_token", token);
+        localStorage.setItem("bladesync_admin_token", token);
         window.location.href = "/inventario.html";
         return;
       } else {

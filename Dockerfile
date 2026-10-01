@@ -1,5 +1,5 @@
 # ==========================================
-# BLADESYNC AI 2026 - PRODUCTION DOCKERFILE
+# HiddenSYNC AI 2026 - PRODUCTION DOCKERFILE
 # ==========================================
 FROM python:3.11-slim
 

@@ -48,12 +48,12 @@ DEFAULT_SETTINGS = {
     "msg_maintenance": "El sistema se encuentra en mantenimiento programado.",
 
     # Logo & Assets
-    "logo_url": "",
-    "logo_dark_url": "",
-    "favicon_url": "",
-    "app_icon_url": "",
-    "cover_image_url": "",
-    "splash_image_url": "",
+    "logo_url": "/static/img/logo.png",
+    "logo_dark_url": "/static/img/logo.png",
+    "favicon_url": "/static/img/logo.png",
+    "app_icon_url": "/static/img/logo.png",
+    "cover_image_url": "/static/img/fondo.png",
+    "splash_image_url": "/static/img/fondo.png",
     "splash_title": "TURNERO",
     "splash_subtitle": "Tu estilo comienza acá.",
     "splash_welcome": "Reservá tu turno o explora nuestro shop.",
@@ -138,7 +138,54 @@ DEFAULT_SETTINGS = {
         "Viernes": {"active": True, "open": "09:00", "close": "20:00", "pause_start": "13:00", "pause_end": "14:00"},
         "Sábado": {"active": True, "open": "09:00", "close": "18:00", "pause_start": "", "pause_end": ""},
         "Domingo": {"active": False, "open": "09:00", "close": "14:00", "pause_start": "", "pause_end": ""}
-    })
+    }),
+
+    # Módulos de Hoja de Ruta Integrados
+    "enable_deposit": "0",
+    "payment_gateway_enabled": "0",
+    "payment_provider": "mercadopago",
+    "deposit_percentage": "30",
+    "deposit_mp_alias": "BARBERIA.PEREYRA.MP",
+    "mp_access_token": "",
+    "mp_public_key": "",
+    "stripe_secret_key": "",
+    "stripe_publishable_key": "",
+    "enable_barber_club": "1",
+    "points_per_amount": "100",
+    "pwa_push_enabled": "1",
+    "pwa_push_hours_before": "2",
+    "vapid_public_key": "",
+    "vapid_private_key": "",
+    "default_service_commission_percent": "50",
+    "default_product_commission_percent": "10",
+    "enable_post_service_rating_qr": "1",
+    "gcal_sync_enabled": "1",
+
+    # Shop Barber Banners & Cupones
+    "shop_banner_slides": json.dumps([
+        {
+            "id": 1,
+            "title": "COMBO CUIDADO DE AUTOR",
+            "subtitle": "Pomada Mate + Aceite para Barba con 15% OFF",
+            "badge": "🔥 PROMO CLUB",
+            "image_url": "/static/img/fondo.png",
+            "coupon": "BARBER15"
+        },
+        {
+            "id": 2,
+            "title": "SERUMS & ACEITES ESENCIALES",
+            "subtitle": "Brillo natural e hidratación profunda 24 hs",
+            "badge": "⭐ RECOMENDADO",
+            "image_url": "/static/img/fondo3.png",
+            "coupon": "BARBER10"
+        }
+    ]),
+    "shop_coupons": json.dumps([
+        {"code": "BARBER10", "type": "percent", "value": 10, "active": True, "description": "10% de descuento en tu compra"},
+        {"code": "BARBER15", "type": "percent", "value": 15, "active": True, "description": "15% de descuento exclusivo Club"},
+        {"code": "CLUB20", "type": "percent", "value": 20, "active": True, "description": "20% de descuento socio VIP"},
+        {"code": "VIP500", "type": "fixed", "value": 500, "active": True, "description": "$500 de regalo en tu compra"}
+    ])
 }
 
 def get_all_settings(db: Session) -> Dict[str, Any]:
@@ -226,6 +273,9 @@ PUBLIC_SETTINGS_KEYS = {
 
     # Horarios de Atención
     "business_hours",
+
+    # Shop Barber Banners & Cupones
+    "shop_banner_slides", "shop_coupons",
 
     # Pantalla TV (públicos)
     "live_tv_title", "live_tv_subtitle", "live_tv_marquee",

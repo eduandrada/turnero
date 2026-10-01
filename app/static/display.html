@@ -252,6 +252,33 @@
         </div>
       </div>
 
+      <!-- TOTEM QR CHECK-IN CARD (¡ANUNCIÁ TU LLEGADA!) -->
+      <div class="bg-gradient-to-r from-[#14141e] via-[#12121a] to-[#191928] border-2 border-[#d4ff00]/60 rounded-3xl p-4 sm:p-5 shadow-[0_0_30px_rgba(212,255,0,0.15)] flex items-center justify-between gap-4">
+        <div class="flex-1 flex flex-col gap-1">
+          <div class="flex items-center gap-2">
+            <span class="text-xl animate-bounce">📱</span>
+            <span class="text-xs text-[#d4ff00] font-black uppercase tracking-widest font-mono">¡ANUNCIÁ TU LLEGADA!</span>
+            <span class="px-2 py-0.5 rounded-full bg-[#d4ff00]/20 text-[#d4ff00] text-[9px] font-black uppercase tracking-wider border border-[#d4ff00]/40 animate-pulse">CHECK-IN QR</span>
+          </div>
+          <p class="text-xs text-gray-200 font-bold leading-snug">
+            ¿Ya estás en la barbería? Escaneá el QR con la cámara de tu celular para avisar tu presencia.
+          </p>
+          <div class="text-[10px] text-gray-400 font-mono flex items-center gap-1.5 mt-0.5">
+            <span class="text-[#00f2fe] font-bold">1. Escaneá QR</span> •
+            <span>2. Ingresá Cel</span> •
+            <span class="text-[#d4ff00] font-bold">3. ¡Confirmá Check-in!</span>
+          </div>
+          <a id="tvCheckinUrlText" href="/checkin.html" target="_blank" class="text-[10px] text-[#00f2fe] font-mono hover:underline truncate block max-w-[220px] mt-1">
+            http://127.0.0.1:8000/checkin.html
+          </a>
+        </div>
+
+        <div class="bg-white p-2 rounded-2xl border-2 border-[#d4ff00] shadow-xl shrink-0 flex flex-col items-center justify-center">
+          <img id="tvCheckinQrImg" src="" alt="QR Check-in" class="w-24 h-24 sm:w-28 sm:h-28 block object-contain">
+          <span class="text-[9px] text-black font-black font-mono tracking-tighter uppercase mt-0.5">CHECK-IN QR</span>
+        </div>
+      </div>
+
     </div>
 
   </main>
@@ -484,6 +511,7 @@
 
     document.addEventListener("DOMContentLoaded", () => {
       initDigitalClock();
+      initCheckinQr();
       fetchDisplayData();
       setInterval(fetchDisplayData, 7000);
 
@@ -503,6 +531,20 @@
       };
       update();
       setInterval(update, 1000);
+    }
+
+    function initCheckinQr() {
+      const origin = window.location.origin;
+      const checkinUrl = `${origin}/checkin.html`;
+      const qrImg = document.getElementById("tvCheckinQrImg");
+      const urlText = document.getElementById("tvCheckinUrlText");
+      if (qrImg) {
+        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(checkinUrl)}`;
+      }
+      if (urlText) {
+        urlText.textContent = checkinUrl;
+        urlText.href = checkinUrl;
+      }
     }
 
     async function fetchDisplayData() {
@@ -538,7 +580,10 @@
       const nextServiceEl = document.getElementById("tvNextService");
 
       if (nextClient) {
-        nextClientNameEl.textContent = nextClient.client_name.toUpperCase();
+        const checkinBadge = nextClient.is_checked_in 
+          ? `<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-black uppercase tracking-wider animate-pulse ml-2">📍 EN SALA DE ESPERA (${nextClient.checked_in_at || 'CHECK-IN'})</span>` 
+          : '';
+        nextClientNameEl.innerHTML = escapeHtml(nextClient.client_name.toUpperCase()) + checkinBadge;
         if (nextBarberHeroEl) {
           nextBarberHeroEl.textContent = (nextClient.barber_name || "GENERAL").toUpperCase();
         }
@@ -582,6 +627,9 @@
           queueListEl.innerHTML = '<div class="py-3 text-gray-500 text-center">No hay más turnos en cola para hoy.</div>';
         } else {
           waitingList.forEach(item => {
+            const checkinPill = item.is_checked_in 
+              ? `<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">📍 LLEGÓ (${item.checked_in_at || ''})</span>`
+              : `<span class="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-300 text-[11px] font-mono">Barbero: <strong class="text-[#d4ff00]">${escapeHtml(item.barber_name)}</strong></span>`;
             const row = document.createElement("div");
             row.className = "flex justify-between items-center py-2";
             row.innerHTML = `
@@ -589,9 +637,7 @@
                 <span class="text-[#00f2fe] font-bold font-mono">${item.time_str} hs</span>
                 <span class="text-white font-bold">${escapeHtml(item.client_name)}</span>
               </div>
-              <span class="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-300 text-[11px] font-mono">
-                Barbero: <strong class="text-[#d4ff00]">${escapeHtml(item.barber_name)}</strong>
-              </span>
+              ${checkinPill}
             `;
             queueListEl.appendChild(row);
           });

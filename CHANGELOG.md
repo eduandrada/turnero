@@ -1,4 +1,4 @@
-# CHANGELOG - BLADESYNC AI / TURNERO & SHOP BARBER
+# CHANGELOG - HiddenSYNC AI / TURNERO & SHOP BARBER
 
 Todas las modificaciones notables aplicadas al proyecto durante este ciclo de refactorización y estabilización se documentan en este archivo.
 

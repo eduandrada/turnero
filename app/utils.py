@@ -1,5 +1,5 @@
 """
-app/utils.py - Utilidades centrales de BladeSync AI:
+app/utils.py - Utilidades centrales de HiddenSYNC AI:
 1. Normalización y validación de números telefónicos (Argentina / Internacional).
 2. Procesador fonético y normalización de códigos de turno para Web Speech API.
 3. Motor de plantillas y estilos de locución para Pantalla TV / Digital Signage.

@@ -321,8 +321,13 @@
           </div>
 
           <div class="form-group" style="grid-column: 1 / -1;">
-            <label>URL IMAGEN PRODUCTO</label>
-            <input type="text" id="pm_image_url" class="form-control" placeholder="/static/products/cera.jpg">
+            <label>IMAGEN DEL PRODUCTO (SUBIR DESDE CELULAR/PC O PEGAR LINK):</label>
+            <input type="file" id="pm_image_file" accept="image/*" onchange="uploadProductFileInv(this)" class="form-control" style="padding: 6px; font-size: 0.8rem; background: #09090c; margin-bottom: 6px;">
+            <input type="text" id="pm_image_url" class="form-control" placeholder="Link URL (https://... o /static/uploads/...)" oninput="updatePmImagePreview(this.value)">
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+              <img id="pm_image_preview" src="" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid #23232c; display: none;">
+              <span id="pm_image_status" style="font-size: 0.75rem; color: #9ca3af;">Puedes capturar desde la cámara, elegir una foto o pegar una URL.</span>
+            </div>
           </div>
 
           <div class="form-group" style="grid-column: 1 / -1;">
@@ -420,7 +425,7 @@
 
   <!-- JAVASCRIPT LOGIC -->
   <script>
-    let invToken = localStorage.getItem("bladesync_admin_token") || "";
+    let invToken = localStorage.getItem("hiddensync_admin_token") || localStorage.getItem("bladesync_admin_token") || "";
     let currentCategoryFilter = "";
     let currentAlertFilter = false;
     let cachedProducts = [];
@@ -471,8 +476,10 @@
           body: JSON.stringify({ username: u, password: p })
         });
         const data = await res.json();
-        if (res.ok && data.token) {
-          invToken = data.token;
+        const token = data.access_token || data.token;
+        if (res.ok && token) {
+          invToken = token;
+          localStorage.setItem("hiddensync_admin_token", invToken);
           localStorage.setItem("bladesync_admin_token", invToken);
           hideAuthOverlay();
           loadInventoryAnalytics();
@@ -487,6 +494,7 @@
 
     function invLogout() {
       invToken = "";
+      localStorage.removeItem("hiddensync_admin_token");
       localStorage.removeItem("bladesync_admin_token");
       showAuthOverlay();
     }
@@ -605,7 +613,7 @@
         tr.innerHTML = `
           <td>
             <div style="display: flex; align-items: center; gap: 10px;">
-              <img src="${p.image_url || '/static/products/cera.jpg'}" style="width: 38px; height: 38px; object-fit: cover; border-radius: 8px; background: #1a1a22;">
+              <img src="${p.image_url || '/static/products/cera.jpg'}" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2238%22 height=%2238%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><rect x=%222%22 y=%223%22 width=%2220%22 height=%2214%22 rx=%222%22/><path d=%22M6 21h12%22/><path d=%22M12 17v4%22/></svg>';" style="width: 38px; height: 38px; object-fit: cover; border-radius: 8px; background: #1a1a22;">
               <div>
                 <strong style="color: #fff; font-size: 0.9rem;">${escapeHtml(p.name)}</strong>
                 ${p.sku ? `<span style="font-family: monospace; color: #9ca3af; font-size: 0.7rem; display: block;">SKU: ${escapeHtml(p.sku)}</span>` : ''}
@@ -700,8 +708,55 @@
       document.getElementById("pm_stock").value = p.stock !== undefined ? p.stock : (p.current_stock || 0);
       document.getElementById("pm_min_stock").value = p.min_stock || 2;
       document.getElementById("pm_image_url").value = p.image_url || "";
+      updatePmImagePreview(p.image_url || "");
       document.getElementById("pm_description").value = p.description || "";
       document.getElementById("productModal").style.display = "flex";
+    }
+
+    async function uploadProductFileInv(input) {
+      if (!input.files || input.files.length === 0) return;
+      const file = input.files[0];
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const statusEl = document.getElementById("pm_image_status");
+      if (statusEl) statusEl.textContent = "Uploading image...";
+
+      try {
+        const res = await fetch("/api/admin/upload", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${invToken}` },
+          body: formData
+        });
+        const data = await res.json();
+        const url = data.file_url || data.url;
+        if (res.ok && url) {
+          document.getElementById("pm_image_url").value = url;
+          updatePmImagePreview(url);
+          if (statusEl) statusEl.textContent = "✅ Imagen subida correctamente";
+        } else {
+          alert(data.detail || "Error al subir imagen.");
+          if (statusEl) statusEl.textContent = "Error al subir imagen";
+        }
+      } catch (e) {
+        alert("Error de conexión al subir la imagen.");
+        if (statusEl) statusEl.textContent = "Error de conexión";
+      }
+    }
+
+    function updatePmImagePreview(url) {
+      const img = document.getElementById("pm_image_preview");
+      const statusEl = document.getElementById("pm_image_status");
+      if (!img) return;
+
+      if (url && url.trim().length > 0) {
+        img.src = url;
+        img.style.display = "block";
+        if (statusEl) statusEl.textContent = "Vista previa cargada";
+      } else {
+        img.style.display = "none";
+        if (statusEl) statusEl.textContent = "Puedes capturar desde la cámara, elegir una foto o pegar una URL.";
+      }
     }
 
     async function submitProductForm() {

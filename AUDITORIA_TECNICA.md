@@ -1,5 +1,5 @@
 # INFORME DE AUDITORÍA TÉCNICA, ESTABILIZACIÓN Y SEGURIDAD INTEGRAL
-## Turnero de Barbería & Shop PWA (BladeSync AI)
+## Turnero de Barbería & Shop PWA (HiddenSYNC AI)
 
 **Fecha:** 2026-09-27  
 **Rol:** Arquitecto de Software, Backend Developer Senior, Especialista en Seguridad y Concurrencia  

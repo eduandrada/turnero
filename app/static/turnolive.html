@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0c">
+  <title>TURNO LIVE // Tablero Unificado & Moderador en Vivo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/admin.css">
+
+  <style>
+    :root {
+      --neon-volt: #d4ff00;
+      --neon-cyan: #00f2fe;
+      --bg-dark: #0a0a0c;
+      --card-bg: #131318;
+      --card-border: #23232c;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: #f3f4f6;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background-image: 
+        radial-gradient(at 10% 10%, rgba(212, 255, 0, 0.04) 0px, transparent 50%),
+        radial-gradient(at 90% 90%, rgba(0, 242, 254, 0.04) 0px, transparent 50%);
+    }
+
+    .font-mono-num {
+      font-family: 'Space Grotesk', monospace;
+    }
+
+    .turnos-header {
+      background: #131318;
+      border-bottom: 1px solid #23232c;
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+
+    .tab-bar {
+      display: flex;
+      gap: 6px;
+      background: #1a1a22;
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid #23232c;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      font-family: 'Space Grotesk', monospace;
+      font-weight: 700;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tab-btn.active {
+      background: #d4ff00;
+      color: #0a0a0c;
+      box-shadow: 0 4px 12px rgba(212, 255, 0, 0.2);
+    }
+
+    .tab-btn .count-badge {
+      background: rgba(0, 0, 0, 0.15);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+    }
+
+    .status-pill {
+      font-family: 'Space Grotesk', monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .status-PENDIENTE { background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3); }
+    .status-EN_SILLA { background: rgba(0, 242, 254, 0.15); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.4); animation: pulseGlow 2s infinite; }
+    .status-COMPLETADO { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .status-CANCELADO { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 5px rgba(0, 242, 254, 0.2); }
+      50% { box-shadow: 0 0 15px rgba(0, 242, 254, 0.5); }
+    }
+
+    .btn-contingencia {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      font-family: 'Space Grotesk', monospace;
+      font-weight: 700;
+      padding: 8px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+    }
+
+    .btn-contingencia:hover {
+      background: #ef4444;
+      color: #ffffff;
+    }
+
+    .border-glow-volt {
+      border-color: var(--neon-volt);
+      box-shadow: 0 0 25px rgba(212, 255, 0, 0.22);
+    }
+    .border-glow-cyan {
+      border-color: var(--neon-cyan);
+      box-shadow: 0 0 25px rgba(0, 242, 254, 0.22);
+    }
+
+    /* Modal Backdrop */
+    .modal-backdrop {
+      background-color: rgba(0, 0, 0, 0.88);
+      backdrop-filter: blur(8px);
+    }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen antialiased selection:bg-[#d4ff00] selection:text-black">
+
+  <!-- PANTALLA DE BLOQUEO / AUTH LOCK OVERLAY -->
+  <div id="authLockOverlay" style="position: fixed; inset: 0; background: rgba(10, 10, 12, 0.95); backdrop-filter: blur(12px); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 20px; width: 100%; max-width: 420px; padding: 36px; box-shadow: 0 20px 40px rgba(0,0,0,0.9); text-align: center;">
+      <div style="margin-bottom: 24px;">
+        <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #d4ff00; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">TABLERO UNIFICADO</span>
+        <h2 style="font-family: 'Space Grotesk', monospace; color: #ffffff; margin: 8px 0 4px 0; font-size: 1.6rem;">TURNO LIVE 2026</h2>
+        <p style="color: #9ca3af; font-size: 0.85rem; margin: 0;">Ingresá tus credenciales de operador o administrador para acceder al centro de control.</p>
+      </div>
+
+      <form id="authLoginForm" onsubmit="event.preventDefault(); handleOperatorLogin();">
+        <div class="form-group" style="text-align: left; margin-bottom: 16px;">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">USUARIO</label>
+          <input type="text" id="opUsername" class="form-control" placeholder="admin / operador" value="admin" required style="margin-top: 4px;">
+        </div>
+        <div class="form-group" style="text-align: left; margin-bottom: 24px;">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">CONTRASEÑA</label>
+          <input type="password" id="opPassword" class="form-control" placeholder="••••••••" required style="margin-top: 4px;">
+        </div>
+
+        <button type="submit" class="btn-admin" style="width: 100%; justify-content: center; padding: 14px; font-size: 0.95rem; margin-bottom: 16px; background: #d4ff00; color: #000; font-weight: 800;">
+          🔓 INGRESAR AL TABLERO →
+        </button>
+
+        <a href="/" style="display: block; color: #94a3b8; font-size: 0.85rem; text-decoration: none; padding: 8px;">
+          ← Volver al Turnero (Cliente)
+        </a>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- APPLICACIÓN PRINCIPAL UNIFICADA (TURNO LIVE) -->
+  <div id="liveTurnosApp" style="display: none;" class="flex flex-col min-h-screen">
+    
+    <!-- HEADER CONTROL UNIFICADO -->
+    <header class="turnos-header">
+      <div class="flex items-center gap-3">
+        <a href="/" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 8px;" title="Ir al Turnero Público">
+          <span class="text-lg">📋</span>
+          <span class="font-mono-num font-extrabold text-white text-base sm:text-lg">PEREYRAS BARBERS <span class="text-[#d4ff00]">//</span> TURNO LIVE</span>
+        </a>
+        <span class="text-[10px] font-mono-num font-bold px-2 py-0.5 rounded bg-[#d4ff00]/10 border border-[#d4ff00]/30 text-[#d4ff00] uppercase hidden sm:inline">RECEPCIÓN & VIVO</span>
+      </div>
+
+      <!-- DIGITAL CLOCK & REFRESH -->
+      <div class="flex items-center gap-2 bg-[#181820] px-3 py-1 rounded-xl border border-[#23232c]">
+        <span class="text-[11px] text-gray-400 font-mono-num">HORA:</span>
+        <span class="text-sm sm:text-base font-extrabold font-mono-num text-white tracking-wider" id="digitalClock">00:00:00</span>
+        <span class="text-[9px] font-mono-num text-[#d4ff00] font-bold">ART</span>
+      </div>
+
+      <!-- ACCIONES OPERATIVAS Y NAVEGACIÓN -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <button onclick="announceCurrentTurnVoice()" title="Llamar Próximo Turno por Voz" class="btn-admin btn-admin-sm" style="background: rgba(212, 255, 0, 0.15); color: #d4ff00; border: 1px solid rgba(212, 255, 0, 0.4); font-weight: bold;">
+          🔔 Llamar Turno
+        </button>
+        <button onclick="openWalkInModal()" title="Agregar Cliente Espontáneo" class="btn-admin btn-admin-sm" style="background: #d4ff00; color: #000; font-weight: 800;">
+          + Walk-in
+        </button>
+        <button onclick="openShiftClosureModal()" class="btn-admin btn-admin-sm" style="background: #10b981; color: #000; font-weight: 800;">
+          💵 Rendición
+        </button>
+        <button onclick="openCheckinQrModal()" class="btn-admin btn-admin-sm" style="background: rgba(0, 242, 254, 0.15); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.4); font-weight: bold;" title="Ver / Imprimir QR Totem de Check-in para Clientes">
+          📲 QR Check-in
+        </button>
+        <button class="btn-contingencia" onclick="openContingencyModal()">
+          ⚠️ Reasignar
+        </button>
+        <button onclick="openTvConfigModal()" class="btn-admin btn-admin-secondary btn-admin-sm" title="Ajustes TV & Marquesina">
+          ⚙️ Ajustes TV
+        </button>
+        <a href="/display.html" target="_blank" class="btn-admin btn-admin-secondary btn-admin-sm" style="color: #00f2fe; border-color: rgba(0, 242, 254, 0.4);" title="Abrir Cartelera TV Gigante">
+          📺 TV Billboard ↗
+        </a>
+        <a href="/inventario.html" target="_blank" class="btn-admin btn-admin-secondary btn-admin-sm" style="color: #c084fc; border-color: rgba(192, 132, 252, 0.4);">
+          📦 Inventario ↗
+        </a>
+        <button onclick="operatorLogout()" class="btn-admin btn-admin-secondary btn-admin-sm" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">
+          🚪 Salir
+        </button>
+      </div>
+    </header>
+
+
+    <!-- CONTENIDO PRINCIPAL DE TURNO LIVE -->
+    <main class="w-full max-w-7xl mx-auto p-3 sm:p-6 flex flex-col gap-6">
+
+      <!-- MODERADOR VIVO BANNER: ATENDIENDO Y PRÓXIMO EN ESPERA -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <!-- CARD: CLIENTE ACTUAL EN SILLA -->
+        <div class="bg-[#131318] border border-[#23232c] rounded-2xl p-4 sm:p-5 flex flex-col justify-between relative overflow-hidden border-glow-cyan">
+          <div class="flex justify-between items-start mb-3">
+            <span class="text-[10px] font-mono-num font-extrabold uppercase tracking-widest text-[#00f2fe] bg-[#00f2fe]/10 border border-[#00f2fe]/30 px-2.5 py-0.5 rounded-full">
+              💈 ATENDIENDO AHORA EN SILLA
+            </span>
+            <span class="text-xs font-mono-num text-gray-400" id="liveActiveTime">--:-- hs</span>
+          </div>
+
+          <div class="my-2">
+            <h3 class="text-xl sm:text-2xl font-extrabold font-mono-num text-white tracking-tight" id="liveActiveClient">
+              Sin Turno Activo
+            </h3>
+            <p class="text-xs text-gray-400 mt-1 flex items-center gap-2">
+              <span id="liveActiveService">Servicio no iniciado</span> • <span class="text-[#00f2fe] font-bold" id="liveActiveBarber">Sin Barbero</span>
+            </p>
+          </div>
+
+          <div class="mt-3 pt-3 border-t border-[#23232c] flex justify-between items-center gap-2 flex-wrap">
+            <span class="text-xs font-mono-num text-gray-400">Estado: <strong class="text-[#00f2fe]" id="liveActiveStatus">Esperando inicio</strong></span>
+            <div class="flex items-center gap-2">
+              <button onclick="finishAndCallNextFromHeader()" class="text-xs font-mono-num font-black text-black bg-[#d4ff00] hover:bg-[#bce600] px-3 py-1.5 rounded-lg border border-[#d4ff00] shadow-[0_0_12px_rgba(212,255,0,0.4)] transition-all flex items-center gap-1" title="Finalizar corte actual y llamar inmediatamente al próximo cliente en cola">
+                ⚡ Sigue el Próximo
+              </button>
+              <button onclick="announceCurrentTurnVoice()" class="text-xs font-mono-num font-bold text-[#00f2fe] hover:underline flex items-center gap-1 bg-[#00f2fe]/10 px-2.5 py-1 rounded-lg border border-[#00f2fe]/30">
+                🔊 Vocalizar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD: PRÓXIMO CLIENTE EN ESPERA -->
+        <div class="bg-[#131318] border border-[#23232c] rounded-2xl p-4 sm:p-5 flex flex-col justify-between relative overflow-hidden border-glow-volt">
+          <div class="flex justify-between items-start mb-3">
+            <span class="text-[10px] font-mono-num font-extrabold uppercase tracking-widest text-[#d4ff00] bg-[#d4ff00]/10 border border-[#d4ff00]/30 px-2.5 py-0.5 rounded-full">
+              ⏳ PRÓXIMO EN FILA DE ESPERA
+            </span>
+            <span class="text-xs font-mono-num text-gray-400" id="liveNextTime">--:-- hs</span>
+          </div>
+
+          <div class="my-2">
+            <h3 class="text-xl sm:text-2xl font-extrabold font-mono-num text-white tracking-tight" id="liveNextClient">
+              No hay turnos siguientes
+            </h3>
+            <p class="text-xs text-gray-400 mt-1 flex items-center gap-2">
+              <span id="liveNextService">Sin datos</span> • <span class="text-[#d4ff00] font-bold" id="liveNextBarber">Sin Asignar</span>
+            </p>
+          </div>
+
+          <div class="mt-3 pt-3 border-t border-[#23232c] flex justify-between items-center">
+            <span class="text-xs font-mono-num text-gray-400">Acción Rápida:</span>
+            <button onclick="openWalkInModal()" class="text-xs font-mono-num font-bold text-[#d4ff00] hover:underline flex items-center gap-1 bg-[#d4ff00]/10 px-2.5 py-1 rounded-lg border border-[#d4ff00]/30">
+              + Agregar Walk-in
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+
+      <!-- SECCIÓN TABLERO DE GESTIÓN DE TURNOS -->
+      <div class="bg-[#131318] border border-[#23232c] rounded-2xl p-4 sm:p-6 shadow-xl">
+        
+        <!-- HEADER TABLERO: TABS Y BÚSQUEDA -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 pb-4 border-b border-[#23232c]">
+          
+          <div class="flex items-center gap-3 flex-wrap">
+            <div class="tab-bar">
+              <button class="tab-btn active" id="tabToday" onclick="switchDayTab('today')">
+                📅 HOY <span class="count-badge" id="countToday">0</span>
+              </button>
+              <button class="tab-btn" id="tabTomorrow" onclick="switchDayTab('tomorrow')">
+                📅 MAÑANA <span class="count-badge" id="countTomorrow">0</span>
+              </button>
+            </div>
+            <div>
+              <h2 class="font-mono-num text-lg font-bold text-white" id="currentTabLabel">Turnos de Hoy</h2>
+              <p class="text-xs text-gray-400" id="currentTabSub">Agenda cronológica en tiempo real</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 w-full md:w-auto">
+            <input type="text" id="searchClientInput" class="form-control text-xs" placeholder="🔍 Buscar cliente o teléfono..." onkeyup="filterLiveTurnos()" style="padding: 8px 12px; width: 100%; max-width: 260px;">
+            <button class="btn-admin btn-admin-secondary btn-admin-sm shrink-0" onclick="loadLiveTurnosData()">
+              🔄 Refrescar
+            </button>
+          </div>
+        </div>
+
+        <!-- FILTROS DE ESTADO (PILLS) -->
+        <div class="flex items-center gap-2 flex-wrap mb-4" id="statusPillsContainer">
+          <button class="status-pill status-EN_SILLA" id="pill-activos" onclick="setLiveStatusFilter('activos')">
+            ⚡ Por Atender <span class="bg-black/30 px-1.5 py-0.5 rounded text-[10px]" id="countLiveActivos">0</span>
+          </button>
+          <button class="status-pill status-COMPLETADO" id="pill-completado" onclick="setLiveStatusFilter('COMPLETADO')">
+            ✅ Ya Atendidos <span class="bg-black/30 px-1.5 py-0.5 rounded text-[10px]" id="countLiveCompletados">0</span>
+          </button>
+          <button class="status-pill status-PENDIENTE" id="pill-pendiente" onclick="setLiveStatusFilter('PENDIENTE')">
+            ⏳ Pendientes <span class="bg-black/30 px-1.5 py-0.5 rounded text-[10px]" id="countLivePendientes">0</span>
+          </button>
+        </div>
+
+        <!-- TABLA DE TURNOS OPERATIVOS -->
+        <div class="admin-table-wrapper">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Horario</th>
+                <th>Cliente</th>
+                <th>Contacto WhatsApp</th>
+                <th>Barbero</th>
+                <th>Servicio</th>
+                <th>Estado</th>
+                <th style="text-align: right;">Acciones Operativas</th>
+              </tr>
+            </thead>
+            <tbody id="liveTurnosTableBody">
+              <tr>
+                <td colspan="7" class="text-center text-gray-500 py-8 font-mono-num animate-pulse">
+                  Cargando agenda de turnos...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+
+  <!-- ============================================== -->
+  <!-- MODALES DE OPERACIÓN INTEGRADOS -->
+  <!-- ============================================== -->
+
+  <!-- MODAL WALK-IN -->
+  <div id="walkInModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 modal-backdrop">
+    <div class="w-full max-w-md bg-[#131318] border border-[#23232c] rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex justify-between items-center border-b border-[#23232c] pb-3">
+        <h3 class="text-base font-mono-num font-bold text-white flex items-center gap-2">
+          <span>⚡</span> Agregar Cliente Espontáneo (Walk-in)
+        </h3>
+        <button onclick="closeWalkInModal()" class="text-gray-400 hover:text-white text-lg">✕</button>
+      </div>
+
+      <form id="walkInForm" onsubmit="event.preventDefault(); submitWalkIn();" class="flex flex-col gap-3">
+        <div>
+          <label class="text-xs font-mono-num text-gray-400 block mb-1">Nombre del Cliente</label>
+          <input type="text" id="walkInClientName" required placeholder="Ej: Juan Pérez" class="w-full bg-[#0a0a0c] border border-[#23232c] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#d4ff00]">
+        </div>
+        <div>
+          <label class="text-xs font-mono-num text-gray-400 block mb-1">Teléfono WhatsApp (Opcional)</label>
+          <input type="text" id="walkInClientPhone" placeholder="1122334455" class="w-full bg-[#0a0a0c] border border-[#23232c] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#d4ff00]">
+        </div>
+        <div>
+          <label class="text-xs font-mono-num text-gray-400 block mb-1">Seleccionar Barbero</label>
+          <select id="walkInBarberSelect" class="w-full bg-[#0a0a0c] border border-[#23232c] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#d4ff00]">
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-mono-num text-gray-400 block mb-1">Seleccionar Servicio</label>
+          <select id="walkInServiceSelect" class="w-full bg-[#0a0a0c] border border-[#23232c] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#d4ff00]">
+          </select>
+        </div>
+
+        <div class="flex justify-end gap-2 mt-2 pt-3 border-t border-[#23232c]">
+          <button type="button" onclick="closeWalkInModal()" class="px-4 py-2 rounded-xl bg-white/5 text-gray-400 text-xs font-mono-num">Cancelar</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-[#d4ff00] text-black font-extrabold text-xs font-mono-num shadow">Confirmar Walk-in →</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL RENDICIÓN DE CAJA -->
+  <div id="shiftClosureModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 20px; width: 100%; max-width: 540px; padding: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.9);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <div>
+          <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #10b981; letter-spacing: 2px; font-weight: 800;">CIERRE DIARIO & CAJA</span>
+          <h3 style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 2px 0 0 0; font-size: 1.3rem;">Rendición de Turno</h3>
+        </div>
+        <button onclick="closeShiftClosureModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <div id="shiftClosureContent">
+        <div style="text-align: center; color: #9ca3af; padding: 20px;" class="animate-pulse">Calculando total de turnos y facturación...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CONTINGENCIA REASIGNACIÓN -->
+  <div id="contingencyModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 20px; width: 100%; max-width: 500px; padding: 28px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <div>
+          <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #ef4444; letter-spacing: 2px; font-weight: 800;">PROTOCOLO DE REASIGNACIÓN</span>
+          <h3 style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 2px 0 0 0; font-size: 1.3rem;">Barbero Ausente</h3>
+        </div>
+        <button onclick="closeContingencyModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <form id="contingencyForm" onsubmit="event.preventDefault(); submitContingency();">
+        <div style="margin-bottom: 16px;">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace; display: block; margin-bottom: 6px;">SELECCIONAR BARBERO AUSENTE</label>
+          <select id="contAbsentBarberSelect" class="form-control" style="width: 100%; padding: 10px; font-weight: bold; color: #ef4444;" required>
+          </select>
+        </div>
+        <div style="margin-bottom: 20px;">
+          <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace; display: block; margin-bottom: 6px;">REASIGNAR TURNOS DEL DÍA A:</label>
+          <select id="contTargetBarberSelect" class="form-control" style="width: 100%; padding: 10px; font-weight: bold; color: #d4ff00;" required>
+          </select>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" onclick="closeContingencyModal()" class="btn-admin btn-admin-secondary">Cancelar</button>
+          <button type="submit" class="btn-admin" style="background: #ef4444; color: #fff; font-weight: bold;">
+            ⚠️ REASIGNAR TODOS LOS TURNOS →
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL AJUSTES TV -->
+  <div id="tvConfigModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 modal-backdrop">
+    <div class="w-full max-w-md bg-[#131318] border border-[#23232c] rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex justify-between items-center border-b border-[#23232c] pb-3">
+        <h3 class="text-base font-mono-num font-bold text-white flex items-center gap-2">
+          <span>⚙️</span> Ajustes Pantalla TV & Cartelera
+        </h3>
+        <button onclick="closeTvConfigModal()" class="text-gray-400 hover:text-white text-lg">✕</button>
+      </div>
+
+      <form id="tvConfigForm" onsubmit="event.preventDefault(); saveTvConfig();" class="flex flex-col gap-3">
+        <div>
+          <label class="text-xs font-mono-num text-gray-400 block mb-1">Título de Pantalla TV</label>
+          <input type="text" id="tvTitleInput" value="PEREYRAS BARBERS" class="w-full bg-[#0a0a0c] border border-[#23232c] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#d4ff00]">
+        </div>
+        <div>
+          <label class="text-xs font-mono-num text-gray-400 block mb-1">Texto de Marquesina Infobar</label>
+          <input type="text" id="tvMarqueeInput" value="💈 Bienvenidos a Pereyras Barbers • Solicita tu turno en la recepción o desde tu celular" class="w-full bg-[#0a0a0c] border border-[#23232c] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#d4ff00]">
+        </div>
+
+        <div class="flex justify-end gap-2 mt-2 pt-3 border-t border-[#23232c]">
+          <button type="button" onclick="closeTvConfigModal()" class="px-4 py-2 rounded-xl bg-white/5 text-gray-400 text-xs font-mono-num">Cancelar</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-[#d4ff00] text-black font-extrabold text-xs font-mono-num shadow">Guardar Ajustes →</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- SCRIPTS Y LÓGICA UNIFICADA -->
+  <script src="/static/js/admin/core.js"></script>
+  <script>
+    let currentDayTab = "today";
+    let currentStatusFilter = "activos";
+    let liveTurnosData = [];
+    let currentLiveBarbers = [];
+    let currentLiveServices = [];
+
+    // Reloj digital continuo
+    function updateClock() {
+      const clockEl = document.getElementById("digitalClock");
+      if (!clockEl) return;
+      const now = new Date();
+      clockEl.textContent = now.toLocaleTimeString("es-AR", { hour12: false });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Verificación de credenciales de operador / admin
+    document.addEventListener("DOMContentLoaded", () => {
+      const token = localStorage.getItem("hiddensync_admin_token") || localStorage.getItem("bladesync_admin_token");
+      if (token) {
+        document.getElementById("authLockOverlay").style.display = "none";
+        document.getElementById("liveTurnosApp").style.display = "flex";
+        initTurnoLiveApp();
+      }
+    });
+
+    async function handleOperatorLogin() {
+      const u = document.getElementById("opUsername").value.trim();
+      const p = document.getElementById("opPassword").value.trim();
+      try {
+        const res = await fetch("/api/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: u, password: p })
+        });
+        const data = await res.json();
+        const token = data.access_token || data.token;
+        if (res.ok && token) {
+          localStorage.setItem("hiddensync_admin_token", token);
+          localStorage.setItem("bladesync_admin_token", token);
+          document.getElementById("authLockOverlay").style.display = "none";
+          document.getElementById("liveTurnosApp").style.display = "flex";
+          initTurnoLiveApp();
+        } else {
+          alert(data.detail || "Credenciales de operador incorrectas.");
+        }
+      } catch (e) { alert("Error de conexión al verificar operador."); }
+    }
+
+    function operatorLogout() {
+      localStorage.removeItem("hiddensync_admin_token");
+      localStorage.removeItem("bladesync_admin_token");
+      location.reload();
+    }
+
+    function authHeaders() {
+      const token = localStorage.getItem("hiddensync_admin_token") || localStorage.getItem("bladesync_admin_token") || "";
+      return {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      };
+    }
+
+    async function initTurnoLiveApp() {
+      await loadLiveTurnosData();
+      await loadBarbersAndServicesSelect();
+      setInterval(loadLiveTurnosData, 15000);
+    }
+
+    async function loadLiveTurnosData() {
+      try {
+        const dateStr = getTargetDateStr(currentDayTab);
+        const res = await fetch(`/api/admin/appointments?date=${dateStr}&date_preset=${currentDayTab}`, { headers: authHeaders() });
+        if (!res.ok) return;
+        liveTurnosData = await res.json();
+        
+        updateLiveCounts();
+        renderLiveTurnosTable();
+        updateLiveModeratorBanner();
+      } catch (e) { console.error("Error al cargar turnos live:", e); }
+    }
+
+    function updateLiveCounts() {
+      const activos = (liveTurnosData || []).filter(a => 
+        ["PENDIENTE", "CONFIRMADO", "EN_SILLA", "EN_ATENCION", "ATENDIENDO", "LLAMANDO"].includes((a.status || "").toUpperCase()) && !a.canceled
+      );
+      const completados = (liveTurnosData || []).filter(a => 
+        ["COMPLETADO", "ATENDIDO", "FINALIZADO"].includes((a.status || "").toUpperCase())
+      );
+      const pendientes = (liveTurnosData || []).filter(a => 
+        (a.status || "").toUpperCase() === "PENDIENTE" && !a.canceled
+      );
+
+      const elAct = document.getElementById("countLiveActivos");
+      if (elAct) elAct.textContent = activos.length;
+
+      const elComp = document.getElementById("countLiveCompletados");
+      if (elComp) elComp.textContent = completados.length;
+
+      const elPend = document.getElementById("countLivePendientes");
+      if (elPend) elPend.textContent = pendientes.length;
+
+      if (currentDayTab === "today") {
+        const elToday = document.getElementById("countToday");
+        if (elToday) elToday.textContent = liveTurnosData.length;
+      } else if (currentDayTab === "tomorrow") {
+        const elTom = document.getElementById("countTomorrow");
+        if (elTom) elTom.textContent = liveTurnosData.length;
+      }
+    }
+
+    function getTargetDateStr(preset) {
+      const d = new Date();
+      if (preset === "tomorrow") d.setDate(d.getDate() + 1);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    function switchDayTab(tab) {
+      currentDayTab = tab;
+      document.getElementById("tabToday").classList.toggle("active", tab === "today");
+      document.getElementById("tabTomorrow").classList.toggle("active", tab === "tomorrow");
+      document.getElementById("currentTabLabel").textContent = tab === "today" ? "Turnos de Hoy" : "Turnos de Mañana";
+      loadLiveTurnosData();
+    }
+
+    function setLiveStatusFilter(status) {
+      currentStatusFilter = status;
+      document.getElementById("pill-activos").classList.toggle("active", status === "activos");
+      document.getElementById("pill-completado").classList.toggle("active", status === "COMPLETADO");
+      document.getElementById("pill-pendiente").classList.toggle("active", status === "PENDIENTE");
+      renderLiveTurnosTable();
+    }
+
+    function filterLiveTurnos() {
+      renderLiveTurnosTable();
+    }
+
+    function renderLiveTurnosTable() {
+      const tbody = document.getElementById("liveTurnosTableBody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+
+      const query = (document.getElementById("searchClientInput")?.value || "").toLowerCase().trim();
+
+      const filtered = (liveTurnosData || []).filter(a => {
+        const matchesQuery = !query || 
+          (a.client_name && a.client_name.toLowerCase().includes(query)) || 
+          (a.client_phone && a.client_phone.toLowerCase().includes(query)) ||
+          (a.service && a.service.toLowerCase().includes(query)) ||
+          (a.barber_name && a.barber_name.toLowerCase().includes(query));
+
+        if (!matchesQuery) return false;
+
+        const st = (a.status || "").toUpperCase();
+        if (currentStatusFilter === "activos") {
+          return ["PENDIENTE", "CONFIRMADO", "EN_SILLA", "EN_ATENCION", "ATENDIENDO", "LLAMANDO"].includes(st) && !a.canceled;
+        }
+        if (currentStatusFilter === "COMPLETADO") {
+          return ["COMPLETADO", "ATENDIDO", "FINALIZADO"].includes(st);
+        }
+        if (currentStatusFilter === "PENDIENTE") {
+          return st === "PENDIENTE" && !a.canceled;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-gray-500 py-8 font-mono-num">No se encontraron turnos con el filtro seleccionado.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach(a => {
+        const tr = document.createElement("tr");
+        const timePart = a.appointment_time ? a.appointment_time.split("T")[1]?.substring(0, 5) : "--:--";
+        const cleanPhone = (a.client_phone || "").replace(/\D/g, "");
+        const st = (a.status || "").toUpperCase();
+        const isAttended = ["COMPLETADO", "ATENDIDO", "FINALIZADO"].includes(st);
+        const checkinTimeFormatted = a.checked_in_at ? (a.checked_in_at.includes("T") ? a.checked_in_at.split("T")[1].substring(0, 5) : a.checked_in_at.substring(11, 16)) : "";
+
+        tr.innerHTML = `
+          <td><strong style="color: ${isAttended ? '#10b981' : '#d4ff00'}; font-family: monospace; font-size: 0.95rem;">${timePart} hs</strong></td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <strong>${escapeHtml(a.client_name)}</strong>
+              ${a.is_checked_in ? `
+                <span style="background: rgba(0, 242, 254, 0.15); border: 1px solid #00f2fe; color: #00f2fe; font-size: 0.68rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px; box-shadow: 0 0 8px rgba(0, 242, 254, 0.3);" title="Cliente en sala de espera">
+                  📍 EN SALA ${checkinTimeFormatted ? '(' + checkinTimeFormatted + ')' : ''}
+                </span>
+              ` : ''}
+            </div>
+            <div style="font-size: 0.7rem; color: #64748b; margin-top: 2px; display: flex; gap: 6px; align-items: center;">
+              <span>#ID: ${a.id}</span>
+              ${a.checkin_token ? `<span style="color: #38bdf8; font-family: monospace; font-weight: bold; background: rgba(56, 189, 248, 0.1); padding: 1px 4px; border-radius: 3px;">🔑 PIN: ${a.checkin_token}</span>` : ''}
+            </div>
+          </td>
+          <td>
+            ${cleanPhone ? `
+              <button onclick="openClientWhatsappModal('${escapeHtml(a.client_name)}', '${escapeHtml(a.client_phone)}', '${timePart} hs', '${escapeHtml(a.barber_name || 'tu barbero')}')" class="btn-admin btn-admin-sm" style="background: rgba(37, 211, 102, 0.15); color: #25D366; border: 1px solid rgba(37, 211, 102, 0.4); font-family: monospace;" title="Abrir Redactor de WhatsApp">
+                💬 ${escapeHtml(a.client_phone)}
+              </button>
+            ` : '-'}
+          </td>
+          <td><span style="color: #e2e8f0; font-weight: 600;">💈 ${escapeHtml(a.barber_name || 'Sin Asignar')}</span></td>
+          <td>${escapeHtml(a.service || 'Corte de Autor')}</td>
+          <td><span class="status-pill status-${st}">${st}</span></td>
+          <td style="text-align: right;">
+            <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
+              ${(!a.is_checked_in && ['PENDIENTE', 'CONFIRMADO'].includes(st)) ? `
+                <button class="btn-admin btn-admin-sm" style="background: rgba(0, 242, 254, 0.12); border: 1px solid rgba(0, 242, 254, 0.35); color: #00f2fe;" onclick="manualLiveCheckin(${a.id})" title="Marcar llegada a sala de espera">
+                  📍 Llegó
+                </button>
+              ` : ''}
+              ${(st === 'EN_SILLA' || st === 'EN_ATENCION') ? `
+                <button class="btn-admin btn-admin-sm" style="background: #d4ff00; color: #000; font-weight: 900; box-shadow: 0 0 10px rgba(212,255,0,0.4);" onclick="finishAndCallNextAppt(${a.id}, ${a.barber_id || 'null'})" title="Finalizar corte actual y llamar inmediatamente al próximo cliente en cola">
+                  ⚡ Sigue el Próximo
+                </button>
+              ` : ''}
+              ${!['EN_SILLA', 'EN_ATENCION', 'COMPLETADO', 'ATENDIDO', 'FINALIZADO'].includes(st) ? `
+                <button class="btn-admin btn-admin-sm" style="background: #00f2fe; color: #000; font-weight: bold;" onclick="changeLiveApptStatus(${a.id}, 'EN_SILLA')">
+                  💈 En Silla
+                </button>
+              ` : ''}
+              ${!isAttended ? `
+                <button class="btn-admin btn-admin-sm" style="background: #10b981; color: #000; font-weight: bold;" onclick="changeLiveApptStatus(${a.id}, 'COMPLETADO')">
+                  ✅ Finalizar
+                </button>
+              ` : `
+                <button class="btn-admin btn-admin-sm btn-admin-secondary" onclick="changeLiveApptStatus(${a.id}, 'CONFIRMADO')" title="Reabrir turno si fue completado por error" style="font-size: 0.7rem; padding: 3px 8px;">
+                  ↩️ Reabrir
+                </button>
+              `}
+              ${st !== 'CANCELADO' ? `
+                <button class="btn-admin btn-admin-sm btn-admin-danger" onclick="changeLiveApptStatus(${a.id}, 'CANCELADO')">
+                  ❌
+                </button>
+              ` : ''}
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateLiveModeratorBanner() {
+      const activeAppt = liveTurnosData.find(a => a.status === "EN_SILLA");
+      const nextAppt = liveTurnosData.find(a => a.status === "PENDIENTE" || a.status === "CONFIRMADO");
+
+      if (activeAppt) {
+        document.getElementById("liveActiveClient").textContent = activeAppt.client_name;
+        document.getElementById("liveActiveService").textContent = activeAppt.service || "Corte / Barba";
+        document.getElementById("liveActiveBarber").textContent = activeAppt.barber_name || "En Silla";
+        document.getElementById("liveActiveTime").textContent = activeAppt.appointment_time ? activeAppt.appointment_time.split("T")[1]?.substring(0, 5) + " hs" : "--:--";
+        document.getElementById("liveActiveStatus").textContent = "En Atención Activa";
+      } else {
+        document.getElementById("liveActiveClient").textContent = "Sin Turno en Silla";
+        document.getElementById("liveActiveService").textContent = "Silla libre para próximo cliente";
+        document.getElementById("liveActiveBarber").textContent = "Disponible";
+        document.getElementById("liveActiveTime").textContent = "--:-- hs";
+        document.getElementById("liveActiveStatus").textContent = "Disponible";
+      }
+
+      if (nextAppt) {
+        document.getElementById("liveNextClient").textContent = nextAppt.client_name;
+        document.getElementById("liveNextService").textContent = nextAppt.service || "Corte";
+        document.getElementById("liveNextBarber").textContent = nextAppt.barber_name || "Sin Asignar";
+        document.getElementById("liveNextTime").textContent = nextAppt.appointment_time ? nextAppt.appointment_time.split("T")[1]?.substring(0, 5) + " hs" : "--:--";
+      } else {
+        document.getElementById("liveNextClient").textContent = "No hay turnos siguientes";
+        document.getElementById("liveNextService").textContent = "Fila despejada";
+        document.getElementById("liveNextBarber").textContent = "Sin Asignar";
+        document.getElementById("liveNextTime").textContent = "--:-- hs";
+      }
+    }
+
+    async function finishAndCallNextFromHeader() {
+      const activeAppt = liveTurnosData.find(a => a.status === "EN_SILLA" || a.status === "EN_ATENCION");
+      const apptId = activeAppt ? activeAppt.id : null;
+      const barberId = activeAppt ? activeAppt.barber_id : null;
+      await finishAndCallNextAppt(apptId, barberId);
+    }
+
+    async function changeLiveApptStatus(id, status) {
+
+      try {
+        const res = await fetch(`/api/admin/appointments/${id}/status`, {
+          method: "PUT",
+          headers: authHeaders(),
+          body: JSON.stringify({ status: status })
+        });
+        if (res.ok) {
+          loadLiveTurnosData();
+        } else {
+          alert("Error al actualizar estado del turno.");
+        }
+      } catch (e) { alert("Error de conexión al cambiar estado."); }
+    }
+
+    async function manualLiveCheckin(id) {
+      try {
+        const res = await fetch("/api/public/checkin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ identifier: String(id) })
+        });
+        if (res.ok) {
+          loadLiveTurnosData();
+        } else {
+          const err = await res.json();
+          alert(err.detail || "Error al registrar llegada.");
+        }
+      } catch (e) {
+        alert("Error de conexión al registrar llegada.");
+      }
+    }
+
+    function announceCurrentTurnVoice() {
+      const activeAppt = liveTurnosData.find(a => a.status === "EN_SILLA") || liveTurnosData.find(a => a.status === "PENDIENTE");
+      if (!activeAppt) {
+        alert("No hay turnos pendientes para llamar.");
+        return;
+      }
+
+      const client = activeAppt.client_name;
+      const barber = activeAppt.barber_name || "su barbero";
+      const text = `Próximo turno: ${client}, por favor pasar con ${barber}.`;
+
+      if ('speechSynthesis' in window) {
+        const synth = window.speechSynthesis;
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'es-AR';
+        utterance.rate = 0.9;
+        synth.speak(utterance);
+      } else {
+        alert(`🔔 Llamando a: ${client}`);
+      }
+    }
+
+    // Cargar combos para Walk-in y Contingencia
+    async function loadBarbersAndServicesSelect() {
+      try {
+        const [resB, resS] = await Promise.all([
+          fetch("/api/barbers"),
+          fetch("/api/services")
+        ]);
+        if (resB.ok) currentLiveBarbers = await resB.json();
+        if (resS.ok) currentLiveServices = await resS.json();
+
+        const bSelect = document.getElementById("walkInBarberSelect");
+        const sSelect = document.getElementById("walkInServiceSelect");
+        const cAbsentSelect = document.getElementById("contAbsentBarberSelect");
+        const cTargetSelect = document.getElementById("contTargetBarberSelect");
+
+        if (bSelect) {
+          bSelect.innerHTML = currentLiveBarbers.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+        }
+        if (cAbsentSelect) {
+          cAbsentSelect.innerHTML = currentLiveBarbers.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+        }
+        if (cTargetSelect) {
+          cTargetSelect.innerHTML = currentLiveBarbers.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+        }
+        if (sSelect) {
+          sSelect.innerHTML = currentLiveServices.map(s => `<option value="${s.id}">${escapeHtml(s.name)} ($${s.price})</option>`).join('');
+        }
+      } catch (e) {}
+    }
+
+    // Walk-in Modal
+    function openWalkInModal() {
+      document.getElementById("walkInModal").classList.remove("hidden");
+    }
+    function closeWalkInModal() {
+      document.getElementById("walkInModal").classList.add("hidden");
+    }
+    async function submitWalkIn() {
+      const name = document.getElementById("walkInClientName").value.trim();
+      const phone = document.getElementById("walkInClientPhone").value.trim() || "1100000000";
+      const bId = parseInt(document.getElementById("walkInBarberSelect").value);
+      const sId = parseInt(document.getElementById("walkInServiceSelect").value);
+
+      const barber = currentLiveBarbers.find(b => b.id === bId);
+      const service = currentLiveServices.find(s => s.id === sId);
+
+      const now = new Date();
+      const dateStr = getTargetDateStr("today");
+      const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00`;
+
+      const payload = {
+        client_name: name,
+        client_phone: phone,
+        barber_id: bId,
+        barber_name: barber ? barber.name : "Barbero",
+        service_id: sId,
+        service: service ? service.name : "Corte",
+        appointment_time: `${dateStr}T${timeStr}`
+      };
+
+      try {
+        const res = await fetch("/api/appointments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          closeWalkInModal();
+          loadLiveTurnosData();
+        } else {
+          alert("Error al agregar cliente Walk-in.");
+        }
+      } catch (e) { alert("Error de conexión."); }
+    }
+
+    // Contingencia Modal
+    function openContingencyModal() {
+      document.getElementById("contingencyModal").style.display = "flex";
+    }
+    function closeContingencyModal() {
+      document.getElementById("contingencyModal").style.display = "none";
+    }
+    async function submitContingency() {
+      const absentId = parseInt(document.getElementById("contAbsentBarberSelect").value);
+      const targetId = parseInt(document.getElementById("contTargetBarberSelect").value);
+      const targetBarber = currentLiveBarbers.find(b => b.id === targetId);
+
+      if (absentId === targetId) {
+        alert("Por favor selecciona un barbero de destino distinto al ausente.");
+        return;
+      }
+
+      if (!confirm(`¿Reasignar todos los turnos del barbero ausente a ${targetBarber ? targetBarber.name : 'nuevo barbero'}?`)) return;
+
+      try {
+        const res = await fetch("/api/admin/contingency/reassign", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ absent_barber_id: absentId, target_barber_id: targetId })
+        });
+        if (res.ok) {
+          closeContingencyModal();
+          loadLiveTurnosData();
+          alert("Turnos reasignados exitosamente.");
+        } else {
+          alert("Error al ejecutar reasignación por contingencia.");
+        }
+      } catch (e) { alert("Error de conexión."); }
+    }
+
+    // Rendición de Turno Modal
+    async function openShiftClosureModal() {
+      const modal = document.getElementById("shiftClosureModal");
+      const content = document.getElementById("shiftClosureContent");
+      if (!modal || !content) return;
+
+      modal.style.display = "flex";
+      content.innerHTML = `<div style="text-align: center; color: #9ca3af; padding: 20px;" class="animate-pulse">Calculando cierre de caja del día...</div>`;
+
+      try {
+        const res = await fetch("/api/admin/shift-closure", { headers: authHeaders() });
+        if (!res.ok) throw new Error("Error cierre");
+        const data = await res.json();
+
+        content.innerHTML = `
+          <div style="background: #09090c; border: 1px solid #23232c; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span style="color: #9ca3af; font-size: 0.85rem;">Total Turnos Atendidos:</span>
+              <strong style="color: #fff;">${data.total_completed_appointments || 0} turnos</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span style="color: #9ca3af; font-size: 0.85rem;">Recaudación Est. Servicios:</span>
+              <strong style="color: #10b981; font-size: 1.1rem;">$${(data.total_revenue || 0).toLocaleString("es-AR")}</strong>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button onclick="closeShiftClosureModal()" class="btn-admin btn-admin-secondary">Cerrar</button>
+          </div>
+        `;
+      } catch (e) {
+        content.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 20px;">Error al calcular rendición.</div>`;
+      }
+    }
+
+    function closeShiftClosureModal() {
+      document.getElementById("shiftClosureModal").style.display = "none";
+    }
+
+    // Ajustes TV Modal
+    function openTvConfigModal() {
+      document.getElementById("tvConfigModal").classList.remove("hidden");
+    }
+    function closeTvConfigModal() {
+      document.getElementById("tvConfigModal").classList.add("hidden");
+    }
+    async function saveTvConfig() {
+      const title = document.getElementById("tvTitleInput").value.trim();
+      const marquee = document.getElementById("tvMarqueeInput").value.trim();
+      try {
+        const res = await fetch("/api/live/config", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ tv_title: title, marquee_text: marquee })
+        });
+        if (res.ok) {
+          closeTvConfigModal();
+          alert("Ajustes de Pantalla TV guardados correctamente.");
+        } else {
+          alert("Error al guardar ajustes TV.");
+        }
+      } catch (e) { alert("Error de conexión."); }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    // Modal QR Totem Check-in
+    function openCheckinQrModal() {
+      const origin = window.location.origin;
+      const checkinUrl = `${origin}/checkin.html`;
+      const qrImg = document.getElementById("modalCheckinQrImg");
+      const urlText = document.getElementById("modalCheckinUrlText");
+      const printBtn = document.getElementById("btnCheckinPrint");
+      if (qrImg) {
+        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(checkinUrl)}`;
+      }
+      if (urlText) {
+        urlText.textContent = checkinUrl;
+        urlText.href = checkinUrl;
+      }
+      if (printBtn) {
+        printBtn.href = checkinUrl;
+      }
+      const modal = document.getElementById("checkinQrModal");
+      if (modal) modal.style.display = "flex";
+    }
+
+    function closeCheckinQrModal() {
+      const modal = document.getElementById("checkinQrModal");
+      if (modal) modal.style.display = "none";
+    }
+  </script>
+
+  <!-- MODAL: QR TOTEM CHECK-IN PARA RECEPCIÓN & CLIENTES -->
+  <div id="checkinQrModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #131318; border: 1px solid #23232c; border-radius: 20px; width: 100%; max-width: 480px; padding: 28px; box-shadow: 0 10px 40px rgba(0,0,0,0.9); text-align: center;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #23232c;">
+        <div>
+          <span style="font-family: 'Space Grotesk', monospace; font-size: 0.7rem; color: #00f2fe; letter-spacing: 2px; font-weight: 800;">TOTEM DE AUTO-ATENCIÓN</span>
+          <h3 style="font-family: 'Space Grotesk', monospace; color: #fff; margin: 2px 0 0 0; font-size: 1.25rem;">📲 QR Check-in para Clientes</h3>
+        </div>
+        <button onclick="closeCheckinQrModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <p style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 16px;">
+        Mostrá o imprimí este código QR para que los clientes que llegan a la barbería puedan escanearlo con su celular y anunciar su llegada al instante.
+      </p>
+
+      <div style="background: #ffffff; padding: 16px; border-radius: 20px; border: 3px solid #d4ff00; display: inline-block; box-shadow: 0 0 30px rgba(212,255,0,0.2); margin-bottom: 16px;">
+        <img id="modalCheckinQrImg" src="" alt="QR Check-in Totem" style="width: 200px; height: 200px; display: block;">
+      </div>
+
+      <div style="background: #09090c; border: 1px solid #23232c; border-radius: 12px; padding: 12px; margin-bottom: 20px; text-align: center;">
+        <span style="font-size: 0.7rem; color: #9ca3af; font-family: monospace; display: block;">ENLACE DIRECTO DE CHECK-IN:</span>
+        <a id="modalCheckinUrlText" href="/checkin.html" target="_blank" style="color: #00f2fe; font-family: monospace; font-weight: bold; font-size: 0.85rem; text-decoration: none; word-break: break-all;">
+          http://127.0.0.1:8000/checkin.html
+        </a>
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: center;">
+        <a id="btnCheckinPrint" href="/checkin.html" target="_blank" class="btn-admin" style="background: #d4ff00; color: #000; font-weight: 800;">
+          🚀 Abrir Vista Totem / Pantalla ↗
+        </a>
+        <button type="button" onclick="closeCheckinQrModal()" class="btn-admin btn-admin-secondary">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+  <script src="/static/js/admin/clients.js"></script>
+</body>
+</html>
