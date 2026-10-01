@@ -810,3 +810,16 @@ class SalesRecordRead(BaseModel):
     cashier_name: Optional[str] = None
     created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
+
+class BulkDeleteAppointmentsRequest(BaseModel):
+    appointment_ids: List[int]
+
+class SystemPurgeRequest(BaseModel):
+    purge_appointments: bool = False
+    purge_clients: bool = False
+    purge_barbers: bool = False
+    purge_notifications: bool = False
+    purge_images: bool = False
+    factory_reset: bool = False
+    confirmation: str = ""
+

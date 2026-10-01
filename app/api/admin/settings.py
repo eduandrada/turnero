@@ -12,8 +12,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from app.core.database import get_db, get_argentina_now
-from app.models import AdminUser, AuditLog, NotificationLog
-from app.schemas import BulkSettingsUpdate, AuditLogRead, NotificationLogRead
+from app.models import (
+    AdminUser, AuditLog, NotificationLog, Appointment, AppointmentHistory, WaitlistEntry,
+    SalesRecord, LoyaltyTransaction, Client, BarberSchedule, ScheduleException, Barber,
+    AppNotification, ShiftClosure, StockMovement, VoucherRedemption, Voucher
+)
+from app.schemas import BulkSettingsUpdate, AuditLogRead, NotificationLogRead, SystemPurgeRequest
 from app.core.dependencies import get_current_admin, require_admin_role, require_encargado_or_admin
 from app.settings_helper import get_all_settings, get_setting, set_setting, bulk_set_settings
 from app.image_service import process_and_save_image, delete_orphan_file, ImageProcessingError, UPLOAD_BASE_DIR
@@ -362,4 +366,84 @@ def bulk_delete_notification_logs(
     count = db.query(NotificationLog).filter(NotificationLog.id.in_(ids)).delete(synchronize_session=False)
     db.commit()
     return {"status": "success", "message": f"Se eliminaron {count} registros de notificaciones."}
+
+@router.post("/api/admin/system/purge")
+def system_purge_or_reset(
+    payload: SystemPurgeRequest,
+    admin: AdminUser = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """
+    Ejecuta purga de datos por categorías o restauración completa a estado de fábrica.
+    Requiere confirmación explícita (palabra clave 'CONFIRMAR' o 'RESTAURAR').
+    """
+    conf = (payload.confirmation or "").strip().upper()
+    if conf not in ["CONFIRMAR", "RESTAURAR", "BORRAR"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Confirmación inválida. Ingresá la palabra clave 'CONFIRMAR' o 'RESTAURAR' para proceder."
+        )
+
+    summary = []
+    is_reset = payload.factory_reset
+
+    if is_reset or payload.purge_appointments:
+        cnt_h = db.query(AppointmentHistory).delete(synchronize_session=False)
+        cnt_w = db.query(WaitlistEntry).delete(synchronize_session=False)
+        cnt_a = db.query(Appointment).delete(synchronize_session=False)
+        cnt_s = db.query(SalesRecord).delete(synchronize_session=False)
+        summary.append(f"Turnos e Historial ({cnt_a} turnos, {cnt_h} historial, {cnt_w} lista de espera, {cnt_s} ventas)")
+
+    if is_reset or payload.purge_clients:
+        cnt_l = db.query(LoyaltyTransaction).delete(synchronize_session=False)
+        cnt_c = db.query(Client).delete(synchronize_session=False)
+        summary.append(f"Clientes ({cnt_c} clientes, {cnt_l} fidelizaciones)")
+
+    if is_reset or payload.purge_barbers:
+        cnt_bs = db.query(BarberSchedule).delete(synchronize_session=False)
+        cnt_ex = db.query(ScheduleException).delete(synchronize_session=False)
+        cnt_b = db.query(Barber).delete(synchronize_session=False)
+        summary.append(f"Barberos ({cnt_b} barberos, {cnt_bs} horarios, {cnt_ex} excepciones)")
+
+    if is_reset or payload.purge_notifications:
+        cnt_n = db.query(NotificationLog).delete(synchronize_session=False)
+        cnt_app = db.query(AppNotification).delete(synchronize_session=False)
+        summary.append(f"Mensajes ({cnt_n} logs enviador, {cnt_app} notificaciones)")
+
+    if is_reset or payload.purge_images:
+        deleted_files_count = 0
+        if os.path.exists(UPLOADS_DIR):
+            for fname in os.listdir(UPLOADS_DIR):
+                fpath = os.path.join(UPLOADS_DIR, fname)
+                if os.path.isfile(fpath) and not fname.startswith("default_"):
+                    try:
+                        os.remove(fpath)
+                        deleted_files_count += 1
+                    except Exception as e:
+                        logger.warning(f"Error al eliminar imagen {fname}: {e}")
+        summary.append(f"Imágenes y Archivos ({deleted_files_count} archivos eliminados)")
+
+    if is_reset:
+        cnt_sh = db.query(ShiftClosure).delete(synchronize_session=False)
+        cnt_st = db.query(StockMovement).delete(synchronize_session=False)
+        cnt_vr = db.query(VoucherRedemption).delete(synchronize_session=False)
+        cnt_vo = db.query(Voucher).delete(synchronize_session=False)
+        summary.append("Módulos Operativos (Cierres de caja, vales, movimientos de stock)")
+
+    db.commit()
+
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Sistema",
+        action="Restauración / Purga de Datos",
+        new_value="; ".join(summary),
+        description=f"Purga ejecutada por {admin.username}. Categorías: {', '.join(summary)}"
+    ))
+    db.commit()
+
+    return {
+        "status": "success",
+        "message": "Restauración / Purga de datos completada exitosamente.",
+        "details": summary
+    }
 

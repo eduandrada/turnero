@@ -577,10 +577,23 @@
               </div>
             </div>
 
-            <!-- BUSCADOR -->
-            <div style="padding: 12px 16px; border-bottom: 1px solid #1a1a24; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-              <input type="text" id="statsSearchInput" class="form-control" placeholder="🔍 Buscar por nombre de cliente, teléfono, barbero o servicio..." oninput="renderAttendedClientsTable()" style="max-width: 420px; font-size: 0.8rem; padding: 7px 12px;">
-              <span id="statsResultCount" style="font-family: monospace; font-size: 0.75rem; color: #10b981; font-weight: bold;">0 atenciones registradas</span>
+            <!-- BUSCADOR & ACCIONES MASIVAS -->
+            <div style="padding: 12px 16px; border-bottom: 1px solid #1a1a24; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <input type="text" id="statsSearchInput" class="form-control" placeholder="🔍 Buscar por nombre de cliente, teléfono, barbero o servicio..." oninput="renderAttendedClientsTable()" style="max-width: 380px; font-size: 0.8rem; padding: 7px 12px;">
+              
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span id="statsSelectedCount" style="display: none; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); padding: 4px 10px; border-radius: 99px; font-weight: bold; font-size: 0.75rem;">0 seleccionados</span>
+                
+                <button type="button" id="btnStatsBulkDelete" class="btn-admin" onclick="deleteSelectedAttendedStats()" style="display: none; background: #ef4444; color: #fff; font-weight: 800; font-size: 0.75rem; padding: 6px 12px; border-radius: 8px;" title="Eliminar atenciones seleccionadas del historial">
+                  🗑️ Eliminar Seleccionados
+                </button>
+
+                <button type="button" class="btn-admin btn-admin-secondary" onclick="openSystemPurgeModal()" style="font-size: 0.75rem; padding: 6px 12px; border: 1px solid #ef4444; color: #ef4444; font-weight: bold;" title="Opciones de purga masiva de datos y restauración de fábrica">
+                  ⚙️ Mantenimiento & Purga / Restaurar App
+                </button>
+
+                <span id="statsResultCount" style="font-family: monospace; font-size: 0.75rem; color: #10b981; font-weight: bold;">0 atenciones registradas</span>
+              </div>
             </div>
 
             <!-- TABLA DE ATENDIDOS -->
@@ -588,6 +601,9 @@
               <table class="admin-table" id="statsTableElement">
                 <thead>
                   <tr>
+                    <th style="width: 38px; text-align: center;">
+                      <input type="checkbox" id="statsSelectAll" onchange="toggleSelectAllStats(this)" style="width: 16px; height: 16px; accent-color: #ef4444; cursor: pointer;" title="Seleccionar todos">
+                    </th>
                     <th>Fecha & Hora</th>
                     <th>Cliente</th>
                     <th>WhatsApp</th>
@@ -2376,6 +2392,110 @@
           💬 Enviar Voucher por WhatsApp →
         </button>
       </div>
+    </div>
+  <!-- MODAL DE PURGA MASIVA Y RESTAURACIÓN DEL SISTEMA DE FÁBRICA -->
+  <div id="systemPurgeModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.88); backdrop-filter: blur(10px); z-index: 99999; display: none; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #111116; border: 1px solid #ef4444; border-radius: 20px; width: 100%; max-width: 650px; padding: 28px; color: #fff; box-shadow: 0 25px 60px rgba(0,0,0,0.95); max-height: 90vh; overflow-y: auto; font-family: 'Plus Jakarta Sans', sans-serif;">
+      
+      <!-- HEADER -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #23232c; padding-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+            🚨
+          </div>
+          <div>
+            <h3 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 1.25rem; color: #f87171; font-weight: 800;">LIMPIEZA, PURGA Y RESTAURACIÓN DE LA APP</h3>
+            <p style="margin: 2px 0 0 0; color: #9ca3af; font-size: 0.8rem;">Seleccioná las categorías a eliminar o realizá un reseteo de fábrica completo.</p>
+          </div>
+        </div>
+        <button onclick="closeSystemPurgeModal()" style="background: transparent; border: none; color: #9ca3af; font-size: 1.5rem; cursor: pointer; padding: 4px 8px;">✕</button>
+      </div>
+
+      <!-- ALERTA DE ADVERTENCIA -->
+      <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.82rem; color: #fca5a5;">
+        ⚠️ <strong>Atención:</strong> Las operaciones de borrado seleccionadas son definitivas e irreversibles. La sesión de Administrador Master se conservará activada para no perder acceso.
+      </div>
+
+      <!-- OPCIONES DE PURGA POR CATEGORÍA -->
+      <div style="background: #09090c; border: 1px solid #1a1a24; border-radius: 14px; padding: 16px; margin-bottom: 20px;">
+        <div style="font-size: 0.78rem; font-family: monospace; color: #00f2fe; font-weight: 800; margin-bottom: 12px; text-transform: uppercase;">
+          📌 OPCIONES DE BORRADO SELECCIONABLE:
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.85rem;">
+          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+            <input type="checkbox" id="chkPurgeAppts" onchange="onPurgeCheckboxChange()" style="width: 18px; height: 18px; accent-color: #ef4444;">
+            <div>
+              <strong style="color: #fff;">📜 Historial de Turnos y Atenciones</strong>
+              <div style="font-size: 0.75rem; color: #9ca3af;">Borra todos los turnos registrados, atenciones completadas y lista de espera.</div>
+            </div>
+          </label>
+
+          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+            <input type="checkbox" id="chkPurgeClients" onchange="onPurgeCheckboxChange()" style="width: 18px; height: 18px; accent-color: #ef4444;">
+            <div>
+              <strong style="color: #fff;">👥 Base de Datos de Clientes & CRM</strong>
+              <div style="font-size: 0.75rem; color: #9ca3af;">Borra el listado de clientes registrados y su historial de puntos/fidelidad.</div>
+            </div>
+          </label>
+
+          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+            <input type="checkbox" id="chkPurgeBarbers" onchange="onPurgeCheckboxChange()" style="width: 18px; height: 18px; accent-color: #ef4444;">
+            <div>
+              <strong style="color: #fff;">💈 Barberos / Personal (Conserva Admin Master)</strong>
+              <div style="font-size: 0.75rem; color: #9ca3af;">Borra los perfiles de barberos y sus horarios de atención configurados.</div>
+            </div>
+          </label>
+
+          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+            <input type="checkbox" id="chkPurgeMessages" onchange="onPurgeCheckboxChange()" style="width: 18px; height: 18px; accent-color: #ef4444;">
+            <div>
+              <strong style="color: #fff;">💬 Historial de Mensajes & Notificaciones WhatsApp</strong>
+              <div style="font-size: 0.75rem; color: #9ca3af;">Borra la auditoría de mensajes enviados, logs de WhatsApp y notificaciones internas.</div>
+            </div>
+          </label>
+
+          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+            <input type="checkbox" id="chkPurgeImages" onchange="onPurgeCheckboxChange()" style="width: 18px; height: 18px; accent-color: #ef4444;">
+            <div>
+              <strong style="color: #fff;">🖼️ Imágenes & Archivos Subidos (Galería / Banners)</strong>
+              <div style="font-size: 0.75rem; color: #9ca3af;">Elimina archivos y fotos almacenadas en la carpeta de subidas del servidor.</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- BOTÓN DE RESTAURACIÓN COMPLETA (FACTORY RESET) -->
+      <div style="background: rgba(239, 68, 68, 0.12); border: 2px dashed #ef4444; border-radius: 14px; padding: 14px 18px; margin-bottom: 20px;">
+        <label style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+          <input type="checkbox" id="chkFactoryReset" onchange="onFactoryResetToggle(this)" style="width: 22px; height: 22px; accent-color: #ef4444;">
+          <div>
+            <strong style="color: #f87171; font-size: 0.95rem;">🔄 RESTAURACIÓN COMPLETA A ESTADO DE FÁBRICA (CLEAN SLATE)</strong>
+            <div style="font-size: 0.78rem; color: #cbd5e1; margin-top: 2px;">
+              Limpia la totalidad de los datos (turnos, clientes, barberos no admin, chats, imágenes, ventas y métricas) dejando la aplicación 100% nueva.
+            </div>
+          </div>
+        </label>
+      </div>
+
+      <!-- CAMPO DE CONFIRMACIÓN SEGURA -->
+      <div style="margin-bottom: 22px;">
+        <label style="color: #cbd5e1; font-size: 0.78rem; font-family: monospace; font-weight: bold; display: block; margin-bottom: 6px;">
+          🔒 PARA EJECUTAR, ESCRIBÍ LA PALABRA <span style="color: #ef4444;">CONFIRMAR</span> O <span style="color: #d4ff00;">RESTAURAR</span>:
+        </label>
+        <input type="text" id="purgeConfirmationInput" class="form-control" placeholder="Escribí CONFIRMAR o RESTAURAR aquí..." style="width: 100%; background: #09090c; color: #fff; border-color: #ef4444; font-family: monospace; font-weight: bold; text-align: center; text-transform: uppercase; font-size: 0.95rem; box-sizing: border-box;">
+      </div>
+
+      <!-- FOOTER ACTIONS -->
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" onclick="closeSystemPurgeModal()" class="btn-admin btn-admin-secondary">
+          Cancelar
+        </button>
+        <button type="button" id="btnExecuteSystemPurge" onclick="executeSystemPurge()" class="btn-admin" style="background: #ef4444; color: #fff; font-weight: 900; padding: 12px 24px; font-size: 0.9rem;">
+          🚨 EJECUTAR PURGA / RESTAURAR →
+        </button>
+      </div>
+
     </div>
   </div>
 

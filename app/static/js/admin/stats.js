@@ -1,7 +1,7 @@
 /**
  * Admin Panel - Attended Clients & Performance Stats Module
  * HiddenSYNC Barber Ecosystem 2026
- * Dedicated analytics, historical attended clients tracking, revenue calculation & CSV export.
+ * Dedicated analytics, historical attended clients tracking, bulk deletion & full system restore.
  */
 
 let statsState = {
@@ -10,7 +10,8 @@ let statsState = {
   endDate: "",
   barberId: "",
   attendedList: [],
-  barbers: []
+  barbers: [],
+  selectedIds: new Set()
 };
 
 async function loadAttendedClientsStats() {
@@ -38,6 +39,10 @@ async function loadAttendedClientsStats() {
     statsState.attendedList = (data || []).filter(a => 
       ["COMPLETADO", "ATENDIDO", "FINALIZADO"].includes((a.status || "").toUpperCase())
     );
+
+    // Reset selecciones al recargar
+    statsState.selectedIds.clear();
+    updateStatsSelectionUI();
 
     updateStatsKPIs();
     renderAttendedClientsTable();
@@ -167,7 +172,12 @@ function renderAttendedClientsTable() {
       `¡Hola ${a.client_name}! Te escribimos de la Barbería para agradecerte por tu visita. ¿Cómo quedó tu ${a.service || 'corte'} con ${a.barber_name || 'el equipo'}? Esperamos que hayas disfrutado la experiencia.`
     );
 
+    const isChecked = statsState.selectedIds.has(a.id);
+
     tr.innerHTML = `
+      <td style="text-align: center;">
+        <input type="checkbox" class="stats-row-checkbox" value="${a.id}" ${isChecked ? 'checked' : ''} onchange="onStatsRowCheckboxChange(this, ${a.id})" style="width: 16px; height: 16px; accent-color: #ef4444; cursor: pointer;">
+      </td>
       <td>
         <span style="font-family: monospace; font-size: 0.85rem; font-weight: 700; color: #00f2fe;">
           ${dtFormatted}
@@ -209,11 +219,230 @@ function renderAttendedClientsTable() {
           <button class="btn-admin btn-admin-sm btn-admin-secondary" onclick="reopenAttendedTurn(${a.id})" title="Reabrir turno si fue completado por error" style="font-size: 0.7rem; padding: 3px 8px;">
             ↩️ Reabrir
           </button>
+          <button class="btn-admin btn-admin-sm" onclick="deleteSingleAttendedStat(${a.id})" title="Eliminar registro del historial" style="background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #ef4444; font-size: 0.7rem; padding: 3px 8px;">
+            🗑️ Borrar
+          </button>
         </div>
       </td>
     `;
     tbody.appendChild(tr);
   });
+
+  updateStatsSelectionUI();
+}
+
+function onStatsRowCheckboxChange(el, id) {
+  if (el.checked) {
+    statsState.selectedIds.add(id);
+  } else {
+    statsState.selectedIds.delete(id);
+  }
+  updateStatsSelectionUI();
+}
+
+function toggleSelectAllStats(headerEl) {
+  const isChecked = headerEl.checked;
+  const checkboxes = document.querySelectorAll(".stats-row-checkbox");
+  
+  checkboxes.forEach(cb => {
+    cb.checked = isChecked;
+    const id = parseInt(cb.value, 10);
+    if (isChecked) {
+      if (id) statsState.selectedIds.add(id);
+    } else {
+      if (id) statsState.selectedIds.delete(id);
+    }
+  });
+
+  updateStatsSelectionUI();
+}
+
+function updateStatsSelectionUI() {
+  const count = statsState.selectedIds.size;
+  const countBadge = document.getElementById("statsSelectedCount");
+  const btnBulkDelete = document.getElementById("btnStatsBulkDelete");
+  const selectAllCb = document.getElementById("statsSelectAll");
+
+  if (countBadge) {
+    countBadge.style.display = count > 0 ? "inline-block" : "none";
+    countBadge.textContent = `${count} seleccionado${count > 1 ? 's' : ''}`;
+  }
+
+  if (btnBulkDelete) {
+    btnBulkDelete.style.display = count > 0 ? "inline-flex" : "none";
+  }
+
+  if (selectAllCb) {
+    const totalVisible = document.querySelectorAll(".stats-row-checkbox").length;
+    selectAllCb.checked = totalVisible > 0 && count === totalVisible;
+  }
+}
+
+async function deleteSingleAttendedStat(id) {
+  if (!confirm(`¿Estás seguro de eliminar el registro de atención #${id}? Esta acción no se puede deshacer.`)) return;
+  try {
+    const res = await fetch(`/api/admin/appointments/${id}`, {
+      method: "DELETE",
+      headers: authHeaders()
+    });
+    if (res.ok) {
+      if (typeof showToast === "function") showToast(`Registro #${id} eliminado del historial`, "success");
+      loadAttendedClientsStats();
+      if (typeof loadAdminAppointments === "function") loadAdminAppointments();
+    } else {
+      const err = await res.json();
+      alert(err.detail || "Error al eliminar el registro.");
+    }
+  } catch (e) {
+    console.error("Error al eliminar atención:", e);
+    alert("Error de conexión al eliminar registro.");
+  }
+}
+
+async function deleteSelectedAttendedStats() {
+  const ids = Array.from(statsState.selectedIds);
+  if (ids.length === 0) {
+    alert("No seleccionaste ninguna atención para eliminar.");
+    return;
+  }
+
+  if (!confirm(`⚠️ ATENCIÓN: Estás por eliminar ${ids.length} registro(s) de atenciones del historial.\n\n¿Confirmás la eliminación masiva?`)) return;
+
+  try {
+    const res = await fetch("/api/admin/appointments/bulk-delete", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ appointment_ids: ids })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (typeof showToast === "function") showToast(data.message || `Se eliminaron ${ids.length} registros`, "success");
+      statsState.selectedIds.clear();
+      loadAttendedClientsStats();
+      if (typeof loadAdminAppointments === "function") loadAdminAppointments();
+    } else {
+      const err = await res.json();
+      alert(err.detail || "Error al realizar la eliminación masiva.");
+    }
+  } catch (e) {
+    console.error("Error en eliminación masiva de historial:", e);
+    alert("Error de conexión durante la eliminación masiva.");
+  }
+}
+
+// ==========================================
+// MÓDULO DE PURGA Y RESTAURACIÓN DE LA APP
+// ==========================================
+function openSystemPurgeModal() {
+  const modal = document.getElementById("systemPurgeModal");
+  if (modal) {
+    document.getElementById("chkPurgeAppts").checked = false;
+    document.getElementById("chkPurgeClients").checked = false;
+    document.getElementById("chkPurgeBarbers").checked = false;
+    document.getElementById("chkPurgeMessages").checked = false;
+    document.getElementById("chkPurgeImages").checked = false;
+    document.getElementById("chkFactoryReset").checked = false;
+    document.getElementById("purgeConfirmationInput").value = "";
+    modal.style.display = "flex";
+  }
+}
+
+function closeSystemPurgeModal() {
+  const modal = document.getElementById("systemPurgeModal");
+  if (modal) modal.style.display = "none";
+}
+
+function onFactoryResetToggle(el) {
+  const isChecked = el.checked;
+  document.getElementById("chkPurgeAppts").checked = isChecked;
+  document.getElementById("chkPurgeClients").checked = isChecked;
+  document.getElementById("chkPurgeBarbers").checked = isChecked;
+  document.getElementById("chkPurgeMessages").checked = isChecked;
+  document.getElementById("chkPurgeImages").checked = isChecked;
+}
+
+function onPurgeCheckboxChange() {
+  const allChecked = 
+    document.getElementById("chkPurgeAppts").checked &&
+    document.getElementById("chkPurgeClients").checked &&
+    document.getElementById("chkPurgeBarbers").checked &&
+    document.getElementById("chkPurgeMessages").checked &&
+    document.getElementById("chkPurgeImages").checked;
+
+  document.getElementById("chkFactoryReset").checked = allChecked;
+}
+
+async function executeSystemPurge() {
+  const purgeAppts = document.getElementById("chkPurgeAppts").checked;
+  const purgeClients = document.getElementById("chkPurgeClients").checked;
+  const purgeBarbers = document.getElementById("chkPurgeBarbers").checked;
+  const purgeMessages = document.getElementById("chkPurgeMessages").checked;
+  const purgeImages = document.getElementById("chkPurgeImages").checked;
+  const factoryReset = document.getElementById("chkFactoryReset").checked;
+
+  if (!purgeAppts && !purgeClients && !purgeBarbers && !purgeMessages && !purgeImages && !factoryReset) {
+    alert("Seleccioná al menos una opción de purga o activá la restauración completa.");
+    return;
+  }
+
+  const confInput = document.getElementById("purgeConfirmationInput").value.trim().toUpperCase();
+  if (confInput !== "CONFIRMAR" && confInput !== "RESTAURAR") {
+    alert("Para proceder, ingresá la palabra CONFIRMAR o RESTAURAR en el campo de texto.");
+    document.getElementById("purgeConfirmationInput").focus();
+    return;
+  }
+
+  const actionText = factoryReset ? "RESTAURACIÓN COMPLETA A ESTADO DE FÁBRICA" : "PURGA SELECCIONADA DE DATOS";
+  if (!confirm(`🚨 ÚLTIMA ADVERTENCIA:\n\nVas a ejecutar una ${actionText}.\nEsta acción NO se puede deshacer.\n\n¿Estás completamente seguro de continuar?`)) return;
+
+  try {
+    const btn = document.getElementById("btnExecuteSystemPurge");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Procesando Limpieza...";
+    }
+
+    const payload = {
+      purge_appointments: purgeAppts,
+      purge_clients: purgeClients,
+      purge_barbers: purgeBarbers,
+      purge_notifications: purgeMessages,
+      purge_images: purgeImages,
+      factory_reset: factoryReset,
+      confirmation: confInput
+    };
+
+    const res = await fetch("/api/admin/system/purge", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      closeSystemPurgeModal();
+      alert(`✅ ${data.message}\n\nDetalles:\n• ${data.details.join("\n• ")}`);
+      
+      // Recargar datos globales de la administración
+      loadAttendedClientsStats();
+      if (typeof loadAdminAppointments === "function") loadAdminAppointments();
+      if (typeof loadAdminBarbers === "function") loadAdminBarbers();
+      if (typeof loadAdminClients === "function") loadAdminClients();
+    } else {
+      const err = await res.json();
+      alert(err.detail || "Error al ejecutar la purga de datos.");
+    }
+  } catch (e) {
+    console.error("Error en purga del sistema:", e);
+    alert("Error de conexión al procesar la purga del sistema.");
+  } finally {
+    const btn = document.getElementById("btnExecuteSystemPurge");
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "🚨 EJECUTAR PURGA / RESTAURAR →";
+    }
+  }
 }
 
 async function reopenAttendedTurn(id) {
@@ -343,3 +572,4 @@ function exportAttendedClientsCSV() {
 
   if (typeof showToast === "function") showToast("Planilla CSV descargada con éxito", "success");
 }
+

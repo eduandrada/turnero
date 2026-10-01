@@ -14,7 +14,7 @@ from sqlalchemy import or_
 
 from app.core.database import get_db
 from app.models import AdminUser, Appointment, Barber, AppointmentHistory, AuditLog, WaitlistEntry, Product, StockMovement, Client, get_now
-from app.schemas import AppointmentRead, AppointmentUpdate, WaitlistEntryRead, AppointmentCheckoutRequest
+from app.schemas import AppointmentRead, AppointmentUpdate, WaitlistEntryRead, AppointmentCheckoutRequest, BulkDeleteAppointmentsRequest
 from app.core.dependencies import require_admin_role, require_encargado_or_admin, require_any_staff_role
 from app.settings_helper import get_setting
 from app.api.loyalty import credit_client_loyalty_points
@@ -518,6 +518,36 @@ def delete_admin_appointment(
     db.add(AuditLog(user_name=admin.username, module="Turnos", action="Eliminar Turno", record_id=str(appointment_id)))
     db.commit()
     return {"message": "Turno eliminado correctamente."}
+
+@router.post("/api/admin/appointments/bulk-delete")
+def bulk_delete_admin_appointments(
+    payload: BulkDeleteAppointmentsRequest,
+    admin: AdminUser = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Elimina masivamente turnos del historial seleccionados por el administrador."""
+    if not payload.appointment_ids:
+        raise HTTPException(status_code=400, detail="No se seleccionó ningún turno para eliminar.")
+
+    ids = payload.appointment_ids
+    db.query(AppointmentHistory).filter(AppointmentHistory.appointment_id.in_(ids)).delete(synchronize_session=False)
+    count = db.query(Appointment).filter(Appointment.id.in_(ids)).delete(synchronize_session=False)
+    db.commit()
+
+    db.add(AuditLog(
+        user_name=admin.username,
+        module="Turnos",
+        action="Eliminación Masiva de Turnos",
+        record_id=f"Total: {count}",
+        description=f"Eliminados {count} turnos del historial."
+    ))
+    db.commit()
+
+    return {
+        "status": "success",
+        "deleted_count": count,
+        "message": f"{count} turno(s) eliminado(s) exitosamente."
+    }
 
 @router.get("/api/admin/waitlist", response_model=List[WaitlistEntryRead])
 def list_admin_waitlist(
