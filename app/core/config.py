@@ -70,8 +70,11 @@ def verify_production_secrets() -> None:
 
 # Database URL
 DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./barberia.db")
-if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+    elif DATABASE_URL.startswith("postgresql://") and not DATABASE_URL.startswith("postgresql+"):
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
 
 # Timezone settings
 TIMEZONE_NAME: str = os.getenv("TIMEZONE", "America/Argentina/Catamarca")
