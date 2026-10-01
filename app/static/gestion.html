@@ -230,6 +230,9 @@
               <p style="color: #9ca3af; font-size: 0.85rem; margin: 2px 0 0 0;">Visualizá, atendé y agendá turnos para el día de hoy.</p>
             </div>
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button class="btn-admin btn-admin-secondary" style="border-color: #23232c; color: #fff;" onclick="loadGestionAppointments(); fetchLimitsAndLoadData();" title="Recargar turnos en vivo">
+                🔄 Actualizar
+              </button>
               <button class="btn-admin btn-admin-secondary" style="border-color: #d4ff00; color: #d4ff00; font-weight: bold;" onclick="openShiftClosureModal()">
                 🔒 Cierre & Rendición
               </button>
@@ -623,6 +626,25 @@
       loadGestionServices();
       loadGestionStyles();
       loadGestionSchedules();
+
+      if (!window.gAutoRefreshStarted) {
+        window.gAutoRefreshStarted = true;
+        setInterval(() => {
+          if (gToken) {
+            loadGestionAppointments();
+          }
+        }, 10000);
+        window.addEventListener("focus", () => {
+          if (gToken) {
+            loadGestionAppointments();
+          }
+        });
+        document.addEventListener("visibilitychange", () => {
+          if (!document.hidden && gToken) {
+            loadGestionAppointments();
+          }
+        });
+      }
     }
 
     function renderLimitPills() {
