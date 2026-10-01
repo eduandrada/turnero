@@ -161,6 +161,13 @@ DEFAULT_SETTINGS = {
     "enable_post_service_rating_qr": "1",
     "gcal_sync_enabled": "1",
 
+    # Cobro, Ticket Virtual & Fidelización Post-Turno
+    "checkout_alias_transferencia": "BARBERIA.PEREYRA.MP",
+    "checkout_alias_titular": "Carmen Pereyra",
+    "checkout_next_cut_promo_code": "VUELVO15",
+    "checkout_next_cut_discount_percent": "15",
+    "checkout_custom_message": "¡Gracias por visitarnos en Pereyras Barbers! Esperamos que hayas disfrutado tu experiencia y verte pronto.",
+
     # Shop Barber Banners & Cupones
     "shop_banner_slides": json.dumps([
         {

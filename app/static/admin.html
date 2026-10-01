@@ -1652,6 +1652,32 @@
                     <input type="text" id="cfg_stripe_publishable_key" class="form-control" placeholder="pk_test_xxxxxx">
                   </div>
                 </div>
+              <!-- TICKET VIRTUAL, COBRO Y BENEFICIOS POST-TURNO -->
+              <div style="background: rgba(212, 255, 0, 0.05); border: 1px solid rgba(212, 255, 0, 0.25); border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+                <h4 style="color: #d4ff00; margin: 0 0 12px 0; font-family: 'Space Grotesk', monospace; font-size: 0.95rem;">🧾 Ticket Virtual, Cobro y Fidelización Post-Turno</h4>
+                <p style="color: #9ca3af; font-size: 0.8rem; margin: 0 0 16px 0;">Datos incluidos automáticamente en el ticket virtual y en el comprobante generado por WhatsApp al finalizar cada corte.</p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">ALIAS DE TRANSFERENCIA DIRECTA</label>
+                    <input type="text" id="cfg_checkout_alias_transferencia" class="form-control" placeholder="BARBERIA.PEREYRA.MP">
+                  </div>
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">TITULAR DE LA CUENTA</label>
+                    <input type="text" id="cfg_checkout_alias_titular" class="form-control" placeholder="Carmen Pereyra">
+                  </div>
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">CÓDIGO PROMO PRÓXIMO CORTE (REGALO)</label>
+                    <input type="text" id="cfg_checkout_next_cut_promo_code" class="form-control" placeholder="VUELVO15">
+                  </div>
+                  <div class="form-group">
+                    <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">% DESCUENTO PRÓXIMO CORTE</label>
+                    <input type="number" id="cfg_checkout_next_cut_discount_percent" class="form-control" placeholder="15" min="0" max="100">
+                  </div>
+                </div>
+                <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
+                  <label style="color: #cbd5e1; font-size: 0.75rem; font-family: monospace;">MENSAJE DE AGRADECIMIENTO / DESPEDIDA</label>
+                  <input type="text" id="cfg_checkout_custom_message" class="form-control" placeholder="¡Gracias por visitarnos en Pereyras Barbers! Esperamos verte pronto.">
+                </div>
               </div>
 
               <button type="submit" class="btn-admin" style="background: #d4ff00; color: #000; font-weight: bold; padding: 12px 24px;">

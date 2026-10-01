@@ -112,6 +112,9 @@ def init_db_and_migrate():
             if "extras_snapshot" not in columns:
                 conn.execute(text("ALTER TABLE appointments ADD COLUMN extras_snapshot TEXT"))
                 conn.commit()
+            if "checkout_data" not in columns:
+                conn.execute(text("ALTER TABLE appointments ADD COLUMN checkout_data TEXT"))
+                conn.commit()
 
         # 2. Migration for barbers
         if "barbers" in tables:

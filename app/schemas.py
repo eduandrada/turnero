@@ -251,9 +251,23 @@ class AppointmentRead(BaseModel):
     is_checked_in: bool = False
     checked_in_at: Optional[datetime] = None
     checkin_token: Optional[str] = None
-    notes: Optional[str] = None
+    checkout_data: Optional[str] = None
     created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
+
+class CheckoutProductItem(BaseModel):
+    product_id: int
+    quantity: int = 1
+    unit_price: Optional[float] = None
+
+class AppointmentCheckoutRequest(BaseModel):
+    payment_method: str = "efectivo" # efectivo, transferencia, mercadopago, debito, credito
+    products: List[CheckoutProductItem] = []
+    discount_amount: float = 0.0
+    discount_code: Optional[str] = None
+    tip_amount: float = 0.0
+    notes: Optional[str] = None
+    override_service_price: Optional[float] = None
 
 class AvailableSlotItem(BaseModel):
     time: str

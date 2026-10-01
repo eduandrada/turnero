@@ -165,6 +165,7 @@ class Appointment(Base):
     is_checked_in = Column(Boolean, default=False)
     checked_in_at = Column(DateTime, nullable=True)
     checkin_token = Column(String(50), nullable=True, index=True)
+    checkout_data = Column(Text, nullable=True)
     created_at = Column(DateTime, default=get_utc_now)
 
     barber = relationship("Barber", back_populates="appointments")

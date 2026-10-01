@@ -19,6 +19,21 @@ async function loadPaymentSettings() {
     document.getElementById("cfg_payment_provider").value = data.payment_provider || "mercadopago";
     document.getElementById("cfg_deposit_percentage").value = data.deposit_percentage || "30";
     document.getElementById("cfg_deposit_mp_alias").value = data.deposit_mp_alias || "";
+    if (document.getElementById("cfg_checkout_alias_transferencia")) {
+      document.getElementById("cfg_checkout_alias_transferencia").value = data.checkout_alias_transferencia || data.deposit_mp_alias || "";
+    }
+    if (document.getElementById("cfg_checkout_alias_titular")) {
+      document.getElementById("cfg_checkout_alias_titular").value = data.checkout_alias_titular || "Carmen Pereyra";
+    }
+    if (document.getElementById("cfg_checkout_next_cut_promo_code")) {
+      document.getElementById("cfg_checkout_next_cut_promo_code").value = data.checkout_next_cut_promo_code || "VUELVO15";
+    }
+    if (document.getElementById("cfg_checkout_next_cut_discount_percent")) {
+      document.getElementById("cfg_checkout_next_cut_discount_percent").value = data.checkout_next_cut_discount_percent || "15";
+    }
+    if (document.getElementById("cfg_checkout_custom_message")) {
+      document.getElementById("cfg_checkout_custom_message").value = data.checkout_custom_message || "¡Gracias por visitarnos en Pereyras Barbers! Esperamos verte pronto.";
+    }
     document.getElementById("cfg_mp_access_token").value = data.mp_access_token || "";
     document.getElementById("cfg_mp_public_key").value = data.mp_public_key || "";
     document.getElementById("cfg_stripe_secret_key").value = data.stripe_secret_key || "";
@@ -48,6 +63,12 @@ async function savePaymentSettings() {
   const stripeSecret = document.getElementById("cfg_stripe_secret_key").value.trim();
   const stripePub = document.getElementById("cfg_stripe_publishable_key").value.trim();
 
+  const checkoutAlias = document.getElementById("cfg_checkout_alias_transferencia")?.value.trim() || alias;
+  const checkoutTitular = document.getElementById("cfg_checkout_alias_titular")?.value.trim() || "Carmen Pereyra";
+  const checkoutPromoCode = document.getElementById("cfg_checkout_next_cut_promo_code")?.value.trim() || "VUELVO15";
+  const checkoutPromoPct = document.getElementById("cfg_checkout_next_cut_discount_percent")?.value.trim() || "15";
+  const checkoutCustomMsg = document.getElementById("cfg_checkout_custom_message")?.value.trim() || "";
+
   const payload = {
     settings: {
       payment_gateway_enabled: enabled,
@@ -55,6 +76,11 @@ async function savePaymentSettings() {
       payment_provider: provider,
       deposit_percentage: depositPct,
       deposit_mp_alias: alias,
+      checkout_alias_transferencia: checkoutAlias,
+      checkout_alias_titular: checkoutTitular,
+      checkout_next_cut_promo_code: checkoutPromoCode,
+      checkout_next_cut_discount_percent: checkoutPromoPct,
+      checkout_custom_message: checkoutCustomMsg,
       mp_access_token: mpToken,
       mp_public_key: mpPub,
       stripe_secret_key: stripeSecret,

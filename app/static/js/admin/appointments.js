@@ -366,8 +366,13 @@ function renderFilteredAppointmentsTable() {
       `;
     } else if (["COMPLETADO", "ATENDIDO", "FINALIZADO"].includes(upperStatus)) {
       actionButtonsHtml = `
-        <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
+        <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
           <span style="font-size: 0.75rem; color: #10b981; font-weight: 700; font-family: monospace;">✅ Atendido</span>
+          ${a.checkout_data ? `
+            <button type="button" class="btn-admin btn-admin-sm" onclick="viewVirtualTicketFromAdmin(${a.id})" style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #10b981; font-size: 0.7rem; padding: 3px 8px;" title="Ver ticket virtual y comprobante">
+              🧾 Ticket
+            </button>
+          ` : ''}
           <button type="button" class="btn-admin btn-admin-sm btn-admin-secondary" onclick="changeApptStatus(${a.id}, 'CONFIRMADO')" title="Reabrir turno si fue completado por error" style="font-size: 0.7rem; padding: 3px 8px;">
             ↩️ Reabrir
           </button>
@@ -532,5 +537,73 @@ async function changeApptStatus(id, newStatus) {
     }
   } catch (e) {
     if (typeof showToast === "function") showToast("Error de conexión al actualizar turno.", "error");
+  }
+}
+
+async function viewVirtualTicketFromAdmin(id) {
+  try {
+    const res = await fetch(`/api/admin/appointments/${id}/checkout-prep`, { headers: authHeaders() });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.appointment && data.appointment.checkout_data) {
+      const ticket = data.appointment.checkout_data;
+      const cleanPhone = (ticket.client_phone || "").replace(/\D/g, "");
+      const waText = encodeURIComponent(`✂️ Ticket Virtual Barbería\nCliente: ${ticket.client_name}\nTotal: $${ticket.total}\n¡Gracias por tu visita!`);
+      const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}?text=${waText}` : null;
+      
+      const modal = document.createElement("div");
+      modal.className = "modal-overlay";
+      modal.style.cssText = "display: flex; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 99999; justify-content: center; align-items: center; padding: 16px;";
+      modal.innerHTML = `
+        <div style="background: #111116; border: 1px solid #23232c; border-radius: 20px; width: 100%; max-width: 460px; padding: 24px; color: #fff; font-family: monospace;">
+          <div style="text-align: center; border-bottom: 1px dashed #444; padding-bottom: 12px; margin-bottom: 12px;">
+            <div style="font-size: 1.8rem;">💈</div>
+            <h3 style="color: #d4ff00; margin: 0;">PEREYRAS BARBERS</h3>
+            <div style="font-size: 0.75rem; color: #9ca3af;">TICKET VIRTUAL #${ticket.appointment_id} - ${ticket.checkout_at || ''}</div>
+          </div>
+          <div style="font-size: 0.82rem; line-height: 1.6; margin-bottom: 10px;">
+            <div>👤 Cliente: <strong>${ticket.client_name}</strong></div>
+            <div>💈 Barbero: <strong>${ticket.barber_name}</strong></div>
+            <div>💳 Pago: <strong>${(ticket.payment_method || 'efectivo').toUpperCase()}</strong></div>
+          </div>
+          <div style="border-top: 1px dashed #444; padding: 8px 0;">
+            <div style="display:flex; justify-content:space-between; font-weight:bold;">
+              <span>${ticket.service_name}</span>
+              <span style="color:#00f2fe;">$${(ticket.service_price || 0).toLocaleString("es-AR")}</span>
+            </div>
+            ${(ticket.products || []).map(p => `
+              <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#cbd5e1;">
+                <span>${p.quantity}x ${p.name}</span>
+                <span>$${(p.subtotal || 0).toLocaleString("es-AR")}</span>
+              </div>
+            `).join("")}
+          </div>
+          <div style="border-top: 1px dashed #444; padding-top: 8px; margin-top: 8px;">
+            <div style="display:flex; justify-content:space-between; font-size:1.15rem; font-weight:900;">
+              <span>TOTAL:</span>
+              <span style="color:#d4ff00;">$${(ticket.total || 0).toLocaleString("es-AR")}</span>
+            </div>
+          </div>
+          ${ticket.promo_code ? `
+            <div style="background:rgba(212,255,0,0.1); border:1px solid rgba(212,255,0,0.3); border-radius:6px; padding:8px; margin-top:10px; text-align:center; font-size:0.78rem; color:#d4ff00;">
+              🎁 Cupón próximo corte: <strong>${ticket.promo_code}</strong> (${ticket.promo_percent || 15}% OFF)
+            </div>
+          ` : ''}
+          <div style="display:flex; flex-direction:column; gap:8px; margin-top:16px;">
+            ${waUrl ? `
+              <a href="${waUrl}" target="_blank" onclick="this.closest('.modal-overlay').remove();" class="btn-admin" style="background:#25D366; color:#000; font-weight:bold; text-align:center; text-decoration:none; padding:10px;">
+                💬 Enviar por WhatsApp
+              </a>
+            ` : ''}
+            <button type="button" onclick="this.closest('.modal-overlay').remove();" class="btn-admin btn-admin-secondary" style="padding:8px;">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+  } catch (e) {
+    console.error("Error al visualizar ticket:", e);
   }
 }
