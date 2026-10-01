@@ -703,12 +703,23 @@ function renderBarbers() {
   if (!grid) return;
   grid.innerHTML = "";
 
+  const count = (state.barbers || []).length;
+  if (count === 1) {
+    grid.className = "flex justify-center items-center w-full my-2";
+  } else if (count === 2) {
+    grid.className = "grid grid-cols-1 sm:grid-cols-2 max-w-xl mx-auto gap-4 w-full";
+  } else {
+    grid.className = "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 w-full";
+  }
+
   state.barbers.forEach(barber => {
     const isSelected = state.selectedBarber && state.selectedBarber.id === barber.id;
     const card = document.createElement("div");
     card.className = `glass-card-interactive p-4 rounded-2xl border ${
       isSelected ? "neon-border-active shadow-volt-sm" : "border-surfaceBorder hover:border-white/20"
-    } flex flex-col items-center text-center transition-all cursor-pointer relative overflow-hidden`;
+    } flex flex-col items-center text-center transition-all cursor-pointer relative overflow-hidden ${
+      count === 1 ? "w-full max-w-xs sm:max-w-[340px]" : "w-full"
+    }`;
 
     const experienceTag = barber.experience ? `<span class="text-[9px] font-mono text-[#00f2fe] bg-[#00f2fe]/10 border border-[#00f2fe]/20 px-2 py-0.5 rounded-full mb-1">⚡ ${escapeHtml(barber.experience)}</span>` : "";
     const stylesTag = barber.featured_styles ? `<span class="text-[9px] font-mono text-gray-300 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md mt-1 truncate max-w-full">✂️ ${escapeHtml(barber.featured_styles)}</span>` : "";

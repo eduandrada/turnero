@@ -266,7 +266,7 @@
         <p class="text-xs text-gray-400 mt-1" id="textBarbersDesc">Selecciona al profesional para tu atención:</p>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="barbersGrid"></div>
+      <div class="w-full flex justify-center" id="barbersGrid"></div>
 
       <div class="pt-2">
         <button type="button" id="btnContinueFromBarber" onclick="continueToServices()" class="w-full py-4 rounded-xl bg-neonVolt text-obsidian font-mono font-bold text-xs sm:text-sm hover:bg-neonVolt/90 active:scale-[0.99] transition shadow-volt-sm flex items-center justify-center gap-2">
@@ -502,7 +502,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=20261001_5"></script>
   <script>
     function openAgendaLoginModal() {
       const token = localStorage.getItem("hiddensync_admin_token") || localStorage.getItem("bladesync_admin_token");
