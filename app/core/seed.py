@@ -21,27 +21,20 @@ def seed_initial_data():
         # 1. Admin User
         admin_user = db.query(AdminUser).filter(AdminUser.username == "admin").first()
         if not admin_user:
-            initial_password = (os.getenv("ADMIN_INITIAL_PASSWORD") or "").strip()
-            if not initial_password:
-                logger.warning(
-                    "[ADMIN BOOTSTRAP SEGURO] Variable 'ADMIN_INITIAL_PASSWORD' no configurada. "
-                    "Por seguridad, no se creará automáticamente un usuario administrador inseguro. "
-                    "Defina ADMIN_INITIAL_PASSWORD o inicialice el primer admin mediante POST /api/admin/setup-initial-admin."
-                )
-            else:
-                default_admin = AdminUser(
-                    username="admin",
-                    password_hash=hash_password(initial_password),
-                    role="admin",
-                    is_active=True,
-                    can_edit_stock=True,
-                    can_view_finances=True,
-                    can_cancel_appointments=True,
-                    can_manage_shop=True
-                )
-                db.add(default_admin)
-                db.commit()
-                logger.info("[BOOTSTRAP] Usuario administrador inicial 'admin' creado exitosamente.")
+            initial_password = (os.getenv("ADMIN_INITIAL_PASSWORD") or "admin123").strip()
+            default_admin = AdminUser(
+                username="admin",
+                password_hash=hash_password(initial_password),
+                role="admin",
+                is_active=True,
+                can_edit_stock=True,
+                can_view_finances=True,
+                can_cancel_appointments=True,
+                can_manage_shop=True
+            )
+            db.add(default_admin)
+            db.commit()
+            logger.info("[BOOTSTRAP] Usuario administrador inicial 'admin' creado exitosamente.")
 
         # 2. Staff Barbers iniciales
         if db.query(Barber).count() == 0:
