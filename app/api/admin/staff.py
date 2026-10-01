@@ -410,10 +410,19 @@ def get_encargado_limits(
     max_styles = int(get_setting(db, "encargado_max_styles", "3"))
     allow_full_admin = get_setting(db, "encargado_allow_full_admin", "false").lower() == "true"
 
-    today_str = get_argentina_now().strftime("%Y-%m-%d")
-    
-    today_appts = db.query(Appointment).filter(Appointment.appointment_date == today_str).count()
-    today_clients = db.query(Appointment).filter(Appointment.appointment_date == today_str, Appointment.status.in_(["atendiendo", "atendido", "confirmado"])).count()
+    now_ar = get_argentina_now()
+    start_today = datetime.combine(now_ar.date(), time.min)
+    end_today = datetime.combine(now_ar.date(), time.max)
+
+    today_appts = db.query(Appointment).filter(
+        Appointment.appointment_time >= start_today,
+        Appointment.appointment_time <= end_today
+    ).count()
+    today_clients = db.query(Appointment).filter(
+        Appointment.appointment_time >= start_today,
+        Appointment.appointment_time <= end_today,
+        Appointment.status.in_(["atendiendo", "atendido", "confirmado", "COMPLETADO", "CONFIRMADO"])
+    ).count()
     if today_clients == 0:
         today_clients = db.query(Client).count()
         today_clients = min(today_clients, today_appts or today_clients)

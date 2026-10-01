@@ -36,6 +36,24 @@ def seed_initial_data():
             db.commit()
             logger.info("[BOOTSTRAP] Usuario administrador inicial 'admin' creado exitosamente.")
 
+        # 1.b Encargado User (Personal de gestión)
+        encargado_user = db.query(AdminUser).filter(AdminUser.username == "encargado").first()
+        if not encargado_user:
+            encargado_password = (os.getenv("ENCARGADO_INITIAL_PASSWORD") or "encargado123").strip()
+            default_encargado = AdminUser(
+                username="encargado",
+                password_hash=hash_password(encargado_password),
+                role="encargado",
+                is_active=True,
+                can_edit_stock=True,
+                can_view_finances=False,
+                can_cancel_appointments=True,
+                can_manage_shop=True
+            )
+            db.add(default_encargado)
+            db.commit()
+            logger.info("[BOOTSTRAP] Usuario encargado inicial 'encargado' creado exitosamente.")
+
         # 2. Staff Barbers iniciales
         if db.query(Barber).count() == 0:
             barbers = [
