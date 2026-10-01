@@ -287,6 +287,34 @@
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="servicesGrid"></div>
 
+      <!-- AGREGADOS & SERVICIOS EXTRA (TILDABLES) -->
+      <div id="extrasContainer" class="mt-2 flex flex-col gap-2">
+        <div class="flex items-center justify-between px-1">
+          <div>
+            <span class="text-[10px] font-mono text-neonVolt font-bold tracking-wider uppercase block">OPCIONES ADICIONALES</span>
+            <h3 class="text-sm sm:text-base font-bold font-mono text-white">¿Deseas sumar algún agregado?</h3>
+          </div>
+          <span class="text-[10px] font-mono text-neonCyan bg-neonCyan/10 px-2.5 py-0.5 rounded-full border border-neonCyan/25">Casilleros Tildables</span>
+        </div>
+        <p class="text-[11px] text-gray-400 px-1 leading-snug">Personaliza tu turno tildando los agregados que quieras (perfilado, barba, alineado, color, etc.):</p>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-1" id="extrasGrid">
+          <!-- Renderizado dinámico de extras -->
+        </div>
+
+        <!-- Barra resumen en vivo de Servicio + Extras -->
+        <div id="serviceSummaryBox" class="glass-card p-3 rounded-xl border border-neonVolt/30 flex items-center justify-between text-xs mt-2 bg-neonVolt/5">
+          <div class="flex flex-col">
+            <span class="text-[9px] font-mono text-gray-400 uppercase tracking-wider">RESUMEN DEL SERVICIO + AGREGADOS</span>
+            <span class="text-white font-bold text-xs" id="summaryServiceLine">Corte General (30m)</span>
+          </div>
+          <div class="text-right">
+            <span class="text-neonVolt font-mono font-bold text-base block" id="summaryServiceTotal">$6.000</span>
+            <span class="text-[10px] font-mono text-gray-400" id="summaryServiceDuration">30 min total</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Asesor Morfológico IA -->
       <div class="mt-1">
         <button type="button" onclick="toggleAIAdvisor()" class="w-full py-3 px-4 rounded-xl bg-surfaceElevated hover:bg-white/10 active:scale-[0.99] border border-surfaceBorder hover:border-neonVolt/40 text-xs font-mono flex items-center justify-between text-gray-300 transition">
@@ -424,6 +452,10 @@
           <span class="text-gray-500 font-mono">2. Servicio:</span>
           <span class="font-bold text-white text-right" id="summaryServiceText">-</span>
         </div>
+        <div class="flex justify-between text-xs py-1 text-gray-300" id="summaryExtrasRow" style="display: none;">
+          <span class="text-gray-500 font-mono">Agregados:</span>
+          <span class="text-neonVolt font-mono text-right text-[11px]" id="summaryExtrasText">-</span>
+        </div>
         <div class="flex justify-between text-xs py-1 text-gray-300">
           <span class="text-gray-500 font-mono">3. Fecha/Hora:</span>
           <span class="text-white font-mono font-bold" id="summaryTimeText">-</span>
@@ -502,7 +534,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=20261001_5"></script>
+  <script src="/static/app.js?v=20261001_6"></script>
   <script>
     function openAgendaLoginModal() {
       const token = localStorage.getItem("hiddensync_admin_token") || localStorage.getItem("bladesync_admin_token");

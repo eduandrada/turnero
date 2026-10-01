@@ -20,6 +20,7 @@ from app.models import (
     AuditLog,
     Barber,
     Service,
+    ServiceExtra,
     Client,
     IdempotencyRecord
 )
@@ -45,6 +46,8 @@ class AppointmentService:
         barber_name: Optional[str] = None,
         service_id: Optional[int] = None,
         service: Optional[str] = None,
+        extras_ids: Optional[List[int]] = None,
+        extras: Optional[List[str]] = None,
         notes: Optional[str] = None,
         idempotency_key: Optional[str] = None,
         request_path: str = "/api/appointments"
@@ -84,10 +87,25 @@ class AppointmentService:
         elif service:
             service_obj = db.query(Service).filter(Service.name.ilike(f"%{service}%")).first()
 
-        resolved_s_name = service_obj.name if service_obj else (service or "Corte Signature Fade")
+        resolved_s_name = service_obj.name if service_obj else (service or "Corte General")
         resolved_s_id = service_obj.id if service_obj else 1
-        duration_min = service_obj.duration_min if service_obj else 45
-        service_price = service_obj.price if service_obj else 0.0
+        base_duration = service_obj.duration_min if service_obj else 30
+        base_price = service_obj.price if service_obj else 0.0
+
+        # Resolver agregados/extras seleccionados
+        selected_extras = []
+        if extras_ids:
+            selected_extras = db.query(ServiceExtra).filter(ServiceExtra.id.in_(extras_ids), ServiceExtra.is_active == True).all()
+        elif extras:
+            selected_extras = db.query(ServiceExtra).filter(ServiceExtra.name.in_(extras), ServiceExtra.is_active == True).all()
+
+        extras_total_price = sum(float(e.price) for e in selected_extras)
+        extras_total_duration = sum(int(e.duration_min) for e in selected_extras)
+        extras_summary_list = [f"{e.name} (+${int(e.price):,})".replace(",", ".") for e in selected_extras]
+        extras_snapshot_str = ", ".join(extras_summary_list) if extras_summary_list else None
+
+        duration_min = base_duration + extras_total_duration
+        service_price = base_price + extras_total_price
 
         slot_start = appt_time_naive
         slot_end = slot_start + timedelta(minutes=duration_min)
@@ -145,6 +163,7 @@ class AppointmentService:
                 service_id=resolved_s_id,
                 service=resolved_s_name,
                 service_price_snapshot=service_price,
+                extras_snapshot=extras_snapshot_str,
                 appointment_time=slot_start,
                 end_time=slot_end,
                 duration_min=duration_min,
@@ -174,7 +193,7 @@ class AppointmentService:
             # Disparar notificaciones WhatsApp
             send_appointment_whatsapp_notifications(db, new_appt)
 
-        logger.info(f"Turno #{new_appt.id} creado para {new_appt.client_name} ({slot_start}) - PIN: {new_appt.checkin_token}")
+        logger.info(f"Turno #{new_appt.id} creado para {new_appt.client_name} ({slot_start}) - PIN: {new_appt.checkin_token} - Total: ${service_price}")
         return {
             "id": new_appt.id,
             "checkin_pin": new_appt.checkin_token,
@@ -183,6 +202,8 @@ class AppointmentService:
             "client_phone": new_appt.client_phone,
             "barber_name": new_appt.barber_name,
             "service": new_appt.service,
+            "extras_snapshot": new_appt.extras_snapshot,
+            "service_price_snapshot": new_appt.service_price_snapshot,
             "appointment_time": new_appt.appointment_time.isoformat(),
             "status": new_appt.status,
             "duration_min": new_appt.duration_min

@@ -120,6 +120,8 @@ const UISound = {
 let state = {
   currentScreen: "screen-intro",
   services: [],
+  extras: [],
+  selectedExtras: [],
   barbers: [],
   styles: [],
   settings: {},
@@ -786,7 +788,7 @@ function selectBarber(barberId, isUserClick = false) {
 }
 
 // ==========================================
-// PASO 2: SERVICIOS
+// PASO 2: SERVICIOS & AGREGADOS (EXTRAS)
 // ==========================================
 async function loadServices() {
   try {
@@ -794,10 +796,21 @@ async function loadServices() {
     if (res.ok) state.services = await res.json();
   } catch (err) {}
 
+  await loadExtras();
   renderServices();
   if (state.services.length > 0 && !state.selectedService) {
     selectService(state.services[0].id, false);
   }
+}
+
+async function loadExtras() {
+  try {
+    const res = await fetch("/api/service-extras");
+    if (res.ok) state.extras = await res.json();
+  } catch (err) {
+    state.extras = [];
+  }
+  renderExtras();
 }
 
 function renderServices() {
@@ -810,8 +823,8 @@ function renderServices() {
     const card = document.createElement("button");
     card.type = "button";
     card.className = `service-btn glass-card-interactive p-4 rounded-2xl text-left border ${
-      isSelected ? "neon-border-active shadow-volt-sm" : "border-surfaceBorder hover:border-white/20"
-    } flex flex-col justify-between transition-all cursor-pointer`;
+      isSelected ? "neon-border-active shadow-volt-sm bg-neonVolt/5" : "border-surfaceBorder hover:border-white/20"
+    } flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden`;
 
     card.innerHTML = `
       <div>
@@ -822,7 +835,7 @@ function renderServices() {
         <p class="text-[11px] text-gray-400 mb-2 leading-snug">${escapeHtml(srv.description || "")}</p>
       </div>
       <div class="flex justify-between items-center mt-2 pt-2 border-t border-white/5">
-        <span class="text-[10px] font-mono text-gray-500 uppercase">PRECIO</span>
+        <span class="text-[10px] font-mono text-gray-500 uppercase">PRECIO BASE</span>
         <span class="text-sm font-mono text-neonVolt font-bold">$${srv.price.toLocaleString("es-AR")}</span>
       </div>
     `;
@@ -832,31 +845,143 @@ function renderServices() {
   });
 }
 
+function renderExtras() {
+  const grid = document.getElementById("extrasGrid");
+  if (!grid) return;
+  grid.innerHTML = "";
+
+  const container = document.getElementById("extrasContainer");
+  if (!state.extras || state.extras.length === 0) {
+    if (container) container.style.display = "none";
+    return;
+  }
+  if (container) container.style.display = "flex";
+
+  state.extras.forEach(extra => {
+    const isChecked = (state.selectedExtras || []).some(e => e.id === extra.id);
+    const card = document.createElement("div");
+    card.className = `p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+      isChecked 
+        ? "bg-neonVolt/10 border-neonVolt shadow-volt-sm" 
+        : "glass-card border-surfaceBorder hover:border-white/20 bg-black/40"
+    }`;
+
+    card.innerHTML = `
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${
+          isChecked 
+            ? "bg-neonVolt border-neonVolt text-obsidian font-bold text-xs shadow-volt-sm" 
+            : "border-gray-500 bg-white/5 text-transparent"
+        }">
+          ${isChecked ? "✓" : ""}
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-1.5">
+            <span class="text-sm">${escapeHtml(extra.icon || '✂️')}</span>
+            <span class="text-xs font-bold ${isChecked ? 'text-neonVolt' : 'text-white'} truncate block">${escapeHtml(extra.name)}</span>
+          </div>
+          ${extra.description ? `<p class="text-[10px] text-gray-400 truncate mt-0.5">${escapeHtml(extra.description)}</p>` : ''}
+        </div>
+      </div>
+      <div class="text-right shrink-0">
+        <span class="text-xs font-mono font-bold ${isChecked ? 'text-neonVolt' : 'text-gray-200'} block">+$${extra.price.toLocaleString("es-AR")}</span>
+        <span class="text-[9px] font-mono text-gray-400 bg-white/5 px-1.5 py-0.5 rounded">+${extra.duration_min}m</span>
+      </div>
+    `;
+
+    card.onclick = () => toggleExtra(extra.id);
+    grid.appendChild(card);
+  });
+
+  updateServiceAndExtrasSummary();
+}
+
+function toggleExtra(extraId) {
+  UISound.play("click");
+  const extra = state.extras.find(e => e.id === extraId);
+  if (!extra) return;
+
+  if (!state.selectedExtras) state.selectedExtras = [];
+  const idx = state.selectedExtras.findIndex(e => e.id === extraId);
+  if (idx >= 0) {
+    state.selectedExtras.splice(idx, 1);
+  } else {
+    state.selectedExtras.push(extra);
+  }
+
+  renderExtras();
+}
+
 function selectService(serviceId, isUserClick = false) {
   const srv = state.services.find(s => s.id === serviceId);
   if (!srv) return;
   state.selectedService = srv;
 
   renderServices();
-
-  const btnServiceText = document.getElementById("btnServiceText");
-  if (btnServiceText) btnServiceText.textContent = `CONTINUAR CON ${srv.name.toUpperCase()} ($${srv.price.toLocaleString("es-AR")})`;
-
-  const agendaService = document.getElementById("agendaServiceName");
-  if (agendaService) agendaService.textContent = srv.name;
-
-  const summaryService = document.getElementById("summaryServiceText");
-  if (summaryService) summaryService.textContent = srv.name;
-
-  const summaryPrice = document.getElementById("summaryPriceText");
-  if (summaryPrice) summaryPrice.textContent = `$${srv.price.toLocaleString("es-AR")}`;
-
+  updateServiceAndExtrasSummary();
   updateNavigationUI(state.currentScreen);
 
   if (isUserClick) {
     UISound.play("granted");
-    setTimeout(() => { continueToAgenda(); }, 180);
   }
+}
+
+function updateServiceAndExtrasSummary() {
+  const baseService = state.selectedService;
+  const basePrice = baseService ? baseService.price : 0;
+  const baseDuration = baseService ? baseService.duration_min : 30;
+
+  const extras = state.selectedExtras || [];
+  const extrasPrice = extras.reduce((sum, e) => sum + (e.price || 0), 0);
+  const extrasDuration = extras.reduce((sum, e) => sum + (e.duration_min || 0), 0);
+
+  const totalPrice = basePrice + extrasPrice;
+  const totalDuration = baseDuration + extrasDuration;
+
+  const summaryLineEl = document.getElementById("summaryServiceLine");
+  const summaryTotalEl = document.getElementById("summaryServiceTotal");
+  const summaryDurEl = document.getElementById("summaryServiceDuration");
+  const btnServiceText = document.getElementById("btnServiceText");
+
+  if (summaryLineEl) {
+    if (extras.length > 0) {
+      const extraNames = extras.map(e => e.name).join(", ");
+      summaryLineEl.innerHTML = `<strong>${escapeHtml(baseService ? baseService.name : 'Servicio')}</strong> <span class="text-neonCyan text-[11px] block mt-0.5">(+ ${extras.length} agregado${extras.length > 1 ? 's' : ''}: ${escapeHtml(extraNames)})</span>`;
+    } else {
+      summaryLineEl.textContent = baseService ? `${baseService.name} (${baseDuration} min)` : "Ningún servicio seleccionado";
+    }
+  }
+
+  if (summaryTotalEl) {
+    summaryTotalEl.textContent = `$${totalPrice.toLocaleString("es-AR")}`;
+  }
+
+  if (summaryDurEl) {
+    summaryDurEl.textContent = `${totalDuration} min estimado`;
+  }
+
+  if (btnServiceText) {
+    const sName = baseService ? baseService.name.toUpperCase() : "SERVICIO";
+    const extrasInfo = extras.length > 0 ? ` + ${extras.length} EXTRA${extras.length > 1 ? 'S' : ''}` : '';
+    btnServiceText.textContent = `CONTINUAR CON ${sName}${extrasInfo} ($${totalPrice.toLocaleString("es-AR")})`;
+  }
+
+  const agendaService = document.getElementById("agendaServiceName");
+  if (agendaService && baseService) {
+    agendaService.textContent = extras.length > 0 ? `${baseService.name} (+${extras.length} extras)` : baseService.name;
+  }
+
+  const summaryService = document.getElementById("summaryServiceText");
+  if (summaryService && baseService) {
+    summaryService.textContent = baseService.name;
+  }
+
+  const summaryPrice = document.getElementById("summaryPriceText");
+  if (summaryPrice) {
+    summaryPrice.textContent = `$${totalPrice.toLocaleString("es-AR")}`;
+  }
+
+  updateBookingSummaryCard();
 }
 
 // ==========================================
@@ -875,9 +1000,12 @@ async function loadSlots() {
 
   const barberIdParam = state.selectedBarber ? state.selectedBarber.id : "";
   const serviceIdParam = state.selectedService ? state.selectedService.id : "";
+  const baseDuration = state.selectedService ? state.selectedService.duration_min : 30;
+  const extrasDuration = (state.selectedExtras || []).reduce((acc, e) => acc + (e.duration_min || 0), 0);
+  const totalDuration = baseDuration + extrasDuration;
 
   try {
-    const res = await fetch(`/api/available-slots?barber_id=${barberIdParam}&service_id=${serviceIdParam}&date=${date}`);
+    const res = await fetch(`/api/available-slots?barber_id=${barberIdParam}&service_id=${serviceIdParam}&duration_min=${totalDuration}&date=${date}`);
     if (!res.ok) throw new Error("Error slots");
     const data = await res.json();
     renderSlots(data.slots);
@@ -933,14 +1061,31 @@ function updateBookingSummaryCard() {
   const summaryService = document.getElementById("summaryServiceText");
   const summaryTime = document.getElementById("summaryTimeText");
   const summaryPrice = document.getElementById("summaryPriceText");
+  const extrasRow = document.getElementById("summaryExtrasRow");
+  const extrasText = document.getElementById("summaryExtrasText");
 
   if (summaryBarber && state.selectedBarber) summaryBarber.textContent = state.selectedBarber.name;
   if (summaryService && state.selectedService) summaryService.textContent = state.selectedService.name;
+
+  const extras = state.selectedExtras || [];
+  if (extrasRow && extrasText) {
+    if (extras.length > 0) {
+      extrasRow.style.display = "flex";
+      extrasText.textContent = extras.map(e => `${e.name} (+$${e.price.toLocaleString("es-AR")})`).join(", ");
+    } else {
+      extrasRow.style.display = "none";
+    }
+  }
+
   if (summaryTime && state.selectedDate && state.selectedSlot) {
     const [y, m, d] = state.selectedDate.split("-");
     summaryTime.textContent = `${d}/${m}/${y} a las ${state.selectedSlot} hs`;
   }
-  if (summaryPrice && state.selectedService) summaryPrice.textContent = `$${state.selectedService.price.toLocaleString("es-AR")}`;
+
+  const basePrice = state.selectedService ? state.selectedService.price : 0;
+  const extrasPrice = extras.reduce((sum, e) => sum + (e.price || 0), 0);
+  const totalPrice = basePrice + extrasPrice;
+  if (summaryPrice) summaryPrice.textContent = `$${totalPrice.toLocaleString("es-AR")}`;
 }
 
 // ==========================================
@@ -1025,6 +1170,8 @@ async function submitBooking() {
     barber_name: state.selectedBarber.name,
     service_id: state.selectedService.id,
     service: state.selectedService.name,
+    extras_ids: (state.selectedExtras || []).map(e => e.id),
+    extras: (state.selectedExtras || []).map(e => e.name),
     appointment_time: `${state.selectedDate}T${state.selectedSlot}:00`,
     idempotency_key: idempotencyKey
   };
@@ -1167,8 +1314,17 @@ function showSuccessModal(appt) {
     </div>
   `;
 
+  let extrasHTML = "";
+  if (appt.extras_snapshot) {
+    extrasHTML = `<div style="font-size: 0.8rem; color: #d4ff00; font-family: monospace; margin-top: 6px; padding: 6px 10px; background: rgba(212,255,0,0.08); border-radius: 8px;">➕ Agregados: ${escapeHtml(appt.extras_snapshot)}</div>`;
+  }
+
+  const priceFormatted = appt.service_price_snapshot ? `$${appt.service_price_snapshot.toLocaleString('es-AR')}` : '';
+
   msg.innerHTML = `
     <strong>${escapeHtml(appt.client_name)}</strong>, tu cita para <strong>${escapeHtml(appt.service)}</strong> con <strong>${escapeHtml(appt.barber_name)}</strong> ha sido agendada para el <strong>${d}/${m}/${y} a las ${timeFormatted} hs</strong>.
+    ${extrasHTML}
+    ${priceFormatted ? `<div style="font-size: 0.9rem; color: #fff; font-weight: bold; margin-top: 6px;">Total: <span style="color: #d4ff00; font-family: monospace;">${priceFormatted}</span></div>` : ''}
     ${checkinPinHTML}
     ${depositInfoHTML}
   `;
@@ -1178,10 +1334,12 @@ function showSuccessModal(appt) {
   if (waBtn) {
     const shopName = (state.settings && state.settings.barber_name) || "la Barbería";
     const shopPhone = (state.settings && (state.settings.whatsapp || state.settings.phone)) || "";
+    const extrasWa = appt.extras_snapshot ? `\n➕ Agregados: ${appt.extras_snapshot}` : '';
+    const totalWa = appt.service_price_snapshot ? `\n💵 Total: $${appt.service_price_snapshot.toLocaleString('es-AR')}` : '';
     const waText = encodeURIComponent(
       `💈 ¡Hola! Acabo de reservar mi turno #${appt.id} en ${shopName}:\n\n` +
       `👤 Cliente: ${appt.client_name}\n` +
-      `✂️ Servicio: ${appt.service}\n` +
+      `✂️ Servicio: ${appt.service}${extrasWa}${totalWa}\n` +
       `💈 Barbero: ${appt.barber_name}\n` +
       `📅 Fecha: ${d}/${m}/${y} a las ${timeFormatted} hs\n` +
       `🔑 PIN de Check-in: ${pinCode}\n\n` +

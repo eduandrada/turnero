@@ -165,6 +165,12 @@ def build_client_appointment_message(db: Session, appointment: Appointment) -> T
         f"📅 *Fecha:* {date_str}\n"
         f"⏰ *Hora:* {time_str} hs\n"
         f"✂️ *Servicio:* {service_name}\n"
+    )
+    if appointment.extras_snapshot:
+        msg += f"➕ *Agregados:* {appointment.extras_snapshot}\n"
+    if appointment.service_price_snapshot:
+        msg += f"💵 *Total estimado:* ${int(appointment.service_price_snapshot):,}\n".replace(",", ".")
+    msg += (
         f"👤 *Barbero:* {barber_name}\n"
         f"📍 *Dirección:* {address}\n\n"
         f"🔑 *TU PIN DE LLEGADA / TOTEM:* `{pin_code}`\n"
@@ -188,15 +194,22 @@ def build_barber_appointment_message(db: Session, appointment: Appointment) -> s
     barber_name = appointment.barber_name or (appointment.barber.name if appointment.barber else "Barbero")
     notes = appointment.notes or "Sin notas adicionales"
 
-    return (
+    barber_msg = (
         f"🔔 *Nuevo turno agendado - {shop_name}*\n\n"
         f"Hola *{barber_name}*, tenés una nueva reserva:\n"
         f"• *Cliente:* {appointment.client_name}\n"
         f"• *Fecha y Hora:* {date_str} a las {time_str} hs ({duration} min)\n"
         f"• *Servicio:* {service_name}\n"
-        f"• *Notas:* {notes}\n"
-        f"• *Turno ID:* #{appointment.id}"
     )
+    if appointment.extras_snapshot:
+        barber_msg += f"• *Agregados:* {appointment.extras_snapshot}\n"
+    if appointment.service_price_snapshot:
+        barber_msg += f"• *Total a cobrar:* ${int(appointment.service_price_snapshot):,}\n".replace(",", ".")
+    barber_msg += (
+        f"• *Notas:* {notes}\n\n"
+        f"PIN de Check-in cliente: `{appointment.checkin_token or f'{appointment.id:04d}'}`"
+    )
+    return barber_msg
 
 import sys
 

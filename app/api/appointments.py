@@ -46,6 +46,8 @@ def create_public_appointment(request: Request, data: AppointmentCreate, db: Ses
         barber_name=data.barber_name,
         service_id=data.service_id,
         service=data.service,
+        extras_ids=data.extras_ids,
+        extras=data.extras,
         notes=data.notes,
         idempotency_key=idem_key
     )

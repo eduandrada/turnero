@@ -109,6 +109,9 @@ def init_db_and_migrate():
             if "checkin_token" not in columns:
                 conn.execute(text("ALTER TABLE appointments ADD COLUMN checkin_token VARCHAR(50)"))
                 conn.commit()
+            if "extras_snapshot" not in columns:
+                conn.execute(text("ALTER TABLE appointments ADD COLUMN extras_snapshot TEXT"))
+                conn.commit()
 
         # 2. Migration for barbers
         if "barbers" in tables:
@@ -282,6 +285,45 @@ def init_db_and_migrate():
             if "commission_amount" not in columns:
                 conn.execute(text("ALTER TABLE sales_records ADD COLUMN commission_amount FLOAT DEFAULT 0.0"))
                 conn.commit()
+
+    # Sembrado inicial de ServiceExtra y Corte General si no existen
+    try:
+        from app.models import ServiceExtra, Service
+        db_session = SessionLocal()
+        if db_session.query(ServiceExtra).count() == 0:
+            default_extras = [
+                ServiceExtra(name="Perfilado con Navaja", description="Definición nítida de líneas con navaja tradicional y toalla tibia", price=1500.0, duration_min=15, icon="✂️", display_order=1),
+                ServiceExtra(name="Alineado & Cejas Clean", description="Limpieza y perfilado de cejas al detalle", price=1000.0, duration_min=10, icon="✨", display_order=2),
+                ServiceExtra(name="Barba Ritual Completa", description="Vapor ozonizado, recorte con máquina y tijera, bálsamo hidratante", price=2500.0, duration_min=20, icon="🧔", display_order=3),
+                ServiceExtra(name="Color / Platinado / Mechas", description="Colorimetría, mechas o platinado profesional de autor", price=4500.0, duration_min=40, icon="🎨", display_order=4),
+                ServiceExtra(name="Degradé Especial / Freestyle", description="Diseño personalizado o degradé marcado a elección", price=1500.0, duration_min=15, icon="💈", display_order=5),
+                ServiceExtra(name="Lavado & Masaje Capilar", description="Lavado profundo con masaje relajante y tónico revitalizante", price=1200.0, duration_min=10, icon="💆", display_order=6),
+            ]
+            db_session.add_all(default_extras)
+            db_session.commit()
+
+        corte_gen = db_session.query(Service).filter(Service.name.ilike("%corte general%")).first()
+        if not corte_gen:
+            corte_gen = Service(
+                name="Corte General",
+                description="Corte de cabello completo a máquina y tijera con acabado y peinado profesional.",
+                duration_min=30,
+                price=6000.0,
+                previous_price=7000.0,
+                category="Cortes",
+                display_order=-1,
+                is_active=True
+            )
+            db_session.add(corte_gen)
+            db_session.commit()
+        else:
+            if corte_gen.display_order >= 0:
+                corte_gen.display_order = -1
+                db_session.commit()
+        db_session.close()
+    except Exception as e:
+        pass
+
 
 def get_db() -> Generator[Session, None, None]:
     """Dependency for obtaining a database session per request."""

@@ -7,11 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import AdminUser, Service, Style, Category, DeliveryZone, AuditLog, Appointment, WaitlistEntry
+from app.models import AdminUser, Service, ServiceExtra, Style, Category, DeliveryZone, AuditLog, Appointment, WaitlistEntry
 from app.schemas import (
     ServiceRead,
     ServiceCreate,
     ServiceUpdate,
+    ServiceExtraRead,
+    ServiceExtraCreate,
+    ServiceExtraUpdate,
     StyleRead,
     StyleCreate,
     StyleUpdate,
@@ -207,3 +210,67 @@ def delete_admin_delivery_zone(
     db.delete(dz)
     db.commit()
     return {"message": "Zona eliminada correctamente"}
+
+# 5. AGREGADOS & SERVICIOS EXTRA (TILDABLES)
+@router.get("/api/admin/service-extras", response_model=List[ServiceExtraRead])
+def get_admin_service_extras(admin: AdminUser = Depends(require_any_staff_role), db: Session = Depends(get_db)):
+    """Retorna todos los agregados y opciones configuradas."""
+    return db.query(ServiceExtra).order_by(ServiceExtra.display_order.asc(), ServiceExtra.id.asc()).all()
+
+@router.post("/api/admin/service-extras", response_model=ServiceExtraRead)
+def create_admin_service_extra(
+    extra_in: ServiceExtraCreate,
+    admin: AdminUser = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Crea una nueva opción o agregado tildable."""
+    extra = ServiceExtra(**extra_in.model_dump())
+    db.add(extra)
+    db.commit()
+    db.refresh(extra)
+
+    db.add(AuditLog(user_name=admin.username, module="Servicios", action="Crear Extra", record_id=str(extra.id), new_value=f"{extra.name} - ${extra.price}"))
+    db.commit()
+    return extra
+
+@router.put("/api/admin/service-extras/{extra_id}", response_model=ServiceExtraRead)
+def update_admin_service_extra(
+    extra_id: int,
+    extra_in: ServiceExtraUpdate,
+    admin: AdminUser = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Actualiza una opción o agregado existente."""
+    extra = db.query(ServiceExtra).filter(ServiceExtra.id == extra_id).first()
+    if not extra:
+        raise HTTPException(status_code=404, detail="Agregado no encontrado.")
+
+    old_info = f"{extra.name} - ${extra.price} ({extra.duration_min}m)"
+    for k, v in extra_in.model_dump(exclude_unset=True).items():
+        setattr(extra, k, v)
+    db.commit()
+    db.refresh(extra)
+
+    db.add(AuditLog(user_name=admin.username, module="Servicios", action="Editar Extra", record_id=str(extra.id), old_value=old_info, new_value=f"{extra.name} - ${extra.price} ({extra.duration_min}m)"))
+    db.commit()
+    return extra
+
+@router.delete("/api/admin/service-extras/{extra_id}")
+def delete_admin_service_extra(
+    extra_id: int,
+    admin: AdminUser = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Elimina una opción o servicio extra."""
+    extra = db.query(ServiceExtra).filter(ServiceExtra.id == extra_id).first()
+    if not extra:
+        raise HTTPException(status_code=404, detail="Agregado no encontrado.")
+
+    name = extra.name
+    db.delete(extra)
+    db.commit()
+
+    db.add(AuditLog(user_name=admin.username, module="Servicios", action="Eliminar Extra", record_id=str(extra_id), old_value=name))
+    db.commit()
+    return {"message": f"Agregado '{name}' eliminado exitosamente."}
+

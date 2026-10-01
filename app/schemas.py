@@ -114,6 +114,34 @@ class ServiceRead(ServiceBase):
     model_config = ConfigDict(from_attributes=True)
 
 # ==========================================
+# SERVICE EXTRA (AGREGADOS) SCHEMAS
+# ==========================================
+class ServiceExtraBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    price: float
+    duration_min: int = 15
+    icon: Optional[str] = "✂️"
+    is_active: bool = True
+    display_order: int = 0
+
+class ServiceExtraCreate(ServiceExtraBase):
+    pass
+
+class ServiceExtraUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
+    duration_min: Optional[int] = None
+    icon: Optional[str] = None
+    is_active: Optional[bool] = None
+    display_order: Optional[int] = None
+
+class ServiceExtraRead(ServiceExtraBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+# ==========================================
 # STYLE SCHEMAS
 # ==========================================
 class StyleBase(BaseModel):
@@ -181,6 +209,8 @@ class AppointmentCreate(BaseModel):
     barber_name: Optional[str] = None
     service_id: Optional[int] = None
     service: Optional[str] = None
+    extras_ids: Optional[List[int]] = None
+    extras: Optional[List[str]] = None
     appointment_time: datetime
     notes: Optional[str] = None
     idempotency_key: Optional[str] = None
@@ -192,6 +222,8 @@ class AppointmentUpdate(BaseModel):
     barber_name: Optional[str] = None
     service_id: Optional[int] = None
     service: Optional[str] = None
+    extras_snapshot: Optional[str] = None
+    service_price_snapshot: Optional[float] = None
     appointment_time: Optional[datetime] = None
     status: Optional[str] = None # PENDIENTE, CONFIRMADO, CANCELADO, COMPLETADO, NO_SHOW
     confirmed: Optional[bool] = None
@@ -207,6 +239,8 @@ class AppointmentRead(BaseModel):
     barber_name: Optional[str] = None
     service_id: Optional[int] = None
     service: Optional[str] = None
+    service_price_snapshot: Optional[float] = None
+    extras_snapshot: Optional[str] = None
     appointment_time: datetime
     end_time: Optional[datetime] = None
     duration_min: int = 45

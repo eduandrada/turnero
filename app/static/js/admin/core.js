@@ -430,6 +430,28 @@ async function submitAdminModal() {
         const err = await res.json().catch(() => ({}));
         showAdminToast(err.detail || "Error al procesar servicio.", "error");
       }
+    } else if (currentModalType === "extra") {
+      const name = document.getElementById("modal_extra_name")?.value?.trim() || "";
+      const price = parseFloat(document.getElementById("modal_extra_price")?.value || "0");
+      const duration_min = parseInt(document.getElementById("modal_extra_duration")?.value || "15");
+      const icon = document.getElementById("modal_extra_icon")?.value?.trim() || "✂️";
+      const description = document.getElementById("modal_extra_desc")?.value?.trim() || "";
+      const is_active = document.getElementById("modal_extra_active") ? (document.getElementById("modal_extra_active").value === "true") : true;
+      const url = isEdit ? `/api/admin/service-extras/${editingRecordId}` : "/api/admin/service-extras";
+
+      const res = await fetch(url, {
+        method: method,
+        headers: authHeaders(),
+        body: JSON.stringify({ name, price, duration_min, icon, description, is_active })
+      });
+      if (res.ok) {
+        closeAdminModal();
+        showAdminToast(isEdit ? "Opción extra actualizada correctamente." : "Opción extra creada exitosamente.", "success");
+        if (typeof loadAdminExtras === "function") loadAdminExtras();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showAdminToast(err.detail || "Error al procesar opción extra.", "error");
+      }
     } else if (currentModalType === "style") {
       const name = document.getElementById("modal_style_name")?.value?.trim() || "";
       const category = document.getElementById("modal_style_category")?.value?.trim() || "Fade";

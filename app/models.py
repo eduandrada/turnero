@@ -77,6 +77,19 @@ class Service(Base):
     appointments = relationship("Appointment", back_populates="service_rel")
 
 
+class ServiceExtra(Base):
+    __tablename__ = "service_extras"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(120), nullable=False)
+    description = Column(Text, nullable=True)
+    price = Column(Float, nullable=False, default=0.0)
+    duration_min = Column(Integer, default=15)
+    icon = Column(String(50), default="✂️")
+    is_active = Column(Boolean, default=True)
+    display_order = Column(Integer, default=0)
+
+
 class Style(Base):
     __tablename__ = "styles"
 
@@ -123,6 +136,7 @@ class Appointment(Base):
     barber_name = Column(String(100), nullable=True)
     service = Column(String(120), nullable=True)
     service_price_snapshot = Column(Float, nullable=True)
+    extras_snapshot = Column(Text, nullable=True)
 
     barber_name_snapshot = synonym("barber_name")
     service_name_snapshot = synonym("service")

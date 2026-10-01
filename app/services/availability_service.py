@@ -148,6 +148,7 @@ def calculate_available_slots(
     target_date_str: str,
     barber_id: int,
     service_id: Optional[int] = None,
+    duration_min: Optional[int] = None,
     allow_overbooking: bool = False
 ) -> Dict[str, Any]:
     """
@@ -157,6 +158,7 @@ def calculate_available_slots(
       - Bloqueos manuales y feriados (ScheduleException).
       - Reservas existentes y sus buffers de preparación y limpieza.
       - Antelación mínima (min_advance_hours).
+      - Duración acumulada de servicio base + agregados opcionales.
     """
     try:
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d").date()
@@ -175,13 +177,14 @@ def calculate_available_slots(
         return {"slots": [], "reason": "No es posible reservar en fechas pasadas."}
 
     # 2. Obtener duración del servicio y buffers
-    service_duration = 45
+    service_duration = duration_min if (duration_min and duration_min > 0) else 45
     prep_buffer = 0
     clean_buffer = 5
     if service_id:
         srv = db.query(Service).filter(Service.id == service_id).first()
         if srv:
-            service_duration = srv.duration_min or 45
+            if not duration_min or duration_min <= 0:
+                service_duration = srv.duration_min or 45
             prep_buffer = getattr(srv, "prep_buffer_min", 0) or 0
             clean_buffer = getattr(srv, "clean_buffer_min", 5) or 5
 

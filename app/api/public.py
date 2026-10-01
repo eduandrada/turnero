@@ -9,10 +9,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db, get_argentina_now
-from app.models import Barber, Service, Style, WaitlistEntry, Appointment, AuditLog
+from app.models import Barber, Service, ServiceExtra, Style, WaitlistEntry, Appointment, AuditLog
 from app.schemas import (
     BarberRead,
     ServiceRead,
+    ServiceExtraRead,
     StyleRead,
     AvailableSlotsResponse,
     AvailableSlotItem,
@@ -37,18 +38,24 @@ def list_public_barbers(db: Session = Depends(get_db)):
 @router.get("/api/services", response_model=List[ServiceRead])
 def list_public_services(db: Session = Depends(get_db)):
     """Retorna los servicios activos."""
-    return db.query(Service).filter(Service.is_active == True).order_by(Service.display_order.asc()).all()
+    return db.query(Service).filter(Service.is_active == True).order_by(Service.display_order.asc(), Service.id.asc()).all()
 
 @router.get("/api/styles", response_model=List[StyleRead])
 def list_public_styles(db: Session = Depends(get_db)):
     """Retorna los estilos de corte activos."""
     return db.query(Style).filter(Style.is_active == True).order_by(Style.display_order.asc()).all()
 
+@router.get("/api/service-extras", response_model=List[ServiceExtraRead])
+def list_public_service_extras(db: Session = Depends(get_db)):
+    """Retorna las opciones y servicios adicionales (extras tildables) activos."""
+    return db.query(ServiceExtra).filter(ServiceExtra.is_active == True).order_by(ServiceExtra.display_order.asc(), ServiceExtra.id.asc()).all()
+
 @router.get("/api/available-slots", response_model=AvailableSlotsResponse)
 def get_available_slots(
     barber_id: Optional[int] = None,
     barber_name: Optional[str] = None,
     service_id: Optional[int] = None,
+    duration_min: Optional[int] = Query(None, description="Duración total estimada incluyendo agregados"),
     date: str = Query(..., description="Fecha en formato YYYY-MM-DD"),
     db: Session = Depends(get_db)
 ):
@@ -81,12 +88,13 @@ def get_available_slots(
         else:
             resolved_id = 1
 
-    # Duración de servicio
-    duration_min = 45
-    if service_id:
-        srv = db.query(Service).filter(Service.id == service_id).first()
-        if srv and srv.duration_min:
-            duration_min = srv.duration_min
+    # Duración de servicio (acumulada con extras si fue provista)
+    effective_duration = duration_min if (duration_min and duration_min > 0) else 45
+    if not duration_min or duration_min <= 0:
+        if service_id:
+            srv = db.query(Service).filter(Service.id == service_id).first()
+            if srv and srv.duration_min:
+                effective_duration = srv.duration_min
 
     # Configuración de horarios comerciales
     bh_json = get_setting(db, "business_hours", "{}")
@@ -108,8 +116,8 @@ def get_available_slots(
             slots=[]
         )
 
-    # Invocar el motor de disponibilidad configurable
-    calc_res = calculate_available_slots(db, date, resolved_id, service_id)
+    # Invocar el motor de disponibilidad configurable con la duración acumulada
+    calc_res = calculate_available_slots(db, date, resolved_id, service_id, duration_min=effective_duration)
     avail_set = set(calc_res.get("slots", []))
 
     open_t = parse_time_str(day_setting.get("open", "09:00")) or time(9, 0)
@@ -120,7 +128,7 @@ def get_available_slots(
     limit_dt = datetime.combine(target_date, close_t)
     step_minutes = 15
 
-    while current_dt + timedelta(minutes=duration_min) <= limit_dt:
+    while current_dt + timedelta(minutes=effective_duration) <= limit_dt:
         time_str = current_dt.strftime("%H:%M")
         is_avail = (time_str in avail_set)
         slots.append(AvailableSlotItem(time=time_str, available=is_avail))

@@ -450,6 +450,31 @@
               </table>
             </div>
           </div>
+
+          <div class="admin-card" style="margin-top: 24px;">
+            <div class="admin-card-header">
+              <div>
+                <h3 class="admin-card-title">✂️ Agregados & Opciones Adicionales (Extras Tildables)</h3>
+                <p style="font-size: 0.75rem; color: #9ca3af; margin: 2px 0 0 0;">Opciones que el cliente puede tildar para sumar al corte (ej: Perfilado, Barba, Alineado, Color, etc.)</p>
+              </div>
+              <button class="btn-admin btn-admin-sm" onclick="openExtraModal()">+ Agregar Opción Extra</button>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Icono / Nombre</th>
+                    <th>Descripción</th>
+                    <th>Duración Extra</th>
+                    <th>Precio Adicional</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="extrasTableBody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         <!-- SECTION: ESTILOS DE CORTE -->

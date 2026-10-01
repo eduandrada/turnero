@@ -5,12 +5,14 @@
  */
 
 let adminServicesList = [];
+let adminExtrasList = [];
 let adminStylesList = [];
 let adminDeliveryList = [];
 
 // 1. SERVICIOS & PRECIOS
 async function loadAdminServices() {
   try {
+    loadAdminExtras();
     const res = await fetch("/api/admin/services", { headers: authHeaders() });
     if (!res.ok) return;
     adminServicesList = await res.json();
@@ -388,3 +390,145 @@ async function editDeliveryModal(id) {
   const modalEl = document.getElementById("adminModal");
   if (modalEl) modalEl.style.display = "flex";
 }
+
+// ==========================================
+// 5. AGREGADOS & SERVICIOS EXTRA (TILDABLES)
+// ==========================================
+async function loadAdminExtras() {
+  try {
+    const res = await fetch("/api/admin/service-extras", { headers: authHeaders() });
+    if (!res.ok) return;
+    adminExtrasList = await res.json();
+    const tbody = document.getElementById("extrasTableBody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+    if (adminExtrasList.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #9ca3af; padding: 20px;">No hay opciones adicionales configuradas. Haz clic en "+ Agregar Opción Extra".</td></tr>`;
+      return;
+    }
+    adminExtrasList.forEach(e => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><span style="font-size: 1.1rem; margin-right: 6px;">${escapeHtml(e.icon || '✂️')}</span> <strong>${escapeHtml(e.name)}</strong></td>
+        <td style="color: #9ca3af; font-size: 0.8rem;">${escapeHtml(e.description || '-')}</td>
+        <td>+${e.duration_min} min</td>
+        <td style="color: #d4ff00; font-weight: bold;">+$${e.price.toLocaleString("es-AR")}</td>
+        <td><span class="badge ${e.is_active ? 'badge-confirmed' : 'badge-canceled'}">${e.is_active ? 'ACTIVO' : 'INACTIVO'}</span></td>
+        <td>
+          <button class="btn-admin btn-admin-sm btn-admin-secondary" onclick="editExtraModal(${e.id})">Editar</button>
+          <button class="btn-admin btn-admin-sm btn-admin-danger" onclick="deleteExtra(${e.id})">Eliminar</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    console.error("Error al cargar extras:", err);
+  }
+}
+
+async function deleteExtra(id) {
+  if (!confirm("¿Eliminar esta opción extra?")) return;
+  try {
+    const res = await fetch(`/api/admin/service-extras/${id}`, { method: "DELETE", headers: authHeaders() });
+    if (res.ok) {
+      showAdminToast("Opción extra eliminada.", "success");
+      loadAdminExtras();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showAdminToast(err.detail || "Error al eliminar extra.", "error");
+    }
+  } catch (e) {
+    showAdminToast("Error de conexión al eliminar extra.", "error");
+  }
+}
+
+function openExtraModal() {
+  currentModalType = "extra";
+  editingRecordId = null;
+  const titleEl = document.getElementById("modalAdminTitle");
+  if (titleEl) titleEl.textContent = "+ AGREGAR OPCIÓN EXTRA";
+  const bodyEl = document.getElementById("modalAdminBody");
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div class="form-group">
+        <label>NOMBRE DEL AGREGADO / EXTRA</label>
+        <input type="text" id="modal_extra_name" class="form-control" placeholder="Ej: Perfilado con Navaja" required>
+      </div>
+      <div class="form-group">
+        <label>PRECIO ADICIONAL ($)</label>
+        <input type="number" step="0.01" id="modal_extra_price" class="form-control" placeholder="1500" required>
+      </div>
+      <div class="form-group">
+        <label>DURACIÓN ADICIONAL (MINUTOS)</label>
+        <input type="number" id="modal_extra_duration" class="form-control" value="15" required>
+      </div>
+      <div class="form-group">
+        <label>ICONO / EMOJI</label>
+        <input type="text" id="modal_extra_icon" class="form-control" value="✂️" placeholder="✂️, 🧔, ✨, 🎨, 💈">
+      </div>
+      <div class="form-group">
+        <label>DESCRIPCIÓN BREVE</label>
+        <input type="text" id="modal_extra_desc" class="form-control" placeholder="Ej: Definición nítida de líneas con navaja tradicional">
+      </div>
+    `;
+  }
+  const modalEl = document.getElementById("adminModal");
+  if (modalEl) modalEl.style.display = "flex";
+}
+
+async function editExtraModal(id) {
+  let e = adminExtrasList.find(item => item.id == id);
+  if (!e) {
+    try {
+      const res = await fetch("/api/admin/service-extras", { headers: authHeaders() });
+      if (res.ok) {
+        adminExtrasList = await res.json();
+        e = adminExtrasList.find(item => item.id == id);
+      }
+    } catch (err) {}
+  }
+  if (!e) {
+    showAdminToast("No se encontró el extra. Actualizando...", "warning");
+    loadAdminExtras();
+    return;
+  }
+  currentModalType = "extra";
+  editingRecordId = id;
+  const titleEl = document.getElementById("modalAdminTitle");
+  if (titleEl) titleEl.textContent = `✏️ EDITAR OPCIÓN EXTRA #${id}`;
+  const bodyEl = document.getElementById("modalAdminBody");
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div class="form-group">
+        <label>NOMBRE DEL AGREGADO / EXTRA</label>
+        <input type="text" id="modal_extra_name" class="form-control" value="${escapeHtml(e.name)}" required>
+      </div>
+      <div class="form-group">
+        <label>PRECIO ADICIONAL ($)</label>
+        <input type="number" step="0.01" id="modal_extra_price" class="form-control" value="${e.price}" required>
+      </div>
+      <div class="form-group">
+        <label>DURACIÓN ADICIONAL (MINUTOS)</label>
+        <input type="number" id="modal_extra_duration" class="form-control" value="${e.duration_min}" required>
+      </div>
+      <div class="form-group">
+        <label>ICONO / EMOJI</label>
+        <input type="text" id="modal_extra_icon" class="form-control" value="${escapeHtml(e.icon || '✂️')}">
+      </div>
+      <div class="form-group">
+        <label>DESCRIPCIÓN BREVE</label>
+        <input type="text" id="modal_extra_desc" class="form-control" value="${escapeHtml(e.description || '')}">
+      </div>
+      <div class="form-group">
+        <label>ESTADO</label>
+        <select id="modal_extra_active" class="form-control">
+          <option value="true" ${e.is_active ? 'selected' : ''}>ACTIVO (Disponible para clientes)</option>
+          <option value="false" ${!e.is_active ? 'selected' : ''}>INACTIVO (Pausado)</option>
+        </select>
+      </div>
+    `;
+  }
+  const modalEl = document.getElementById("adminModal");
+  if (modalEl) modalEl.style.display = "flex";
+}
+
