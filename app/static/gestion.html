@@ -963,13 +963,13 @@
           actionsHtml = `<button class="btn-admin btn-admin-sm" onclick="openCheckoutModal(${a.id}, true)" style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #10b981;" title="Ver o reenviar ticket virtual">🧾 Ver Ticket</button>`;
         } else if (isInService) {
           actionsHtml = `
-            <button class="btn-admin btn-admin-sm" onclick="callApptToTvGestion(${a.id}, '${escapeHtml(a.client_name)}', '${escapeHtml(a.barber_name || '')}')" style="background: rgba(0, 242, 254, 0.18); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.4); font-weight: 700;" title="Rellamar a pantalla TV con timbre y locución">📢 Rellamar TV</button>
+            <button class="btn-admin btn-admin-sm" onclick="callApptToTvGestion(${a.id})" style="background: rgba(0, 242, 254, 0.18); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.4); font-weight: 700;" title="Rellamar a pantalla TV con timbre y locución">📢 Rellamar TV</button>
             <button class="btn-admin btn-admin-sm" onclick="openCheckoutModal(${a.id})" style="background: #10b981; color: #000; font-weight: 800;" title="Cobrar y emitir ticket virtual">🏁 Cobrar / Finalizar</button>
           `;
         } else {
           actionsHtml = `
             ${!a.is_checked_in ? `<button class="btn-admin btn-admin-sm" onclick="manualCheckinGestion(${a.id})" style="background: rgba(0, 242, 254, 0.15); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.35);" title="Registrar llegada a sala de espera">📍 Llegó</button>` : ''}
-            <button class="btn-admin btn-admin-sm" onclick="handleAtenderGestion(${a.id}, '${escapeHtml(a.client_name)}', '${escapeHtml(a.barber_name || '')}', ${a.barber_id || 'null'})" style="background: #d4ff00; color: #000; font-weight: 800;" title="Sentar en sillón y llamar a pantalla TV">💈 Atender</button>
+            <button class="btn-admin btn-admin-sm" onclick="handleAtenderGestion(${a.id})" style="background: #d4ff00; color: #000; font-weight: 800;" title="Sentar en sillón y llamar a pantalla TV">💈 Atender</button>
             <button class="btn-admin btn-admin-sm" onclick="openCheckoutModal(${a.id})" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.5); font-weight: 700;" title="Cobrar y emitir ticket virtual">🏁 Finalizar</button>
           `;
         }
@@ -1001,6 +1001,14 @@
     }
 
     function handleAtenderGestion(id, clientName, barberName, barberId) {
+      if (!clientName) {
+        const item = (cachedAppts || []).find(x => x.id === id);
+        if (item) {
+          clientName = item.client_name || '';
+          barberName = item.barber_name || '';
+          barberId = item.barber_id || null;
+        }
+      }
       const bName = (barberName || '').trim();
       const hasSpecificBarber = bName && bName !== '-' && !bName.toLowerCase().includes('general') && !bName.toLowerCase().includes('sin asignar');
 
@@ -1138,6 +1146,13 @@
     }
 
     async function callApptToTvGestion(id, clientName, barberName) {
+      if (!clientName) {
+        const item = (cachedAppts || []).find(x => x.id === id);
+        if (item) {
+          clientName = item.client_name || '';
+          barberName = item.barber_name || '';
+        }
+      }
       try {
         const res = await fetch(`/api/live-agenda/${id}/call`, {
           method: "POST",
@@ -1830,18 +1845,28 @@
 
     async function openCheckoutModal(appointmentId, viewOnly = false) {
       try {
-        const res = await fetch(`/api/admin/appointments/${appointmentId}/checkout-prep`, {
+        const apptId = parseInt(appointmentId);
+        if (!apptId || isNaN(apptId)) {
+          console.error("ID de turno inválido en openCheckoutModal:", appointmentId);
+          alert("Error: No se pudo identificar el turno para abrir el cobro.");
+          return;
+        }
+
+        const res = await fetch(`/api/admin/appointments/${apptId}/checkout-prep`, {
           headers: authHeaders()
         });
         if (!res.ok) {
-          alert("No se pudo cargar la información para el cobro del turno.");
+          const errText = await res.text();
+          console.error("checkout-prep response error:", res.status, errText);
+          alert(`No se pudo cargar la información para el cobro del turno. (Error ${res.status})`);
           return;
         }
         const data = await res.json();
         currentCheckoutPrep = data;
         currentCheckoutItems = [];
+        currentCustomExtras = [];
 
-        if (viewOnly && data.appointment.checkout_data) {
+        if (viewOnly && data.appointment && data.appointment.checkout_data) {
           showVirtualTicketModal(data.appointment.checkout_data);
           return;
         }
@@ -1849,75 +1874,123 @@
         renderCheckoutModalUI(data);
       } catch (e) {
         console.error("Error al preparar cobro:", e);
-        alert("Error de conexión al abrir el cobro del turno.");
+        alert("Error de conexión al abrir el cobro del turno: " + (e.message || e));
       }
     }
 
     function renderCheckoutModalUI(data) {
-      const a = data.appointment;
-      const s = data.settings;
-      const pList = data.products;
+      try {
+        if (!data || !data.appointment) {
+          alert("No se recibieron datos válidos para este turno.");
+          return;
+        }
+        const a = data.appointment || {};
+        const s = data.settings || {};
+        const pList = Array.isArray(data.products) ? data.products : [];
 
-      document.getElementById("co_appt_id").value = a.id;
-      document.getElementById("co_client_title").innerText = `${a.client_name} (Turno #${a.id})`;
-      document.getElementById("co_client_phone").innerText = a.client_phone || 'Sin teléfono';
-      document.getElementById("co_barber_name").innerText = a.barber_name || 'Sin asignar';
-      document.getElementById("co_service_name").innerText = a.service;
-      document.getElementById("co_service_price").value = a.service_price || 0;
+        const apptIdEl = document.getElementById("co_appt_id");
+        if (apptIdEl) apptIdEl.value = a.id || "";
 
-      // Extras
-      const extrasContainer = document.getElementById("co_extras_container");
-      if (a.extras && a.extras.length > 0) {
-        extrasContainer.style.display = "block";
-        extrasContainer.innerHTML = a.extras.map(e => 
-          `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#9ca3af; padding:2px 0;">
-            <span>+ ${escapeHtml(e.name || 'Extra')}</span>
-            <span style="font-family:monospace; color:#fff;">$${(e.price || 0).toLocaleString("es-AR")}</span>
-          </div>`
-        ).join("");
-      } else {
-        extrasContainer.style.display = "none";
-        extrasContainer.innerHTML = "";
+        const titleEl = document.getElementById("co_client_title");
+        if (titleEl) titleEl.innerText = `${a.client_name || 'Cliente'} (Turno #${a.id || 0})`;
+
+        const phoneEl = document.getElementById("co_client_phone");
+        if (phoneEl) phoneEl.innerText = a.client_phone || 'Sin teléfono';
+
+        const barberEl = document.getElementById("co_barber_name");
+        if (barberEl) barberEl.innerText = a.barber_name || 'Sin asignar';
+
+        const serviceEl = document.getElementById("co_service_name");
+        if (serviceEl) serviceEl.innerText = a.service || 'Servicio';
+
+        const srvPriceEl = document.getElementById("co_service_price");
+        if (srvPriceEl) srvPriceEl.value = a.service_price || 0;
+
+        // Extras
+        const extrasContainer = document.getElementById("co_extras_container");
+        if (extrasContainer) {
+          if (a.extras && Array.isArray(a.extras) && a.extras.length > 0) {
+            extrasContainer.style.display = "block";
+            extrasContainer.innerHTML = a.extras.map(e => 
+              `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#9ca3af; padding:2px 0;">
+                <span>+ ${escapeHtml(e.name || 'Extra')}</span>
+                <span style="font-family:monospace; color:#fff;">$${(parseFloat(e.price) || 0).toLocaleString("es-AR")}</span>
+              </div>`
+            ).join("");
+          } else {
+            extrasContainer.style.display = "none";
+            extrasContainer.innerHTML = "";
+          }
+        }
+
+        // Seña previa
+        const depNotice = document.getElementById("co_deposit_notice");
+        if (depNotice) {
+          if (a.deposit_paid && a.deposit_amount > 0) {
+            depNotice.style.display = "flex";
+            const depVal = document.getElementById("co_deposit_val");
+            if (depVal) depVal.innerText = `-$${(parseFloat(a.deposit_amount) || 0).toLocaleString("es-AR")}`;
+          } else {
+            depNotice.style.display = "none";
+          }
+        }
+
+        // Populate products select
+        const prodSel = document.getElementById("co_product_select");
+        if (prodSel) {
+          prodSel.innerHTML = `<option value="">-- Seleccionar producto del Shop --</option>` + pList.map(p => 
+            `<option value="${p.id}" data-price="${p.price}" data-stock="${p.stock}" ${p.stock <= 0 ? 'disabled' : ''}>
+              ${escapeHtml(p.name)} - $${(parseFloat(p.price) || 0).toLocaleString("es-AR")} (${p.stock > 0 ? 'Stock: ' + p.stock : 'SIN STOCK'})
+            </option>`
+          ).join("");
+        }
+
+        // Settings in modal
+        const aliasEl = document.getElementById("co_alias_display");
+        if (aliasEl) aliasEl.innerText = s.alias || "BARBERIA.PEREYRA.MP";
+
+        const titularEl = document.getElementById("co_titular_display");
+        if (titularEl) titularEl.innerText = s.titular || "Carmen Pereyra";
+
+        const promoEl = document.getElementById("co_promo_badge");
+        if (promoEl) promoEl.innerText = `${s.promo_percent || 15}% OFF con código ${s.promo_code || 'VUELVO15'}`;
+
+        // Reset items and inputs
+        currentCheckoutItems = [];
+        currentCustomExtras = [];
+        const ceNameInp = document.getElementById("co_custom_extra_name");
+        if (ceNameInp) ceNameInp.value = "";
+        const cePriceInp = document.getElementById("co_custom_extra_price");
+        if (cePriceInp) cePriceInp.value = "";
+        renderCustomExtrasTable();
+
+        const discEl = document.getElementById("co_discount");
+        if (discEl) discEl.value = "0";
+
+        const tipEl = document.getElementById("co_tip");
+        if (tipEl) tipEl.value = "0";
+
+        const notesEl = document.getElementById("co_notes");
+        if (notesEl) notesEl.value = "";
+
+        const payMethEl = document.getElementById("co_pay_method");
+        if (payMethEl) payMethEl.value = "efectivo";
+
+        toggleCheckoutTransferBox();
+        renderCheckoutItemsTable();
+        recalcCheckoutTotals();
+
+        const modal = document.getElementById("checkoutModal");
+        if (modal) {
+          modal.style.display = "flex";
+        } else {
+          alert("Error: No se encontró la ventana de cobro en el sistema.");
+        }
+      } catch (err) {
+        console.error("Error al renderizar interfaz de cobro:", err);
+        alert("Error al mostrar la ventana de cobro: " + (err.message || err));
       }
-
-      // Seña previa
-      const depNotice = document.getElementById("co_deposit_notice");
-      if (a.deposit_paid && a.deposit_amount > 0) {
-        depNotice.style.display = "flex";
-        document.getElementById("co_deposit_val").innerText = `-$${a.deposit_amount.toLocaleString("es-AR")}`;
-      } else {
-        depNotice.style.display = "none";
-      }
-
-      // Populate products select
-      const prodSel = document.getElementById("co_product_select");
-      prodSel.innerHTML = `<option value="">-- Seleccionar producto del Shop --</option>` + pList.map(p => 
-        `<option value="${p.id}" data-price="${p.price}" data-stock="${p.stock}" ${p.stock <= 0 ? 'disabled' : ''}>
-          ${escapeHtml(p.name)} - $${p.price.toLocaleString("es-AR")} (${p.stock > 0 ? 'Stock: ' + p.stock : 'SIN STOCK'})
-        </option>`
-      ).join("");
-
-      // Settings in modal
-      document.getElementById("co_alias_display").innerText = s.alias || "BARBERIA.PEREYRA.MP";
-      document.getElementById("co_titular_display").innerText = s.titular || "Carmen Pereyra";
-      document.getElementById("co_promo_badge").innerText = `${s.promo_percent || 15}% OFF con código ${s.promo_code || 'VUELVO15'}`;
-
-      // Reset items and inputs
-      currentCheckoutItems = [];
-      currentCustomExtras = [];
-      const ceNameInp = document.getElementById("co_custom_extra_name");
-      if (ceNameInp) ceNameInp.value = "";
-      const cePriceInp = document.getElementById("co_custom_extra_price");
-      if (cePriceInp) cePriceInp.value = "";
-      renderCustomExtrasTable();
-
-      document.getElementById("co_discount").value = "0";
-      document.getElementById("co_tip").value = "0";
-      document.getElementById("co_notes").value = "";
-      document.getElementById("co_pay_method").value = "efectivo";
-      toggleCheckoutTransferBox();
-
-      renderCheckoutItemsTable();
+    }
       recalcCheckoutTotals();
 
       document.getElementById("checkoutModal").style.display = "flex";
@@ -2090,31 +2163,47 @@
     }
 
     function recalcCheckoutTotals() {
-      if (!currentCheckoutPrep) return;
-      const srvPrice = parseFloat(document.getElementById("co_service_price").value || 0);
+      if (!currentCheckoutPrep || !currentCheckoutPrep.appointment) return;
+      const srvPriceInp = document.getElementById("co_service_price");
+      const srvPrice = parseFloat((srvPriceInp ? srvPriceInp.value : 0) || 0);
       
       let extrasTotal = 0;
-      if (currentCheckoutPrep.appointment.extras) {
+      if (currentCheckoutPrep.appointment.extras && Array.isArray(currentCheckoutPrep.appointment.extras)) {
         extrasTotal = currentCheckoutPrep.appointment.extras.reduce((acc, ex) => acc + (parseFloat(ex.price) || 0), 0);
       }
 
-      const customExtrasTotal = currentCustomExtras.reduce((acc, ex) => acc + (parseFloat(ex.price) || 0), 0);
-      const productsTotal = currentCheckoutItems.reduce((acc, i) => acc + (i.price * i.qty), 0);
+      const customExtrasTotal = (currentCustomExtras || []).reduce((acc, ex) => acc + (parseFloat(ex.price) || 0), 0);
+      const productsTotal = (currentCheckoutItems || []).reduce((acc, i) => acc + ((parseFloat(i.price) || 0) * (parseInt(i.qty) || 1)), 0);
       const depositCredit = (currentCheckoutPrep.appointment.deposit_paid) ? (parseFloat(currentCheckoutPrep.appointment.deposit_amount) || 0) : 0;
-      const discount = Math.max(0, parseFloat(document.getElementById("co_discount").value || 0));
-      const tip = Math.max(0, parseFloat(document.getElementById("co_tip").value || 0));
+      
+      const discInp = document.getElementById("co_discount");
+      const discount = Math.max(0, parseFloat((discInp ? discInp.value : 0) || 0));
+      const tipInp = document.getElementById("co_tip");
+      const tip = Math.max(0, parseFloat((tipInp ? tipInp.value : 0) || 0));
 
       const subtotal = srvPrice + extrasTotal + customExtrasTotal + productsTotal;
       const finalTotal = Math.max(0, subtotal + tip - depositCredit - discount);
 
-      document.getElementById("co_lbl_subtotal").innerText = `$${subtotal.toLocaleString("es-AR")}`;
+      const subLbl = document.getElementById("co_lbl_subtotal");
+      if (subLbl) subLbl.innerText = `$${subtotal.toLocaleString("es-AR")}`;
+      
       const ceLbl = document.getElementById("co_lbl_custom_extras");
       if (ceLbl) ceLbl.innerText = `$${customExtrasTotal.toLocaleString("es-AR")}`;
-      document.getElementById("co_lbl_products").innerText = `$${productsTotal.toLocaleString("es-AR")}`;
-      document.getElementById("co_lbl_discount").innerText = `-$${discount.toLocaleString("es-AR")}`;
-      document.getElementById("co_lbl_deposit").innerText = `-$${depositCredit.toLocaleString("es-AR")}`;
-      document.getElementById("co_lbl_tip").innerText = `+$${tip.toLocaleString("es-AR")}`;
-      document.getElementById("co_lbl_total").innerText = `$${finalTotal.toLocaleString("es-AR")}`;
+
+      const prodLbl = document.getElementById("co_lbl_products");
+      if (prodLbl) prodLbl.innerText = `$${productsTotal.toLocaleString("es-AR")}`;
+
+      const discLbl = document.getElementById("co_lbl_discount");
+      if (discLbl) discLbl.innerText = `-$${discount.toLocaleString("es-AR")}`;
+
+      const depLbl = document.getElementById("co_lbl_deposit");
+      if (depLbl) depLbl.innerText = `-$${depositCredit.toLocaleString("es-AR")}`;
+
+      const tipLbl = document.getElementById("co_lbl_tip");
+      if (tipLbl) tipLbl.innerText = `+$${tip.toLocaleString("es-AR")}`;
+
+      const totLbl = document.getElementById("co_lbl_total");
+      if (totLbl) totLbl.innerText = `$${finalTotal.toLocaleString("es-AR")}`;
     }
 
     async function submitCheckout() {
