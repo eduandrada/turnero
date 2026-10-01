@@ -1288,10 +1288,10 @@ function showSuccessModal(appt) {
   let depositInfoHTML = "";
   if (appt.payment_link) {
     depositInfoHTML = `
-      <div style="background: rgba(212, 255, 0, 0.12); border: 1px solid #d4ff00; border-radius: 12px; padding: 14px; margin: 14px 0; text-align: center;">
-        <span style="color: #d4ff00; font-family: monospace; font-size: 0.75rem; font-weight: bold; text-transform: uppercase;">💳 SEÑA PREVIA REQUERIDA (${appt.deposit_percentage}%)</span>
-        <div style="font-size: 1.2rem; font-weight: bold; color: #fff; margin: 4px 0;">Monto Seña: $${appt.deposit_amount.toLocaleString('es-AR')}</div>
-        <a href="${appt.payment_link}" target="_blank" class="block w-full py-3 mt-2 bg-neonVolt text-obsidian font-mono font-bold rounded-xl text-center shadow-volt">
+      <div style="background: rgba(212, 255, 0, 0.12); border: 1px solid #d4ff00; border-radius: 12px; padding: 10px 12px; margin: 8px 0; text-align: center;">
+        <span style="color: #d4ff00; font-family: monospace; font-size: 0.72rem; font-weight: bold; text-transform: uppercase;">💳 SEÑA PREVIA REQUERIDA (${appt.deposit_percentage}%)</span>
+        <div style="font-size: 1.1rem; font-weight: bold; color: #fff; margin: 2px 0;">Monto Seña: $${appt.deposit_amount.toLocaleString('es-AR')}</div>
+        <a href="${appt.payment_link}" target="_blank" class="block w-full py-2.5 mt-1.5 bg-neonVolt text-obsidian font-mono font-bold rounded-xl text-center shadow-volt text-xs">
           ⚡ PAGAR SEÑA AHORA (MERCADO PAGO / STRIPE) →
         </a>
       </div>
@@ -1301,30 +1301,42 @@ function showSuccessModal(appt) {
   const pinCode = appt.checkin_pin || appt.checkin_token || String(appt.id).padStart(4, '0');
 
   const checkinPinHTML = `
-    <div style="background: rgba(0, 242, 254, 0.08); border: 1px dashed rgba(0, 242, 254, 0.4); border-radius: 14px; padding: 14px; margin: 14px 0; text-align: center;">
-      <span style="color: #00f2fe; font-family: monospace; font-size: 0.75rem; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase;">
+    <div style="background: rgba(0, 242, 254, 0.08); border: 1px dashed rgba(0, 242, 254, 0.4); border-radius: 12px; padding: 10px 12px; margin: 8px 0; text-align: center;">
+      <span style="color: #00f2fe; font-family: monospace; font-size: 0.72rem; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase;">
         📍 TU PIN DE LLEGADA / TOTEM DE ENTRADA
       </span>
-      <div style="font-size: 2.2rem; font-weight: 900; color: #ffffff; font-family: 'Space Grotesk', monospace; letter-spacing: 6px; margin: 6px 0; text-shadow: 0 0 20px rgba(0, 242, 254, 0.4);">
+      <div style="font-size: 1.85rem; font-weight: 900; color: #ffffff; font-family: 'Space Grotesk', monospace; letter-spacing: 5px; margin: 3px 0; text-shadow: 0 0 16px rgba(0, 242, 254, 0.4);">
         ${pinCode}
       </div>
-      <p style="font-size: 0.8rem; color: #94a3b8; margin: 0; line-height: 1.4;">
-        Al llegar a la barbería, ingresá este <strong>PIN de 4 dígitos</strong> o tu <strong>teléfono</strong> en el Totem de recepción para anunciar tu llegada y sentarte en la sala de espera.
+      <p style="font-size: 0.75rem; color: #94a3b8; margin: 0; line-height: 1.35;">
+        Al llegar a la barbería, ingresá este <strong>PIN de 4 dígitos</strong> o tu teléfono en el Totem para anunciar tu llegada.
       </p>
     </div>
   `;
 
   let extrasHTML = "";
   if (appt.extras_snapshot) {
-    extrasHTML = `<div style="font-size: 0.8rem; color: #d4ff00; font-family: monospace; margin-top: 6px; padding: 6px 10px; background: rgba(212,255,0,0.08); border-radius: 8px;">➕ Agregados: ${escapeHtml(appt.extras_snapshot)}</div>`;
+    extrasHTML = `
+      <div style="text-align: left; background: rgba(212, 255, 0, 0.07); border: 1px solid rgba(212, 255, 0, 0.25); border-radius: 10px; padding: 8px 12px; margin: 6px 0; font-size: 0.76rem; font-family: monospace; color: #d4ff00; max-height: 95px; overflow-y: auto; scrollbar-width: thin; line-height: 1.4;">
+        <span style="font-weight: 800; color: #fff;">✨ Adicionales seleccionados:</span><br>
+        ${escapeHtml(appt.extras_snapshot)}
+      </div>
+    `;
   }
 
   const priceFormatted = appt.service_price_snapshot ? `$${appt.service_price_snapshot.toLocaleString('es-AR')}` : '';
 
   msg.innerHTML = `
-    <strong>${escapeHtml(appt.client_name)}</strong>, tu cita para <strong>${escapeHtml(appt.service)}</strong> con <strong>${escapeHtml(appt.barber_name)}</strong> ha sido agendada para el <strong>${d}/${m}/${y} a las ${timeFormatted} hs</strong>.
+    <div style="line-height: 1.45; font-size: 0.82rem; margin-bottom: 6px;">
+      <strong>${escapeHtml(appt.client_name)}</strong>, tu cita para <strong>${escapeHtml(appt.service)}</strong> con <strong>${escapeHtml(appt.barber_name)}</strong> ha sido agendada para el <strong>${d}/${m}/${y} a las ${timeFormatted} hs</strong>.
+    </div>
     ${extrasHTML}
-    ${priceFormatted ? `<div style="font-size: 0.9rem; color: #fff; font-weight: bold; margin-top: 6px;">Total: <span style="color: #d4ff00; font-family: monospace;">${priceFormatted}</span></div>` : ''}
+    ${priceFormatted ? `
+      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); border-radius: 8px; padding: 6px 12px; margin: 6px 0; font-size: 0.82rem;">
+        <span style="color: #94a3b8;">Total:</span>
+        <strong style="color: #d4ff00; font-family: monospace; font-size: 1.05rem;">${priceFormatted}</strong>
+      </div>
+    ` : ''}
     ${checkinPinHTML}
     ${depositInfoHTML}
   `;
