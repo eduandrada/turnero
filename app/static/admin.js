@@ -43,7 +43,7 @@
     let loadedCount = 0;
     missingModules.forEach(m => {
       const script = document.createElement("script");
-      script.src = m.path;
+      script.src = m.path + "?v=20261001_5";
       script.async = false;
       script.onload = () => {
         loadedCount++;
