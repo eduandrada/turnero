@@ -289,6 +289,7 @@ function switchSection(secId) {
     notifications: "Notificaciones",
     identity: "Identidad & Barbería",
     appearance: "Apariencia & Tema",
+    live_settings: "📺 Pantalla TV & Agenda en Vivo",
     content: "Contenido & Textos",
     pwa: "Configuración PWA",
     security: "Seguridad",
@@ -318,8 +319,9 @@ function switchSection(secId) {
     else if (secId === "products" && typeof loadAdminProducts === "function") loadAdminProducts();
     else if (secId === "orders" && typeof loadAdminOrders === "function") loadAdminOrders();
     else if (secId === "delivery" && typeof loadAdminDelivery === "function") loadAdminDelivery();
+    else if (secId === "promotions" && typeof loadAdminVouchers === "function") loadAdminVouchers();
     else if (secId === "notifications" && typeof loadAdminNotificationLogs === "function") loadAdminNotificationLogs();
-    else if ((secId === "identity" || secId === "appearance" || secId === "content" || secId === "pwa" || secId === "whatsapp" || secId === "shop_promos") && typeof loadSettingsToForm === "function") loadSettingsToForm();
+    else if ((secId === "identity" || secId === "appearance" || secId === "content" || secId === "pwa" || secId === "whatsapp" || secId === "shop_promos" || secId === "live_settings" || secId === "security") && typeof loadSettingsToForm === "function") loadSettingsToForm();
     else if (secId === "backups" && typeof loadAdminBackups === "function") loadAdminBackups();
     else if (secId === "audit" && typeof loadAuditLogsData === "function") loadAuditLogsData();
     else if (secId === "staff" && typeof loadStaffData === "function") loadStaffData();
