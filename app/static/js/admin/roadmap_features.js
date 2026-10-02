@@ -15,29 +15,44 @@ async function loadPaymentSettings() {
     const data = await res.json();
 
     const enabled = data.payment_gateway_enabled === "1" || data.enable_deposit === "1";
-    document.getElementById("cfg_payment_gateway_enabled").checked = enabled;
-    document.getElementById("cfg_payment_provider").value = data.payment_provider || "mercadopago";
-    document.getElementById("cfg_deposit_percentage").value = data.deposit_percentage || "30";
-    document.getElementById("cfg_deposit_mp_alias").value = data.deposit_mp_alias || "";
-    if (document.getElementById("cfg_checkout_alias_transferencia")) {
-      document.getElementById("cfg_checkout_alias_transferencia").value = data.checkout_alias_transferencia || data.deposit_mp_alias || "";
-    }
-    if (document.getElementById("cfg_checkout_alias_titular")) {
-      document.getElementById("cfg_checkout_alias_titular").value = data.checkout_alias_titular || "Carmen Pereyra";
-    }
-    if (document.getElementById("cfg_checkout_next_cut_promo_code")) {
-      document.getElementById("cfg_checkout_next_cut_promo_code").value = data.checkout_next_cut_promo_code || "VUELVO15";
-    }
-    if (document.getElementById("cfg_checkout_next_cut_discount_percent")) {
-      document.getElementById("cfg_checkout_next_cut_discount_percent").value = data.checkout_next_cut_discount_percent || "15";
-    }
-    if (document.getElementById("cfg_checkout_custom_message")) {
-      document.getElementById("cfg_checkout_custom_message").value = data.checkout_custom_message || "¡Gracias por visitarnos en Pereyras Barbers! Esperamos verte pronto.";
-    }
-    document.getElementById("cfg_mp_access_token").value = data.mp_access_token || "";
-    document.getElementById("cfg_mp_public_key").value = data.mp_public_key || "";
-    document.getElementById("cfg_stripe_secret_key").value = data.stripe_secret_key || "";
-    document.getElementById("cfg_stripe_publishable_key").value = data.stripe_publishable_key || "";
+    const elGateway = document.getElementById("cfg_payment_gateway_enabled");
+    if (elGateway) elGateway.checked = enabled;
+
+    const elProvider = document.getElementById("cfg_payment_provider");
+    if (elProvider) elProvider.value = data.payment_provider || "mercadopago";
+
+    const elPct = document.getElementById("cfg_deposit_percentage");
+    if (elPct) elPct.value = data.deposit_percentage || "30";
+
+    const elAlias = document.getElementById("cfg_deposit_mp_alias");
+    if (elAlias) elAlias.value = data.deposit_mp_alias || "";
+
+    const elTransfer = document.getElementById("cfg_checkout_alias_transferencia");
+    if (elTransfer) elTransfer.value = data.checkout_alias_transferencia || data.deposit_mp_alias || "";
+
+    const elTitular = document.getElementById("cfg_checkout_alias_titular");
+    if (elTitular) elTitular.value = data.checkout_alias_titular || "Carmen Pereyra";
+
+    const elPromo = document.getElementById("cfg_checkout_next_cut_promo_code");
+    if (elPromo) elPromo.value = data.checkout_next_cut_promo_code || "VUELVO15";
+
+    const elPromoPct = document.getElementById("cfg_checkout_next_cut_discount_percent");
+    if (elPromoPct) elPromoPct.value = data.checkout_next_cut_discount_percent || "15";
+
+    const elCustomMsg = document.getElementById("cfg_checkout_custom_message");
+    if (elCustomMsg) elCustomMsg.value = data.checkout_custom_message || "¡Gracias por visitarnos en Pereyras Barbers! Esperamos verte pronto.";
+
+    const elMpToken = document.getElementById("cfg_mp_access_token");
+    if (elMpToken) elMpToken.value = data.mp_access_token || "";
+
+    const elMpPub = document.getElementById("cfg_mp_public_key");
+    if (elMpPub) elMpPub.value = data.mp_public_key || "";
+
+    const elStripeSec = document.getElementById("cfg_stripe_secret_key");
+    if (elStripeSec) elStripeSec.value = data.stripe_secret_key || "";
+
+    const elStripePub = document.getElementById("cfg_stripe_publishable_key");
+    if (elStripePub) elStripePub.value = data.stripe_publishable_key || "";
 
     togglePaymentFields();
   } catch (e) {
@@ -54,20 +69,20 @@ function togglePaymentFields() {
 }
 
 async function savePaymentSettings() {
-  const enabled = document.getElementById("cfg_payment_gateway_enabled").checked ? "1" : "0";
-  const provider = document.getElementById("cfg_payment_provider").value;
-  const depositPct = document.getElementById("cfg_deposit_percentage").value;
-  const alias = document.getElementById("cfg_deposit_mp_alias").value.trim();
-  const mpToken = document.getElementById("cfg_mp_access_token").value.trim();
-  const mpPub = document.getElementById("cfg_mp_public_key").value.trim();
-  const stripeSecret = document.getElementById("cfg_stripe_secret_key").value.trim();
-  const stripePub = document.getElementById("cfg_stripe_publishable_key").value.trim();
+  const enabled = document.getElementById("cfg_payment_gateway_enabled")?.checked ? "1" : "0";
+  const provider = document.getElementById("cfg_payment_provider")?.value || "mercadopago";
+  const depositPct = document.getElementById("cfg_deposit_percentage")?.value || "30";
+  const alias = document.getElementById("cfg_deposit_mp_alias")?.value?.trim() || "";
+  const mpToken = document.getElementById("cfg_mp_access_token")?.value?.trim() || "";
+  const mpPub = document.getElementById("cfg_mp_public_key")?.value?.trim() || "";
+  const stripeSecret = document.getElementById("cfg_stripe_secret_key")?.value?.trim() || "";
+  const stripePub = document.getElementById("cfg_stripe_publishable_key")?.value?.trim() || "";
 
-  const checkoutAlias = document.getElementById("cfg_checkout_alias_transferencia")?.value.trim() || alias;
-  const checkoutTitular = document.getElementById("cfg_checkout_alias_titular")?.value.trim() || "Carmen Pereyra";
-  const checkoutPromoCode = document.getElementById("cfg_checkout_next_cut_promo_code")?.value.trim() || "VUELVO15";
-  const checkoutPromoPct = document.getElementById("cfg_checkout_next_cut_discount_percent")?.value.trim() || "15";
-  const checkoutCustomMsg = document.getElementById("cfg_checkout_custom_message")?.value.trim() || "";
+  const checkoutAlias = document.getElementById("cfg_checkout_alias_transferencia")?.value?.trim() || alias;
+  const checkoutTitular = document.getElementById("cfg_checkout_alias_titular")?.value?.trim() || "Carmen Pereyra";
+  const checkoutPromoCode = document.getElementById("cfg_checkout_next_cut_promo_code")?.value?.trim() || "VUELVO15";
+  const checkoutPromoPct = document.getElementById("cfg_checkout_next_cut_discount_percent")?.value?.trim() || "15";
+  const checkoutCustomMsg = document.getElementById("cfg_checkout_custom_message")?.value?.trim() || "";
 
   const payload = {
     settings: {
@@ -95,7 +110,7 @@ async function savePaymentSettings() {
       body: JSON.stringify(payload)
     });
     if (res.ok) {
-      UISound.play("success");
+      if (typeof UISound !== "undefined") UISound.play("success");
       alert("✅ Configuración de Pasarela de Pagos y Señas guardada correctamente.");
     } else {
       alert("Error al guardar la configuración.");
@@ -113,8 +128,10 @@ async function loadLoyaltySettings() {
     const resSettings = await fetch("/api/admin/settings", { headers: authHeaders() });
     if (resSettings.ok) {
       const data = await resSettings.json();
-      document.getElementById("cfg_enable_barber_club").checked = data.enable_barber_club === "1";
-      document.getElementById("cfg_points_per_amount").value = data.points_per_amount || "100";
+      const elClub = document.getElementById("cfg_enable_barber_club");
+      if (elClub) elClub.checked = data.enable_barber_club === "1";
+      const elPoints = document.getElementById("cfg_points_per_amount");
+      if (elPoints) elPoints.value = data.points_per_amount || "100";
     }
 
     const resRewards = await fetch("/api/loyalty/rewards");
@@ -137,9 +154,9 @@ function renderLoyaltyRewardsTable(rewards) {
 
   tbody.innerHTML = rewards.map(r => `
     <tr>
-      <td><strong>${r.name}</strong><br><small style="color:#9ca3af;">${r.description || ''}</small></td>
+      <td><strong>${escapeHtml(r.name)}</strong><br><small style="color:#9ca3af;">${escapeHtml(r.description || '')}</small></td>
       <td><span style="color:#d4ff00; font-weight:bold; font-family:monospace;">${r.points_required} pts</span></td>
-      <td><span class="badge" style="background:rgba(255,255,255,0.08);">${r.reward_type}</span></td>
+      <td><span class="badge" style="background:rgba(255,255,255,0.08);">${escapeHtml(r.reward_type)}</span></td>
       <td>${r.is_active ? '🟢 Activo' : '🔴 Inactivo'}</td>
       <td>
         <button class="btn-admin btn-admin-danger btn-admin-sm" onclick="deleteLoyaltyReward(${r.id})">🗑️ Eliminar</button>
@@ -149,8 +166,8 @@ function renderLoyaltyRewardsTable(rewards) {
 }
 
 async function saveLoyaltySettings() {
-  const enabled = document.getElementById("cfg_enable_barber_club").checked ? "1" : "0";
-  const pointsRate = document.getElementById("cfg_points_per_amount").value;
+  const enabled = document.getElementById("cfg_enable_barber_club")?.checked ? "1" : "0";
+  const pointsRate = document.getElementById("cfg_points_per_amount")?.value || "100";
 
   try {
     const res = await fetch("/api/admin/settings", {
@@ -164,7 +181,7 @@ async function saveLoyaltySettings() {
       })
     });
     if (res.ok) {
-      UISound.play("success");
+      if (typeof UISound !== "undefined") UISound.play("success");
       alert("✅ Reglas de Barber Club guardadas correctamente.");
     }
   } catch (e) {
@@ -194,7 +211,7 @@ async function createLoyaltyRewardModal() {
     });
     if (res.ok) {
       loadLoyaltySettings();
-      UISound.play("success");
+      if (typeof UISound !== "undefined") UISound.play("success");
     }
   } catch (e) {
     alert("Error al crear premio.");
@@ -217,9 +234,12 @@ async function loadPushSettings() {
     const res = await fetch("/api/admin/settings", { headers: authHeaders() });
     if (res.ok) {
       const data = await res.json();
-      document.getElementById("cfg_pwa_push_enabled").checked = data.pwa_push_enabled === "1";
-      document.getElementById("cfg_pwa_push_hours_before").value = data.pwa_push_hours_before || "2";
-      document.getElementById("cfg_vapid_public_key").value = data.vapid_public_key || "";
+      const elPush = document.getElementById("cfg_pwa_push_enabled");
+      if (elPush) elPush.checked = data.pwa_push_enabled === "1";
+      const elHours = document.getElementById("cfg_pwa_push_hours_before");
+      if (elHours) elHours.value = data.pwa_push_hours_before || "2";
+      const elVapid = document.getElementById("cfg_vapid_public_key");
+      if (elVapid) elVapid.value = data.vapid_public_key || "";
     }
   } catch (e) {
     console.error("Error cargando notificaciones Push:", e);
@@ -227,9 +247,30 @@ async function loadPushSettings() {
 }
 
 async function savePushSettings() {
-  const enabled = document.getElementById("cfg_pwa_push_enabled").checked ? "1" : "0";
-  const hours = document.getElementById("cfg_pwa_push_hours_before").value;
-  const vapid = document.getElementById("cfg_vapid_public_key").value.trim();
+  const enabled = document.getElementById("cfg_pwa_push_enabled")?.checked ? "1" : "0";
+  const hours = document.getElementById("cfg_pwa_push_hours_before")?.value || "2";
+  const vapid = document.getElementById("cfg_vapid_public_key")?.value?.trim() || "";
+
+  try {
+    const res = await fetch("/api/admin/settings", {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        settings: {
+          pwa_push_enabled: enabled,
+          pwa_push_hours_before: hours,
+          vapid_public_key: vapid
+        }
+      })
+    });
+    if (res.ok) {
+      if (typeof UISound !== "undefined") UISound.play("success");
+      alert("✅ Configuración de Notificaciones Push PWA guardada.");
+    }
+  } catch (e) {
+    alert("Error al guardar.");
+  }
+}
 
   try {
     const res = await fetch("/api/admin/settings", {

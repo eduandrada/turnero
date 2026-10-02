@@ -1829,18 +1829,18 @@
                 <li>📷 <strong>Formato Admitido:</strong> <code>.JPG</code>, <code>.PNG</code> o <code>.WEBP</code> (Se recomienda compresión WebP de alta velocidad).</li>
                 <li>📏 <strong>Resolución Óptima:</strong> <code>1200 x 500 px</code> (Aspecto 16:9 o 21:9 panorámico para visualización móvil e integrada).</li>
                 <li>💡 <strong>Consejo de Diseño:</strong> Fondos oscuros con elementos de producto enfocados a la derecha y espacio despejado a la izquierda para contraste de texto.</li>
-                <li>🖼️ <strong>Rutas Locales o URLs:</strong> Podés usar imágenes del sistema como <code>/static/img/fondo.png</code> o subirlas desde Identidad.</li>
+                <li>🖼️ <strong>Rutas Locales o URLs:</strong> Podés usar imágenes del sistema como <code>/static/img/fondo.png</code> o subir una nueva imagen.</li>
               </ul>
             </div>
 
             <!-- MODELO / EJEMPLO EN VIVO EN EL ADMIN -->
             <div style="margin-bottom: 28px;">
-              <h4 style="color: #fff; font-size: 0.9rem; margin-bottom: 10px; font-family: 'Space Grotesk', monospace;">👁️ Modelo / Ejemplo en Vivo del Banner Promocional</h4>
-              <div style="position: relative; border-radius: 20px; overflow: hidden; border: 1px solid #23232c; background: linear-gradient(to right, rgba(19,19,24,0.95), rgba(19,19,24,0.5)), url('/static/img/fondo.png'); background-size: cover; background-position: center; padding: 24px; min-height: 160px; display: flex; flex-direction: column; justify-content: center; gap: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);">
-                <span style="background: rgba(212,255,0,0.15); border: 1px solid rgba(212,255,0,0.3); color: #d4ff00; font-family: monospace; font-size: 0.65rem; font-weight: bold; padding: 2px 10px; border-radius: 99px; text-transform: uppercase; align-self: flex-start;">🔥 MODELO DE EJEMPLO // PROMO CLUB</span>
-                <h3 style="color: #fff; font-family: 'Space Grotesk', monospace; font-weight: 800; font-size: 1.2rem; margin: 0;">COMBO CUIDADO DE AUTOR</h3>
-                <p style="color: #e2e8f0; font-size: 0.75rem; margin: 0; max-width: 360px;">Pomada Mate + Aceite Esencial con 15% OFF usando el código de descuento BARBER15.</p>
-                <button type="button" style="background: #d4ff00; color: #000; font-family: monospace; font-weight: bold; font-size: 0.7rem; padding: 6px 14px; border-radius: 99px; border: none; align-self: flex-start; margin-top: 6px; cursor: pointer;">🎟️ USAR CUPÓN BARBER15</button>
+              <h4 style="color: #fff; font-size: 0.9rem; margin-bottom: 10px; font-family: 'Space Grotesk', monospace;">👁️ Vista Previa en Vivo del Banner (Slide 1)</h4>
+              <div id="shopPromoLiveCard" style="position: relative; border-radius: 20px; overflow: hidden; border: 1px solid #23232c; background: linear-gradient(to right, rgba(19,19,24,0.95), rgba(19,19,24,0.5)), url('/static/img/fondo.png'); background-size: cover; background-position: center; padding: 24px; min-height: 160px; display: flex; flex-direction: column; justify-content: center; gap: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);">
+                <span id="shopPromoLiveBadge" style="background: rgba(212,255,0,0.15); border: 1px solid rgba(212,255,0,0.3); color: #d4ff00; font-family: monospace; font-size: 0.65rem; font-weight: bold; padding: 2px 10px; border-radius: 99px; text-transform: uppercase; align-self: flex-start;">🔥 PROMO CLUB</span>
+                <h3 id="shopPromoLiveTitle" style="color: #fff; font-family: 'Space Grotesk', monospace; font-weight: 800; font-size: 1.2rem; margin: 0;">COMBO CUIDADO DE AUTOR</h3>
+                <p id="shopPromoLiveSubtitle" style="color: #e2e8f0; font-size: 0.75rem; margin: 0; max-width: 360px;">Pomada Mate + Aceite Esencial con 15% OFF</p>
+                <button id="shopPromoLiveBtn" type="button" style="background: #d4ff00; color: #000; font-family: monospace; font-weight: bold; font-size: 0.7rem; padding: 6px 14px; border-radius: 99px; border: none; align-self: flex-start; margin-top: 6px; cursor: pointer;">🎟️ USAR CUPÓN BARBER15</button>
               </div>
             </div>
 
@@ -1854,23 +1854,29 @@
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
                   <div class="form-group">
                     <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">TÍTULO DEL BANNER *</label>
-                    <input type="text" id="promo_s1_title" class="form-control" value="COMBO CUIDADO DE AUTOR">
+                    <input type="text" id="promo_s1_title" class="form-control" value="COMBO CUIDADO DE AUTOR" oninput="updateShopPromoLivePreview()">
                   </div>
                   <div class="form-group">
                     <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">SUBTÍTULO / DESCRIPCIÓN *</label>
-                    <input type="text" id="promo_s1_subtitle" class="form-control" value="Pomada Mate + Aceite Esencial con 15% OFF">
+                    <input type="text" id="promo_s1_subtitle" class="form-control" value="Pomada Mate + Aceite Esencial con 15% OFF" oninput="updateShopPromoLivePreview()">
                   </div>
                   <div class="form-group">
                     <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">ETIQUETA / BADGE *</label>
-                    <input type="text" id="promo_s1_badge" class="form-control" value="🔥 PROMO CLUB">
+                    <input type="text" id="promo_s1_badge" class="form-control" value="🔥 PROMO CLUB" oninput="updateShopPromoLivePreview()">
                   </div>
                   <div class="form-group">
                     <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">CÓDIGO DE CUPÓN ASOCIADO</label>
-                    <input type="text" id="promo_s1_coupon" class="form-control" value="BARBER15" placeholder="BARBER15">
+                    <input type="text" id="promo_s1_coupon" class="form-control" value="BARBER15" placeholder="BARBER15" oninput="updateShopPromoLivePreview()">
                   </div>
                   <div class="form-group" style="grid-column: 1 / -1;">
                     <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">URL DE LA IMAGEN DE FONDO (1200x500 px)</label>
-                    <input type="text" id="promo_s1_image" class="form-control" value="/static/img/fondo.png">
+                    <div style="display: flex; gap: 8px;">
+                      <input type="text" id="promo_s1_image" class="form-control" value="/static/img/fondo.png" oninput="updateShopPromoLivePreview()">
+                      <label class="btn-admin btn-admin-secondary" style="margin: 0; cursor: pointer; white-space: nowrap; font-size: 0.75rem;">
+                        📤 Subir Imagen
+                        <input type="file" accept="image/*" style="display: none;" onchange="handleShopBannerUpload(this, 'promo_s1_image')">
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1897,7 +1903,13 @@
                   </div>
                   <div class="form-group" style="grid-column: 1 / -1;">
                     <label style="color: #cbd5e1; font-size: 0.7rem; font-family: monospace;">URL DE LA IMAGEN DE FONDO (1200x500 px)</label>
-                    <input type="text" id="promo_s2_image" class="form-control" value="/static/img/fondo3.png">
+                    <div style="display: flex; gap: 8px;">
+                      <input type="text" id="promo_s2_image" class="form-control" value="/static/img/fondo3.png">
+                      <label class="btn-admin btn-admin-secondary" style="margin: 0; cursor: pointer; white-space: nowrap; font-size: 0.75rem;">
+                        📤 Subir Imagen
+                        <input type="file" accept="image/*" style="display: none;" onchange="handleShopBannerUpload(this, 'promo_s2_image')">
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1908,7 +1920,7 @@
                 Los clientes pueden ingresar estos códigos en el carrito para obtener descuentos automáticos.
               </p>
 
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 24px;">
+              <div id="shopActiveVouchersGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 24px;">
                 <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid #23232c; border-radius: 12px; padding: 12px;">
                   <span style="color: #d4ff00; font-weight: bold; font-family: monospace; font-size: 0.85rem;">BARBER10</span>
                   <p style="color: #9ca3af; font-size: 0.75rem; margin: 4px 0 0 0;">10% de descuento general</p>

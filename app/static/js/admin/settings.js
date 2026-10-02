@@ -106,6 +106,8 @@ async function loadSettingsToForm() {
 
     updateAdminBrandUI(sets);
     updateLiveThemePreview();
+    updateShopPromoLivePreview();
+    loadShopPromosActiveVouchers();
   } catch (e) { console.error("Error al cargar configuración:", e); }
 }
 
@@ -710,5 +712,92 @@ async function saveShopPromoSettings() {
     }
   } catch (e) {
     alert("Error de conexión con el servidor.");
+  }
+}
+
+function updateShopPromoLivePreview() {
+  const title = document.getElementById("promo_s1_title")?.value || "COMBO CUIDADO DE AUTOR";
+  const subtitle = document.getElementById("promo_s1_subtitle")?.value || "Pomada Mate + Aceite Esencial con 15% OFF";
+  const badge = document.getElementById("promo_s1_badge")?.value || "🔥 PROMO CLUB";
+  const coupon = document.getElementById("promo_s1_coupon")?.value || "BARBER15";
+  const image = document.getElementById("promo_s1_image")?.value || "/static/img/fondo.png";
+
+  const elTitle = document.getElementById("shopPromoLiveTitle");
+  const elSubtitle = document.getElementById("shopPromoLiveSubtitle");
+  const elBadge = document.getElementById("shopPromoLiveBadge");
+  const elBtn = document.getElementById("shopPromoLiveBtn");
+  const elCard = document.getElementById("shopPromoLiveCard");
+
+  if (elTitle) elTitle.textContent = title;
+  if (elSubtitle) elSubtitle.textContent = subtitle;
+  if (elBadge) elBadge.textContent = badge;
+  if (elBtn) elBtn.textContent = coupon ? `🎟️ USAR CUPÓN ${coupon}` : "🛍️ VER PRODUCTOS";
+  if (elCard && image) {
+    elCard.style.backgroundImage = `linear-gradient(to right, rgba(19,19,24,0.95), rgba(19,19,24,0.5)), url('${image}')`;
+  }
+}
+
+async function handleShopBannerUpload(input, targetInputId) {
+  if (!input || !input.files || input.files.length === 0) return;
+  const file = input.files[0];
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const res = await fetch("/api/admin/upload", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${adminToken}` },
+      body: formData
+    });
+    if (!res.ok) {
+      const errData = await res.json();
+      alert(errData.detail || "Error al subir la imagen.");
+      return;
+    }
+    const data = await res.json();
+    const targetInput = document.getElementById(targetInputId);
+    if (targetInput) {
+      targetInput.value = data.file_url;
+      updateShopPromoLivePreview();
+    }
+    showToast("Imagen de banner subida correctamente", "success");
+  } catch (e) {
+    console.error("Error al subir archivo de banner:", e);
+    alert("Ocurrió un error al subir la imagen.");
+  }
+}
+
+async function loadShopPromosActiveVouchers() {
+  const container = document.getElementById("shopActiveVouchersGrid");
+  if (!container) return;
+
+  try {
+    const res = await fetch("/api/admin/vouchers", { headers: authHeaders() });
+    if (!res.ok) return;
+    const list = await res.json();
+    const active = list.filter(v => v.is_active);
+
+    if (!active || active.length === 0) {
+      container.innerHTML = `
+        <div style="grid-column: 1 / -1; color: #9ca3af; font-size: 0.8rem; font-family: monospace; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+          Sin cupones activos en el sistema. Podés crear nuevos en la sección 🎟️ Promociones.
+        </div>
+      `;
+      return;
+    }
+
+    const colors = ["#d4ff00", "#00f2fe", "#f59e0b", "#10b981", "#c084fc"];
+    container.innerHTML = active.map((v, i) => {
+      const color = colors[i % colors.length];
+      let desc = v.description || (v.discount_type === "PERCENTAGE" ? `${v.discount_value}% de descuento` : `$${v.discount_value} de descuento`);
+      return `
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid #23232c; border-radius: 12px; padding: 12px;">
+          <span style="color: ${color}; font-weight: bold; font-family: monospace; font-size: 0.85rem;">${escapeHtml(v.code)}</span>
+          <p style="color: #9ca3af; font-size: 0.75rem; margin: 4px 0 0 0;">${escapeHtml(desc)}</p>
+        </div>
+      `;
+    }).join("");
+  } catch (e) {
+    console.error("Error al cargar cupones activos para shop promos:", e);
   }
 }

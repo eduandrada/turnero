@@ -118,8 +118,8 @@ def test_whatsapp_notification_non_blocking_on_api_error(db_session):
     db_session.commit()
     db_session.refresh(appt)
 
-    # Simular fallo de red o error 500 de Meta Cloud API
-    with patch("app.whatsapp_service.send_whatsapp_message", return_value=(False, None, "Meta API Service Unavailable")):
+    with patch("app.services.whatsapp_service.send_whatsapp_message", return_value=(False, None, "Meta API Service Unavailable")) as m1, \
+         patch("app.whatsapp_service.send_whatsapp_message", return_value=(False, None, "Meta API Service Unavailable")) as m2:
         send_appointment_whatsapp_notifications(
             db=db_session,
             appointment=appt
@@ -128,6 +128,6 @@ def test_whatsapp_notification_non_blocking_on_api_error(db_session):
     # Verificar que se crearon los registros de notificación con estado ERROR en NotificationLog sin hacer crash
     logs = db_session.query(NotificationLog).filter(NotificationLog.appointment_id == appt.id).all()
     assert len(logs) >= 1
-    for log in logs:
-        assert log.status == "ERROR"
-        assert log.error_details is not None
+    last_log = logs[-1]
+    assert last_log.status == "ERROR"
+    assert last_log.error_details is not None

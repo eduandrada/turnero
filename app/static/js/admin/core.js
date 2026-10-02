@@ -306,27 +306,31 @@ function switchSection(secId) {
   const titleEl = document.getElementById("currentSectionTitle");
   if (titleEl) titleEl.textContent = titles[secId] || "Panel";
 
-  if (secId === "dashboard" && typeof loadAdminDashboard === "function") loadAdminDashboard();
-  else if (secId === "appointments" && typeof loadAdminAppointments === "function") loadAdminAppointments();
-  else if (secId === "clients" && typeof loadAdminClients === "function") loadAdminClients();
-  else if (secId === "barbers" && typeof loadAdminBarbers === "function") loadAdminBarbers();
-  else if (secId === "services" && typeof loadAdminServices === "function") loadAdminServices();
-  else if (secId === "styles" && typeof loadAdminStyles === "function") loadAdminStyles();
-  else if (secId === "schedules" && typeof loadAdminSchedules === "function") loadAdminSchedules();
-  else if (secId === "stats" && typeof loadAttendedClientsStats === "function") loadAttendedClientsStats();
-  else if (secId === "products" && typeof loadAdminProducts === "function") loadAdminProducts();
-  else if (secId === "orders" && typeof loadAdminOrders === "function") loadAdminOrders();
-  else if (secId === "delivery" && typeof loadAdminDelivery === "function") loadAdminDelivery();
-  else if (secId === "notifications" && typeof loadAdminNotificationLogs === "function") loadAdminNotificationLogs();
-  else if ((secId === "identity" || secId === "appearance" || secId === "content" || secId === "pwa" || secId === "whatsapp" || secId === "shop_promos") && typeof loadSettingsToForm === "function") loadSettingsToForm();
-  else if (secId === "backups" && typeof loadAdminBackups === "function") loadAdminBackups();
-  else if (secId === "audit" && typeof loadAuditLogsData === "function") loadAuditLogsData();
-  else if (secId === "staff" && typeof loadStaffData === "function") loadStaffData();
-  else if (secId === "shift_closures" && typeof loadShiftClosuresData === "function") loadShiftClosuresData();
-  else if (secId === "payments_config" && typeof loadPaymentSettings === "function") loadPaymentSettings();
-  else if (secId === "barber_club" && typeof loadLoyaltySettings === "function") loadLoyaltySettings();
-  else if (secId === "push_pwa" && typeof loadPushSettings === "function") loadPushSettings();
-  else if (secId === "barber_productivity" && typeof loadBarberProductivity === "function") loadBarberProductivity();
+  try {
+    if (secId === "dashboard" && typeof loadAdminDashboard === "function") loadAdminDashboard();
+    else if (secId === "appointments" && typeof loadAdminAppointments === "function") loadAdminAppointments();
+    else if (secId === "clients" && typeof loadAdminClients === "function") loadAdminClients();
+    else if (secId === "barbers" && typeof loadAdminBarbers === "function") loadAdminBarbers();
+    else if (secId === "services" && typeof loadAdminServices === "function") loadAdminServices();
+    else if (secId === "styles" && typeof loadAdminStyles === "function") loadAdminStyles();
+    else if (secId === "schedules" && typeof loadAdminSchedules === "function") loadAdminSchedules();
+    else if (secId === "stats" && typeof loadAttendedClientsStats === "function") loadAttendedClientsStats();
+    else if (secId === "products" && typeof loadAdminProducts === "function") loadAdminProducts();
+    else if (secId === "orders" && typeof loadAdminOrders === "function") loadAdminOrders();
+    else if (secId === "delivery" && typeof loadAdminDelivery === "function") loadAdminDelivery();
+    else if (secId === "notifications" && typeof loadAdminNotificationLogs === "function") loadAdminNotificationLogs();
+    else if ((secId === "identity" || secId === "appearance" || secId === "content" || secId === "pwa" || secId === "whatsapp" || secId === "shop_promos") && typeof loadSettingsToForm === "function") loadSettingsToForm();
+    else if (secId === "backups" && typeof loadAdminBackups === "function") loadAdminBackups();
+    else if (secId === "audit" && typeof loadAuditLogsData === "function") loadAuditLogsData();
+    else if (secId === "staff" && typeof loadStaffData === "function") loadStaffData();
+    else if (secId === "shift_closures" && typeof loadShiftClosuresData === "function") loadShiftClosuresData();
+    else if (secId === "payments_config" && typeof loadPaymentSettings === "function") loadPaymentSettings();
+    else if (secId === "barber_club" && typeof loadLoyaltySettings === "function") loadLoyaltySettings();
+    else if (secId === "push_pwa" && typeof loadPushSettings === "function") loadPushSettings();
+    else if (secId === "barber_productivity" && typeof loadBarberProductivity === "function") loadBarberProductivity();
+  } catch (err) {
+    console.error(`Error cargando sección ${secId}:`, err);
+  }
 }
 
 function getLocalDateStr(offsetDays = 0) {

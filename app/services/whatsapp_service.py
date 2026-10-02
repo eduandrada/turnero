@@ -218,13 +218,11 @@ def send_appointment_whatsapp_notifications(db: Session, appointment: Appointmen
     notify_client = get_setting(db, "wa_notify_client", "true") == "true"
     notify_barber = get_setting(db, "wa_notify_barber", "true") == "true"
     shop_name = get_setting(db, "barber_name", "Turnero")
-    sender_fn = getattr(sys.modules.get("app.whatsapp_service"), "send_whatsapp_message", send_whatsapp_message)
-
     # 1. Notificación al Cliente
     if notify_client and appointment.client_phone:
         try:
             client_msg, buttons = build_client_appointment_message(db, appointment)
-            success, msg_id, response_details = sender_fn(
+            success, msg_id, response_details = send_whatsapp_message(
                 to_phone=appointment.client_phone,
                 text=client_msg,
                 interactive_buttons=buttons,
@@ -254,7 +252,7 @@ def send_appointment_whatsapp_notifications(db: Session, appointment: Appointmen
             barber = db.query(Barber).filter(Barber.id == appointment.barber_id).first()
             if barber and barber.phone:
                 barber_msg = build_barber_appointment_message(db, appointment)
-                success, msg_id, response_details = sender_fn(
+                success, msg_id, response_details = send_whatsapp_message(
                     to_phone=barber.phone,
                     text=barber_msg
                 )
