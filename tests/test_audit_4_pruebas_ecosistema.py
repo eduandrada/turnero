@@ -118,14 +118,14 @@ def test_prueba_3_checkin_con_telefono_inteligente(client, admin_token):
     """
     headers = {"Authorization": f"Bearer {admin_token}"}
     now_dt = get_argentina_now()
-    appt_time = (now_dt + timedelta(minutes=55)).replace(microsecond=0)
+    appt_time = (now_dt + timedelta(minutes=5)).replace(microsecond=0)
     phone = "5493834888803"
 
-    # 1. Crear Turno con Barbero 1 (después del turno 1)
+    # 1. Crear Turno con Barbero 3
     create_res = client.post("/api/appointments", json={
         "client_name": "Lucas Benítez",
         "client_phone": phone,
-        "barber_id": 1,
+        "barber_id": 3,
         "service": "Corte Clásico",
         "appointment_time": appt_time.isoformat()
     })
@@ -158,13 +158,13 @@ def test_prueba_4_flujo_sillon_y_finalizacion_sincronizada(client, admin_token):
     """
     headers = {"Authorization": f"Bearer {admin_token}"}
     now_dt = get_argentina_now()
-    appt_time = (now_dt + timedelta(minutes=55)).replace(microsecond=0)
+    appt_time = (now_dt + timedelta(minutes=5)).replace(microsecond=0)
 
-    # 1. Crear Turno con Barbero 2 (después del turno 2)
+    # 1. Crear Turno con Barbero 4
     create_res = client.post("/api/appointments", json={
         "client_name": "Federico Silva",
         "client_phone": "5493834888804",
-        "barber_id": 2,
+        "barber_id": 4,
         "service": "Corte Clásico",
         "appointment_time": appt_time.isoformat()
     })

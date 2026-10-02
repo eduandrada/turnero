@@ -122,7 +122,23 @@ def setup_test_database():
             is_active=True,
             display_order=2
         )
-        db.add_all([b1, b2])
+        b3 = Barber(
+            name="Tercer Barbero",
+            phone="+5491199990003",
+            specialties="Stylist",
+            working_days="Lunes,Martes,Miércoles,Jueves,Viernes,Sábado",
+            is_active=True,
+            display_order=3
+        )
+        b4 = Barber(
+            name="Cuarto Barbero",
+            phone="+5491199990004",
+            specialties="Stylist",
+            working_days="Lunes,Martes,Miércoles,Jueves,Viernes,Sábado",
+            is_active=True,
+            display_order=4
+        )
+        db.add_all([b1, b2, b3, b4])
         db.commit()
 
         # 4. Servicios
